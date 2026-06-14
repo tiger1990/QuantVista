@@ -1,0 +1,50 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-06-14T23:30:00Z",
+    "last_updated": "2026-06-14T23:30:00Z",
+    "completed": "2026-06-14T23:30:00Z"
+  },
+  "mode": "initial_scan",
+  "scan_level": "exhaustive",
+  "project_root": "/Users/deepakpanwar/Documents/AI_Projects/FinanceStockManager",
+  "project_knowledge": "/Users/deepakpanwar/Documents/AI_Projects/FinanceStockManager/docs",
+  "repository_type": "monolith",
+  "project_types": [
+    { "part_id": "backend", "project_type_id": "backend", "display_name": "Backend / data layer (Python)" }
+  ],
+  "completed_steps": [
+    { "step": "step_1", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Classified as monolith, 1 documented part (backend/data, Python 3.12); frontend planned but absent" },
+    { "step": "step_2", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Existing docs: plans/ (00-09 + futures), plans/sprints/, db/README.md; project-context.md in _bmad-output" },
+    { "step": "step_3", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Tech stack: FastAPI/Celery/Postgres backend (designed); only Alembic db layer is code" },
+    { "step": "step_4", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Data models scanned from migrations 0001-0012: 33 tables, RLS + PIT + partitions documented. API/UI scans skipped (no code)" },
+    { "step": "step_5", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Annotated source tree written" },
+    { "step": "step_6", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Dev/deployment info extracted (db runnable now; app/IaC planned)" },
+    { "step": "step_8", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "architecture.md written" },
+    { "step": "step_9", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Supporting docs written: project-overview, data-models, source-tree, development-guide" },
+    { "step": "step_10", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "index.md generated with To-be-generated markers for api-contracts, component-inventory, deployment-guide" },
+    { "step": "step_11", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Validation complete; 3 docs intentionally deferred until code exists" },
+    { "step": "step_12", "status": "completed", "timestamp": "2026-06-14T23:30:00Z", "summary": "Workflow complete" }
+  ],
+  "current_step": "completed",
+  "findings": {
+    "project_classification": "monolith, 1 part, Python backend/data layer",
+    "technology_stack": "Python 3.12, FastAPI (planned), Celery, PostgreSQL, Alembic; Next.js frontend planned",
+    "data_models": "33 tables across migrations 0001-0012; 2 domains (global vs tenant-scoped RLS); bitemporal PIT fundamentals; monthly range partitions"
+  },
+  "outputs_generated": [
+    "project-scan-report.json",
+    "index.md",
+    "project-overview.md",
+    "architecture.md",
+    "data-models.md",
+    "source-tree-analysis.md",
+    "development-guide.md"
+  ],
+  "incomplete_docs": [
+    { "title": "API Contracts", "doc_type": "api-contracts", "reason": "no API code yet; design in plans/04" },
+    { "title": "Component Inventory", "doc_type": "component-inventory", "reason": "no frontend code yet" },
+    { "title": "Deployment Guide", "doc_type": "deployment-guide", "reason": "no IaC/CI committed; design in plans/08" }
+  ],
+  "resume_instructions": "Workflow complete. Re-run after backend/frontend code lands to generate the 3 deferred docs."
+}

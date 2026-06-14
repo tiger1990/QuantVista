@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node / frontend
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# BMAD personal/local overrides (team config stays tracked)
+_bmad/custom/*.user.toml
+_bmad/config.user.toml
+
+# Claude Code / ECC tooling install — regenerable skill copies, local config
+.claude/
