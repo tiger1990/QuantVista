@@ -1,0 +1,1 @@
+"""core bounded context."""

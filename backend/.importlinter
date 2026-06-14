@@ -1,0 +1,51 @@
+# import-linter — enforces the bounded-context dependency DAG from plans/02-architecture.md §4.
+# Run: `lint-imports` (from backend/, with the package importable, e.g. `pip install -e .[dev]`).
+# A forbidden import fails this check (and, via QV-003, fails CI).
+
+[importlinter]
+root_package = quantvista
+
+# ---------------------------------------------------------------------------
+# 1. Layered DAG. Higher layers may import lower ones; never the reverse.
+#    `api` / `jobs` are composition roots (import anything; imported by nothing).
+#    `core` / `schemas` are the foundation (imported by all; import no domain context).
+#    Siblings inside one layer (market_data | news) are independent — see contract 2.
+# ---------------------------------------------------------------------------
+[importlinter:contract:module-dag]
+name = Bounded-context dependency DAG
+type = layers
+layers =
+    quantvista.api | quantvista.jobs
+    quantvista.alerts
+    quantvista.portfolio
+    quantvista.analytics
+    quantvista.market_data | quantvista.news
+    quantvista.identity
+    quantvista.core
+
+# ---------------------------------------------------------------------------
+# 2. Sibling independence: market_data and news must not import each other.
+# ---------------------------------------------------------------------------
+[importlinter:contract:independent-siblings]
+name = Market Data and News are independent
+type = independence
+modules =
+    quantvista.market_data
+    quantvista.news
+
+# ---------------------------------------------------------------------------
+# 3. Foundation purity: core and schemas may not import any domain context.
+# ---------------------------------------------------------------------------
+[importlinter:contract:foundation-purity]
+name = core and schemas import no domain context
+type = forbidden
+source_modules =
+    quantvista.core
+    quantvista.schemas
+forbidden_modules =
+    quantvista.identity
+    quantvista.market_data
+    quantvista.news
+    quantvista.analytics
+    quantvista.portfolio
+    quantvista.alerts
