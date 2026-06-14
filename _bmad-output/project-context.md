@@ -13,11 +13,14 @@ optimized_for_llm: true
 
 _This file contains critical rules and patterns that AI agents must follow when implementing code in this project. Focus on unobvious details that agents might otherwise miss._
 
-> **State of the repo (2026-06-14):** Only the **database layer exists as code** — Alembic
-> revisions `0001`→`0012` in `db/` plus `db/seeds/seed_reference.sql`. There is **no backend
-> app, no frontend, and no git repo yet**. The rich design lives in `plans/` (00–09 + futures)
-> and the sprint backlog in `plans/sprints/`. Treat `plans/` as the source of truth until code
-> catches up.
+> **State of the repo (updated 2026-06-15, QV-001):** The **module skeleton now exists**. Backend
+> is the `quantvista` namespace package at `backend/src/quantvista/` (bounded contexts + `api, jobs,
+> schemas, db`), with the Alembic DB layer relocated from repo-root `db/` to
+> `backend/src/quantvista/db/` (revisions `0001`→`0012` unchanged). `import-linter` enforces the
+> module DAG; Ruff/mypy/pytest are green. Frontend is a Next.js app at `frontend/`. Business logic is
+> still **not** implemented — contexts hold `interfaces.py` (Protocol/ABC) + empty placeholders. The
+> rich design lives in `plans/` (00–09 + futures) and the sprint backlog in `plans/sprints/`; treat
+> `plans/` as the source of truth for behavior until code catches up.
 
 ---
 
@@ -25,7 +28,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 | Layer | Choice | Notes |
 |-------|--------|-------|
-| Backend language | **Python 3.12** | `pyproject.toml` not created yet |
+| Backend language | **Python 3.13** | `backend/pyproject.toml` (`requires-python >=3.13`); venv at `backend/.venv` |
 | Backend framework | **FastAPI** | REST under `/api/v1`; same image runs `api` / `worker` / `beat` by command |
 | Async/jobs | **Celery + Celery Beat**, **Redis** (cache · queue · Redis Streams event bus) | worker autoscale by queue depth (KEDA) in prod |
 | Database | **PostgreSQL** (RLS, monthly range partitions, bitemporal PIT) | migrations are hand-written DDL |
@@ -57,7 +60,7 @@ These are the unobvious, load-bearing rules. Violating one is a real bug, not a 
 - **Every tenant-scoped feature needs a cross-tenant-access-denial test** — this is a required CI gate, not optional.
 
 ### 3. Module boundaries are hard seams (modular monolith)
-- Bounded contexts: `identity`, `market_data`, `news`, `analytics`, `portfolio`, `alerts`, `platform/core`, plus `api`, `jobs`, `schemas`, `db`.
+- Bounded contexts: `identity`, `market_data`, `news`, `analytics`, `portfolio`, `alerts`, `core` (Platform/Core; named `core` to avoid shadowing stdlib `platform`), plus `api`, `jobs`, `schemas`, `db` — all under `backend/src/quantvista/`.
 - Modules talk **only** through published interfaces (Python `Protocol`/ABC, e.g. `IAuthService`, `IMarketDataProvider`, `IEntitlementService`) or domain events on the Redis Streams bus.
 - **No cross-module table access. No shared mutable state.** `import-linter` enforces the dependency DAG in CI — a forbidden import fails the build.
 
@@ -88,7 +91,7 @@ These are the unobvious, load-bearing rules. Violating one is a real bug, not a 
 
 ## Implementation Rules by Category
 
-### Language-Specific Rules (Python 3.12)
+### Language-Specific Rules (Python 3.13)
 - Modern typing only: `X | None`, `list[...]`, `dict[...]` — not `Optional`/`List`. Start files with `from __future__ import annotations` (matches `db/migrations`).
 - `UUID` PKs via `gen_random_uuid()` (pgcrypto). Financial values are `Decimal`/`NUMERIC`, **never `float`**.
 - mypy must pass; type all public interfaces. Module domain interfaces are `Protocol`/ABC (`IAuthService`, `IMarketDataProvider`, …).

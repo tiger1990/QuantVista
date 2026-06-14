@@ -5,14 +5,14 @@
 
 ## Prerequisites
 
-- Python 3.12, PostgreSQL (with `pgcrypto`, `btree_gin` available), Alembic.
+- Python 3.13, PostgreSQL (with `pgcrypto`, `btree_gin` available), Alembic.
 - Planned (not yet required): Redis, MinIO/S3, Docker + docker-compose, Node.js (frontend).
 
 ## Database — runnable now
 
 ```bash
 export DATABASE_URL=postgresql+psycopg://quantvista:***@localhost:5432/quantvista
-cd db
+cd backend/src/quantvista/db    # relocated from repo-root db/ in QV-001
 alembic upgrade head            # apply all migrations 0001→0012
 alembic current                 # show current revision
 alembic downgrade -1            # roll back one
@@ -28,13 +28,17 @@ psql "$DATABASE_URL" -f seeds/seed_reference.sql   # idempotent reference seed
 - Partition maintenance: schedule monthly `create_month_partition()` for `daily_prices`,
   `technical_indicators`, `factor_values`, `scores` (or use pg_partman).
 
-## Backend app — planned (Sprint 00, QV-001/002)
+## Backend app — scaffolded (QV-001)
 
-- Package layout mirrors bounded contexts: `identity, market_data, news, analytics, portfolio, alerts,
-  platform/core` + `api, jobs, schemas, db`. `import-linter` enforces the module DAG (forbidden import
-  fails CI). The `db/` folder moves to `backend/src/db` with no migration-history change.
+- Importable package `quantvista` under `backend/src/quantvista/`, organised by bounded context:
+  `identity, market_data, news, analytics, portfolio, alerts, core` + `api, jobs, schemas, db`. Layer
+  concerns (`models/services/repositories`) live inside each context, not as shared top-level folders.
+- `import-linter` (`backend/.importlinter`, `root_package = quantvista`) enforces the module DAG —
+  a forbidden cross-context import fails `lint-imports` (and CI via QV-003).
+- The `db/` folder was relocated to `backend/src/quantvista/db` with no migration-history change.
+- Tooling: Ruff (lint+format), mypy (strict), pytest, import-linter — all green on the skeleton.
 - One image runs `api` / `worker` / `beat` by command.
-- `docker-compose up` (planned) brings up postgres, redis, minio, api, worker, beat, web.
+- `docker-compose up` (QV-002) brings up postgres, redis, minio, api, worker, beat, web.
 
 ## Tooling & quality
 

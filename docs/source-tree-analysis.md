@@ -51,8 +51,10 @@ FinanceStockManager/
 - **Migrations:** `cd db && DATABASE_URL=... alembic upgrade head` (see development-guide.md).
 - **Application entry points (api/worker/beat):** *not yet implemented.*
 
-## Where the next code lands (per plans/02)
+## Where code lands (QV-001 — scaffolded)
 
-A backend package mirroring the bounded contexts: `identity/`, `market_data/`, `news/`, `analytics/`,
-`portfolio/`, `alerts/`, `platform/core/` + `api/`, `jobs/`, `schemas/`, `db/`. Frontend: Next.js
-feature-folder app. Both are Sprint 00 scope (QV-001).
+Backend: the `quantvista` namespace package at `backend/src/quantvista/` mirroring the bounded
+contexts — `core/`, `identity/`, `market_data/`, `news/`, `analytics/`, `portfolio/`, `alerts/` +
+`api/`, `jobs/`, `schemas/`, `db/` (the last relocated from repo-root `db/`). `import-linter`
+enforces the module DAG. Frontend: Next.js feature-folder app at `frontend/`. Both delivered in
+QV-001; the runnable local stack (docker-compose) is QV-002.
