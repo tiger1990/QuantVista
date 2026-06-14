@@ -1,0 +1,177 @@
+# generated: 2026-06-15
+# last_updated: 2026-06-15
+# project: FinanceStockManager
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+#
+# NOTE: Story keys preserve canonical QV-### IDs. Full story detail (statement, acceptance
+# criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
+
+generated: 2026-06-15
+last_updated: 2026-06-15
+project: FinanceStockManager
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ---- Epic 1: Platform, CI/CD, IaC & Observability (EPIC-PLAT) ----
+  epic-1: backlog
+  1-1-qv-001-monorepo-module-skeleton-with-dependency-linting: backlog
+  1-2-qv-002-local-dev-environment-docker-compose: backlog
+  1-3-qv-003-base-ci-pipeline: backlog
+  1-4-qv-008-iac-bootstrap-aws-staging: backlog
+  1-5-qv-009-observability-baseline: backlog
+  1-6-qv-020-job-observability-dashboard: backlog
+  1-7-qv-079-security-hardening-pass-owasp-asvs-l2: backlog
+  1-8-qv-082-observability-slos-alerting-finalized: backlog
+  1-9-qv-083-backup-pitr-restore-drill: backlog
+  1-10-qv-084-production-cd-pipeline-staging-gates: backlog
+  1-11-qv-085-load-soak-test: backlog
+  epic-1-retrospective: optional
+
+  # ---- Epic 2: Identity, Tenancy, Entitlements & Billing (EPIC-IDN) ----
+  epic-2: backlog
+  2-1-qv-004-postgresql-alembic-rls-scaffolding: backlog
+  2-2-qv-005-reference-seed-data-markets-plans-entitlements-nifty-200-constituents: backlog
+  2-3-qv-006-authn-register-login-jwt-refresh-rotation: backlog
+  2-4-qv-007-tenant-context-middleware-entitlement-service-stub: backlog
+  2-5-qv-074-stripe-integration-checkout: backlog
+  2-6-qv-075-stripe-webhooks-entitlement-sync: backlog
+  2-7-qv-076-entitlement-enforcement-pass-all-gated-features: backlog
+  2-8-qv-077-public-api-quant-tier-read-only-docs: backlog
+  2-9-qv-078-frontend-pricing-upgrade-flows-billing-portal: backlog
+  epic-2-retrospective: optional
+
+  # ---- Epic 3: Market-Data Ingestion & Correctness (EPIC-DATA) ----
+  epic-3: backlog
+  3-1-qv-012-imarketdataprovider-interface-dev-adapter: backlog
+  3-2-qv-013-schema-stocks-markets-index-constituents-corporate-actions: backlog
+  3-3-qv-014-schema-daily-prices-monthly-range-partitions: backlog
+  3-4-qv-015-job-framework-idempotency-jobs-runs-celery-beat-wiring: backlog
+  3-5-qv-016-ingest-daily-prices-idempotent-full-universe: backlog
+  3-6-qv-017-ingest-corporate-actions-adjusted-close-computation: backlog
+  3-7-qv-018-data-quality-gates-post-ingestion: backlog
+  3-8-qv-019-sync-stock-master-sync-index-constituents: backlog
+  3-9-qv-021-schema-fundamentals-bitemporal: backlog
+  3-10-qv-022-ingest-fundamentals-versioned-upsert: backlog
+  3-11-qv-023-schema-ingest-shareholding-pit-ownership: backlog
+  3-12-qv-024-in-process-event-bus-ieventbus: backlog
+  3-13-qv-025-schema-technical-indicators-partitioned-compute-indicators: backlog
+  3-14-qv-026-sync-macro-series-rates-inflation-gdp: backlog
+  3-15-qv-027-correction-handling-pipeline-test: backlog
+  3-16-qv-072-m-data-licensed-india-vendor-adapter: backlog
+  3-17-qv-073-production-data-cutover-lineage-verification: backlog
+  epic-3-retrospective: optional
+
+  # ---- Epic 4: Factors, Scoring & Intelligence (EPIC-INTEL) ----
+  epic-4: backlog
+  4-1-qv-028-factor-framework-concrete-factors: backlog
+  4-2-qv-029-normalizer-scoreengine-scores-factor-values-schema: backlog
+  4-3-qv-030-compute-factors-compute-scores-jobs: backlog
+  4-4-qv-031-caching-invalidation-on-scorescomputed: backlog
+  4-5-qv-032-api-stocks-stocks-symbol: backlog
+  4-6-qv-033-api-scores-symbol-decomposition-rankings: backlog
+  4-7-qv-034-frontend-app-shell-auth-flows-design-system-base: backlog
+  4-8-qv-035-frontend-dashboard-stocks-list: backlog
+  4-9-qv-036-frontend-stock-detail-with-score-decomposition: backlog
+  4-10-qv-037-leakage-pit-regression-test-for-scoring: backlog
+  4-11-qv-038-screener-query-engine-api: backlog
+  4-12-qv-039-saved-screens-entitlement-limited: backlog
+  4-13-qv-040-frontend-screener-comparison-view: backlog
+  4-14-qv-046-sentiment-factor-wired-into-scoring: backlog
+  epic-4-retrospective: optional
+
+  # ---- Epic 5: News & Sentiment (EPIC-NEWS) ----
+  epic-5: backlog
+  5-1-qv-041-inewsprovider-ingest-news-hourly: backlog
+  5-2-qv-042-news-tagging-to-stocks: backlog
+  5-3-qv-043-api-frontend-per-stock-news-feed: backlog
+  5-4-qv-044-finbert-sentiment-service-model-runtime: backlog
+  5-5-qv-045-event-impact-scorer: backlog
+  epic-5-retrospective: optional
+
+  # ---- Epic 6: Alerts & Notifications (EPIC-ALERT) ----
+  epic-6: backlog
+  6-1-qv-047-alerts-schema-rule-engine: backlog
+  6-2-qv-048-evaluate-alerts-deduplication: backlog
+  6-3-qv-049-notification-delivery-in-app-email: backlog
+  6-4-qv-050-frontend-alerts-management-notifications: backlog
+  epic-6-retrospective: optional
+
+  # ---- Epic 7: Portfolio & Risk (EPIC-PORT) ----
+  epic-7: backlog
+  7-1-qv-051-schema-portfolios-portfolio-positions-rls: backlog
+  7-2-qv-052-portfolio-crud-api: backlog
+  7-3-qv-053-constraints-engine: backlog
+  7-4-qv-054-mean-variance-optimizer-shrinkage-covariance: backlog
+  7-5-qv-055-optimize-api: backlog
+  7-6-qv-056-frontend-portfolio-builder-optimization-ui: backlog
+  7-7-qv-057-risk-parity-optimizer: backlog
+  7-8-qv-058-riskengine-metrics: backlog
+  7-9-qv-059-rebalancing-drift-alerts: backlog
+  7-10-qv-060-frontend-risk-dashboard-rebalancing-ui: backlog
+  7-11-qv-061-portfolio-multi-tenancy-isolation-tests: backlog
+  epic-7-retrospective: optional
+
+  # ---- Epic 8: Backtesting (EPIC-BT) ----
+  epic-8: backlog
+  8-1-qv-062-backtest-spec-schema-async: backlog
+  8-2-qv-063-pit-data-access-for-backtests: backlog
+  8-3-qv-064-survivorship-free-historical-universe: backlog
+  8-4-qv-065-backtest-engine-core-rebalance-loop-frictions: backlog
+  8-5-qv-066-bias-regression-test-suite-ci-non-skippable: backlog
+  8-6-qv-067-parquet-offload-duckdb-polars-read-path: backlog
+  8-7-qv-068-performance-risk-metrics-suite: backlog
+  8-8-qv-069-reproducibility-guarantee: backlog
+  8-9-qv-071-frontend-backtest-setup-results: backlog
+  epic-8-retrospective: optional
+
+  # ---- Epic 9: ML Augmentation (EPIC-ML) ----
+  epic-9: backlog
+  9-1-qv-087-feature-store-from-pit-factor-values: backlog
+  9-2-qv-088-walk-forward-purged-cv-training-pipeline: backlog
+  9-3-qv-089-champion-challenger-evaluation-gate: backlog
+  9-4-qv-090-batch-ml-scoring-serving: backlog
+  9-5-qv-091-drift-monitoring: backlog
+  epic-9-retrospective: optional
+
+  # ---- Epic 10: Compliance & Data Licensing (EPIC-COMP) ----
+  epic-10: backlog
+  10-1-qv-010-spike-m-data-india-data-vendor-evaluation: backlog
+  10-2-qv-011-compliance-content-draft-methodology-non-advice-disclaimer: backlog
+  10-3-qv-070-methodology-disclaimer-page: backlog
+  10-4-qv-080-dpdp-data-subject-flows-consent-access-erasure: backlog
+  10-5-qv-081-audit-logging-complete: backlog
+  10-6-qv-086-launch-compliance-content-finalized: backlog
+  epic-10-retrospective: optional
