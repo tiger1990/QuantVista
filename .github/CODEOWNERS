@@ -1,0 +1,15 @@
+# CODEOWNERS — owners GitHub auto-requests for review and enforces on `master`
+# via the QuantVista-MainRules ruleset (require_code_owner_review).
+# For any changed file, the LAST matching pattern wins.
+#
+# Note: GitHub does not count a PR author's own approval toward code-owner
+# review. With a single owner, add a second collaborator (or a review bot) so
+# PRs can satisfy this requirement.
+
+# Default owner for everything not matched below.
+*               @tiger1990
+
+# Bounded-context surfaces (same owner today; reassign as the team grows).
+/backend/       @tiger1990
+/frontend/      @tiger1990
+/.github/       @tiger1990
