@@ -1,0 +1,153 @@
+name: CI
+
+# Runs on every PR targeting master and on direct pushes to master.
+# Path filtering is done per-job (via detect-changes) rather than at the workflow
+# level, so the required `ci-success` check is never left "Expected — waiting".
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  backend-quality:
+    name: Backend lint, types & imports
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend (with dev tooling)
+        run: python -m pip install -e ".[dev]"
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format check
+        run: ruff format --check .
+      - name: Mypy (strict)
+        run: mypy
+      - name: Import-linter (bounded-context DAG)
+        run: lint-imports
+
+  backend-tests:
+    name: Backend tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend (with dev tooling)
+        run: python -m pip install -e ".[dev]"
+      - name: Pytest
+        run: pytest
+
+  frontend-quality:
+    name: Frontend lint & typecheck
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+  frontend-build:
+    name: Frontend build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Next.js build
+        run: npm run build
+
+  # Aggregator gate — the single required status check on master.
+  # Always runs; fails if any needed job failed or was cancelled. Skipped jobs
+  # (path-filtered out) are allowed, so a backend-only or frontend-only PR still passes.
+  ci-success:
+    name: CI success
+    if: always()
+    needs:
+      - detect-changes
+      - backend-quality
+      - backend-tests
+      - frontend-quality
+      - frontend-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no job failed
+        run: |
+          results='${{ join(needs.*.result, ',') }}'
+          echo "Needed job results: $results"
+          case "$results" in
+            *failure*|*cancelled*)
+              echo "::error::One or more required CI jobs failed or were cancelled."
+              exit 1
+              ;;
+          esac
+          echo "All required CI jobs passed (or were skipped via path filter)."
