@@ -47,9 +47,9 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   # ---- Epic 1: Platform, CI/CD, IaC & Observability (EPIC-PLAT) ----
   epic-1: in-progress
-  1-1-qv-001-monorepo-module-skeleton-with-dependency-linting: review
-  1-2-qv-002-local-dev-environment-docker-compose: backlog
-  1-3-qv-003-base-ci-pipeline: backlog
+  1-1-qv-001-monorepo-module-skeleton-with-dependency-linting: done
+  1-2-qv-002-local-dev-environment-docker-compose: ready-for-dev
+  1-3-qv-003-base-ci-pipeline: done
   1-4-qv-008-iac-bootstrap-aws-staging: backlog
   1-5-qv-009-observability-baseline: backlog
   1-6-qv-020-job-observability-dashboard: backlog
