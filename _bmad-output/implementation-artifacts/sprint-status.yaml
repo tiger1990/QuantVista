@@ -61,8 +61,8 @@ development_status:
   epic-1-retrospective: optional
 
   # ---- Epic 2: Identity, Tenancy, Entitlements & Billing (EPIC-IDN) ----
-  epic-2: backlog
-  2-1-qv-004-postgresql-alembic-rls-scaffolding: backlog
+  epic-2: in-progress
+  2-1-qv-004-postgresql-alembic-rls-scaffolding: ready-for-dev  # uses local Postgres 18.4 (not Docker-gated); migrations apply + RLS verified locally
   2-2-qv-005-reference-seed-data-markets-plans-entitlements-nifty-200-constituents: backlog
   2-3-qv-006-authn-register-login-jwt-refresh-rotation: backlog
   2-4-qv-007-tenant-context-middleware-entitlement-service-stub: backlog
