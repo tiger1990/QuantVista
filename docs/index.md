@@ -24,6 +24,7 @@
 - [Data Models](./data-models.md)
 - [Source Tree Analysis](./source-tree-analysis.md)
 - [Development Guide](./development-guide.md)
+- [Pending Verifications](./pending-verifications.md) — verification debt merged on accepted risk (review each sprint; PV-001 = QV-002 live stack, gate before QV-004)
 - [API Contracts](./api-contracts.md) _(To be generated)_ — no API code exists yet; design in `plans/04-api-contracts.md`
 - [Component Inventory](./component-inventory.md) _(To be generated)_ — no frontend code exists yet
 - [Deployment Guide](./deployment-guide.md) _(To be generated)_ — no IaC/CI committed yet; design in `plans/08`

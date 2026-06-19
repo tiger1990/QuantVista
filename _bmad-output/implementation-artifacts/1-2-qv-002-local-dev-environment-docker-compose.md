@@ -4,7 +4,12 @@ baseline_commit: f3dde2a41fa1bcd5925fefb129b2d141fe160f7e
 
 # Story 1.2: QV-002 — Local dev environment (docker-compose)
 
-Status: in-progress
+Status: done
+
+<!-- Merged on accepted risk: the live `docker compose up` smoke test (AC #1–3) is deferred to a
+Docker-capable machine and tracked as PV-001 in docs/pending-verifications.md. Hard gate: must be
+green before QV-004. -->
+
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -47,9 +52,9 @@ so that **I can run, seed, and exercise the whole system locally without hand-wi
   - [x] Author root `docker-compose.yml` with services `postgres` (16-alpine, env user/db, `pg_data`, healthcheck `pg_isready`), `redis` (7-alpine, `redis_data`, healthcheck `redis-cli ping`), `minio` (console + api ports, `minio_data`, healthcheck), `api`, `worker`, `beat` (build `backend/`, env from `.env`), `web` (build `frontend/`).
   - [x] Add a one-shot **`migrate`** service (backend image) that runs `alembic upgrade head` then loads the seed (see Dev Notes → "Seeding"); `api`/`worker`/`beat` use `depends_on: { migrate: { condition: service_completed_successfully } }` and `postgres`/`redis` `condition: service_healthy`.
   - [x] Define network `quantvista-net` and volumes `pg_data`, `redis_data`, `minio_data`. Map ports: api `8000`, web `3000`, postgres `5432`, redis `6379`, minio `9000`/`9001`.
-- [ ] **Task 7 — Docs + verification** (AC: #7, #8) — _docs done; live verification BLOCKED (no Docker engine on this machine, see plans)_
+- [ ] **Task 7 — Docs + verification** (AC: #7, #8) — _docs done; live verification deferred & tracked as PV-001 (merged on accepted risk)_
   - [x] Update `README.md` (root) and `backend/README.md` with the compose workflow, service table, ports, health URLs, seed/migrate behavior, and `docker-compose down -v`.
-  - [ ] ⏸️ **BLOCKED — verify end-to-end:** `docker compose up` → all services healthy; `curl localhost:8000/api/v1/health` → 200 envelope; `curl localhost:3000` → 200; `worker`/`beat` logs ready; seed loaded. Requires a Docker engine (this Mac is macOS 12 Monterey; no compatible Docker Desktop / engine installed). **Gate this before QV-004.** See `plans/sprints/sprint-00-foundations.md` → QV-002 deferred-verification note.
+  - [ ] ⏸️ **DEFERRED (tracked as PV-001) — verify end-to-end:** `docker compose up` → all services healthy; `curl localhost:8000/api/v1/health` → 200 envelope; `curl localhost:3000` → 200; `worker`/`beat` logs ready; seed loaded. This Mac (macOS 12 Monterey) cannot run a Docker engine, so QV-002 was merged on accepted risk with this run deferred to a Docker-capable machine. **Hard gate: before QV-004.** Tracked in `docs/pending-verifications.md` (PV-001).
   - [x] Re-run the QV-001 quality gates locally and confirm green (no regressions).
 
 ## Dev Notes
