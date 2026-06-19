@@ -47,6 +47,22 @@ lint-imports                            # bounded-context dependency DAG (backen
 
 A **forbidden cross-context import fails `lint-imports`** (and, via QV-003, fails CI).
 
+## Run in Docker (the local stack)
+
+The backend ships **one image, three roles** (`api`/`worker`/`beat`) selected by `command`:
+
+```bash
+docker build -t quantvista-backend:local .                                  # build once
+docker run --rm quantvista-backend:local                                    # api (default CMD)
+docker run --rm quantvista-backend:local celery -A quantvista.jobs.celery_app worker -l info
+docker run --rm quantvista-backend:local celery -A quantvista.jobs.celery_app beat -l info
+```
+
+Normally you don't run these by hand — `docker compose up` (repo root) wires `postgres`, `redis`,
+`minio`, `migrate`+`seed` (one-shots), `api`, `worker`, `beat`, and `web` together. See the root
+`README.md`. Config is env-driven (`quantvista.core.config`); the app connects to Postgres as the
+non-superuser `quantvista_app` role so RLS is enforced.
+
 ## Database / migrations
 
 Migrations are hand-written, forward-only, expand/contract Alembic DDL (revisions `0001`→`0012`).

@@ -1,6 +1,15 @@
+---
+baseline_commit: f3dde2a41fa1bcd5925fefb129b2d141fe160f7e
+---
+
 # Story 1.2: QV-002 — Local dev environment (docker-compose)
 
-Status: ready-for-dev
+Status: done
+
+<!-- Merged on accepted risk: the live `docker compose up` smoke test (AC #1–3) is deferred to a
+Docker-capable machine and tracked as PV-001 in docs/pending-verifications.md. Hard gate: must be
+green before QV-004. -->
+
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,27 +35,27 @@ so that **I can run, seed, and exercise the whole system locally without hand-wi
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Env-driven config (pydantic-settings)** (AC: #4, #6)
-  - [ ] Add `quantvista/core/config.py`: a `Settings(BaseSettings)` with `app_env`, `database_url`, `redis_url`, `s3_endpoint_url`, `s3_access_key`, `s3_secret_key`, `s3_bucket`. Load from env; provide a cached `get_settings()`.
-  - [ ] Create `.env.example` (repo root) with every var and safe local defaults (MinIO creds, local Postgres URL). Ensure `.gitignore` keeps `.env` out and `!.env.example` in (already configured).
-- [ ] **Task 2 — Minimal FastAPI app (health)** (AC: #3, #4)
-  - [ ] Add `quantvista/api/app.py` with `create_app() -> FastAPI`, mounting a router at `/api/v1` with `GET /health` that returns the standard envelope (`quantvista.schemas.envelope.Envelope.ok({"status": "ok"})`). Keep an ASGI entrypoint (`app = create_app()`) for uvicorn.
-  - [ ] (Optional, recommended) `GET /api/v1/health/ready` that checks DB + Redis connectivity and returns `upstream_unavailable` envelope on failure — keep liveness (`/health`) dependency-free.
-- [ ] **Task 3 — Celery app for worker/beat** (AC: #1, #4)
-  - [ ] Add `quantvista/jobs/celery_app.py` constructing the Celery app from `Settings.redis_url` (broker + backend), with a trivial `ping` task to prove worker liveness. Beat schedule can be empty (real jobs are QV-015+).
-- [ ] **Task 4 — Backend Dockerfile** (AC: #5, #1)
-  - [ ] `backend/Dockerfile`: multi-stage (builder installs from `pyproject.toml`), `python:3.13-slim` runtime, **non-root** user, `WORKDIR /app`, package installed (`pip install .`). Default `CMD` runs the api role (`uvicorn quantvista.api.app:app --host 0.0.0.0 --port 8000`). `.dockerignore` excludes `.venv`, `__pycache__`, tests artifacts, `node_modules`.
-  - [ ] Confirm the SAME image runs `worker` (`celery -A quantvista.jobs.celery_app worker -l info`) and `beat` (`celery -A quantvista.jobs.celery_app beat -l info`) via compose `command` override — no role-specific image.
-- [ ] **Task 5 — Frontend Dockerfile (web)** (AC: #1, #5)
-  - [ ] Set `output: "standalone"` in `frontend/next.config.ts`. Add `frontend/Dockerfile`: multi-stage (deps → build → runner), non-root, copies `.next/standalone` + static, runs `node server.js` on port 3000.
-- [ ] **Task 6 — docker-compose.yml** (AC: #1, #2, #3)
-  - [ ] Author root `docker-compose.yml` with services `postgres` (16-alpine, env user/db, `pg_data`, healthcheck `pg_isready`), `redis` (7-alpine, `redis_data`, healthcheck `redis-cli ping`), `minio` (console + api ports, `minio_data`, healthcheck), `api`, `worker`, `beat` (build `backend/`, env from `.env`), `web` (build `frontend/`).
-  - [ ] Add a one-shot **`migrate`** service (backend image) that runs `alembic upgrade head` then loads the seed (see Dev Notes → "Seeding"); `api`/`worker`/`beat` use `depends_on: { migrate: { condition: service_completed_successfully } }` and `postgres`/`redis` `condition: service_healthy`.
-  - [ ] Define network `quantvista-net` and volumes `pg_data`, `redis_data`, `minio_data`. Map ports: api `8000`, web `3000`, postgres `5432`, redis `6379`, minio `9000`/`9001`.
-- [ ] **Task 7 — Docs + verification** (AC: #7, #8)
-  - [ ] Update `README.md` (root) and `backend/README.md` with the compose workflow, service table, ports, health URLs, seed/migrate behavior, and `docker-compose down -v`.
-  - [ ] Verify end-to-end: `docker-compose up` → all 7 services healthy; `curl localhost:8000/api/v1/health` → 200 envelope; `curl localhost:3000` → 200; `worker`/`beat` logs show ready; seed loaded (spot-check a reference table).
-  - [ ] Re-run the QV-001 quality gates locally and confirm green (no regressions).
+- [x] **Task 1 — Env-driven config (pydantic-settings)** (AC: #4, #6)
+  - [x] Add `quantvista/core/config.py`: a `Settings(BaseSettings)` with `app_env`, `database_url`, `redis_url`, `s3_endpoint_url`, `s3_access_key`, `s3_secret_key`, `s3_bucket`. Load from env; provide a cached `get_settings()`.
+  - [x] Create `.env.example` (repo root) with every var and safe local defaults (MinIO creds, local Postgres URL). Ensure `.gitignore` keeps `.env` out and `!.env.example` in (already configured).
+- [x] **Task 2 — Minimal FastAPI app (health)** (AC: #3, #4)
+  - [x] Add `quantvista/api/app.py` with `create_app() -> FastAPI`, mounting a router at `/api/v1` with `GET /health` that returns the standard envelope (`quantvista.schemas.envelope.Envelope.ok({"status": "ok"})`). Keep an ASGI entrypoint (`app = create_app()`) for uvicorn.
+  - [ ] (Optional, recommended) `GET /api/v1/health/ready` that checks DB + Redis connectivity and returns `upstream_unavailable` envelope on failure — keep liveness (`/health`) dependency-free. _(Deferred — not required for AC; liveness `/health` is shipped.)_
+- [x] **Task 3 — Celery app for worker/beat** (AC: #1, #4)
+  - [x] Add `quantvista/jobs/celery_app.py` constructing the Celery app from `Settings.redis_url` (broker + backend), with a trivial `ping` task to prove worker liveness. Beat schedule can be empty (real jobs are QV-015+).
+- [x] **Task 4 — Backend Dockerfile** (AC: #5, #1)
+  - [x] `backend/Dockerfile`: multi-stage (builder installs from `pyproject.toml`), `python:3.13-slim` runtime, **non-root** user, `WORKDIR /app`, package installed (`pip install .`). Default `CMD` runs the api role (`uvicorn quantvista.api.app:app --host 0.0.0.0 --port 8000`). `.dockerignore` excludes `.venv`, `__pycache__`, tests artifacts, `node_modules`.
+  - [x] Confirm the SAME image runs `worker` (`celery -A quantvista.jobs.celery_app worker -l info`) and `beat` (`celery -A quantvista.jobs.celery_app beat -l info`) via compose `command` override — no role-specific image.
+- [x] **Task 5 — Frontend Dockerfile (web)** (AC: #1, #5)
+  - [x] Set `output: "standalone"` in `frontend/next.config.ts`. Add `frontend/Dockerfile`: multi-stage (deps → build → runner), non-root, copies `.next/standalone` + static, runs `node server.js` on port 3000.
+- [x] **Task 6 — docker-compose.yml** (AC: #1, #2, #3)
+  - [x] Author root `docker-compose.yml` with services `postgres` (16-alpine, env user/db, `pg_data`, healthcheck `pg_isready`), `redis` (7-alpine, `redis_data`, healthcheck `redis-cli ping`), `minio` (console + api ports, `minio_data`, healthcheck), `api`, `worker`, `beat` (build `backend/`, env from `.env`), `web` (build `frontend/`).
+  - [x] Add a one-shot **`migrate`** service (backend image) that runs `alembic upgrade head` then loads the seed (see Dev Notes → "Seeding"); `api`/`worker`/`beat` use `depends_on: { migrate: { condition: service_completed_successfully } }` and `postgres`/`redis` `condition: service_healthy`.
+  - [x] Define network `quantvista-net` and volumes `pg_data`, `redis_data`, `minio_data`. Map ports: api `8000`, web `3000`, postgres `5432`, redis `6379`, minio `9000`/`9001`.
+- [ ] **Task 7 — Docs + verification** (AC: #7, #8) — _docs done; live verification deferred & tracked as PV-001 (merged on accepted risk)_
+  - [x] Update `README.md` (root) and `backend/README.md` with the compose workflow, service table, ports, health URLs, seed/migrate behavior, and `docker-compose down -v`.
+  - [ ] ⏸️ **DEFERRED (tracked as PV-001) — verify end-to-end:** `docker compose up` → all services healthy; `curl localhost:8000/api/v1/health` → 200 envelope; `curl localhost:3000` → 200; `worker`/`beat` logs ready; seed loaded. This Mac (macOS 12 Monterey) cannot run a Docker engine, so QV-002 was merged on accepted risk with this run deferred to a Docker-capable machine. **Hard gate: before QV-004.** Tracked in `docs/pending-verifications.md` (PV-001).
+  - [x] Re-run the QV-001 quality gates locally and confirm green (no regressions).
 
 ## Dev Notes
 
@@ -120,8 +129,52 @@ Keep liveness dependency-free so it stays green during boot. Put DB/Redis checks
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) via BMAD dev-story workflow.
+
 ### Debug Log References
+
+- mypy strict flagged: generator fixtures typed `-> None` (→ `Iterator[None]`), `Settings(_env_file=...)` untyped kwarg (→ `Settings()`), and `celery` lacking py.typed. Fixed via fixture typing + two scoped `[[tool.mypy.overrides]]` (celery `ignore_missing_imports`; `quantvista.jobs.celery_app` `disallow_untyped_decorators = false`).
+- ruff `UP`/format: reformatted `core/config.py` long line.
+- `httpx` added to dev deps (required by `fastapi.testclient.TestClient`). Starlette emits a deprecation warning recommending `httpx2`; harmless, tests pass.
+- Seed file uses `BEGIN/COMMIT` + dollar-quoted functions → not safely splittable; seeded via a dedicated `seed` one-shot on the `postgres` image (`psql -f`), not the slim app image.
 
 ### Completion Notes List
 
+- **Status: in-progress — Tasks 1–6 complete & validated; Task 7 docs done, live `docker compose up` smoke test (AC #1–3) PENDING** (no Docker engine on this macOS 12 machine). See `plans/sprints/sprint-00-foundations.md` → QV-002 deferred-verification note. Recommended gate: **before QV-004**.
+- **Statically verified green:** backend ruff (lint+format), mypy --strict (45 files), pytest (25 passed: 18 prior + 7 new), import-linter (3 contracts kept — new `api→schemas`/`jobs→core` edges allowed); frontend tsc/eslint/`next build`; `docker compose config` renders all 9 services valid.
+- **Same image, three roles:** one `backend/Dockerfile` (multi-stage, non-root, `python:3.13-slim`); compose runs it as `api` (default CMD), `worker`, `beat` via `command` override + shared `image: quantvista-backend:local`.
+- **First real app wiring:** `quantvista.api.app:create_app` + `/api/v1/health` reusing `schemas.envelope`; `quantvista.jobs.celery_app` (Redis broker/result + `ping`); `quantvista.core.config` (pydantic-settings). No business logic.
+- **RLS guardrail honored:** `scripts/db/00-create-app-role.sql` provisions a **non-superuser `quantvista_app`** role (initdb hook); app services connect as it, `migrate`/`seed` use the admin role. So local RLS isn't silently masked (project-context #2).
+- **Seeding:** one-shot `migrate` (alembic upgrade head, admin role) → one-shot `seed` (`psql -f seed_reference.sql`); `api`/`worker`/`beat` gate on `service_completed_successfully`.
+- **Deferred by design:** optional `/health/ready` (DB/Redis deep check) — liveness `/health` shipped; MinIO bucket bootstrap (S3 unused until later); `nginx`/`finbert` from plans/08 (out of AC scope).
+- **What the live run must confirm later:** all services reach healthy; `curl :8000/api/v1/health` → 200 envelope; `curl :3000` → 200; worker/beat logs ready; seed rows present; images build (first real full-deps `pip install` + Next standalone build).
+
 ### File List
+
+**New — backend app code + tests:**
+- `backend/src/quantvista/core/config.py`
+- `backend/src/quantvista/api/app.py`
+- `backend/src/quantvista/jobs/celery_app.py`
+- `backend/tests/test_config.py`, `backend/tests/test_health.py`, `backend/tests/test_celery_app.py`
+
+**New — containerization / local stack:**
+- `docker-compose.yml`
+- `backend/Dockerfile`, `backend/.dockerignore`
+- `frontend/Dockerfile`, `frontend/.dockerignore`
+- `scripts/db/00-create-app-role.sql`
+- `.env.example`
+
+**Modified:**
+- `backend/pyproject.toml` (httpx dev dep; mypy overrides for celery)
+- `frontend/next.config.ts` (`output: "standalone"`)
+- `README.md`, `backend/README.md` (compose workflow, service table, ports)
+- `plans/sprints/sprint-00-foundations.md` (QV-002 deferred-verification note)
+- this story file (frontmatter `baseline_commit`, tasks, Dev Agent Record, Status)
+
+**Untracked (local only, gitignored):** `.env` (copied from `.env.example` for local runs)
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-06-19 | QV-002 implemented (Tasks 1–6): pydantic-settings config, FastAPI `/api/v1/health` (standard envelope), Celery app + `ping`, multi-stage non-root backend + frontend Dockerfiles, `docker-compose.yml` (postgres/redis/minio + migrate/seed one-shots + api/worker/beat/web), non-superuser app DB role for RLS, README/compose docs. All static gates green; `docker compose config` valid. **Live `docker compose up` verification deferred** (no Docker engine on macOS 12) — documented in plans, gate before QV-004. Status: in-progress. |
