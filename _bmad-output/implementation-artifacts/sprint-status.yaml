@@ -1,5 +1,5 @@
 # generated: 2026-06-15
-# last_updated: 2026-06-15
+# last_updated: 2026-06-18
 # project: FinanceStockManager
 # project_key: NOKEY
 # tracking_system: file-system
@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-06-15
+last_updated: 2026-06-18
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -48,7 +48,7 @@ development_status:
   # ---- Epic 1: Platform, CI/CD, IaC & Observability (EPIC-PLAT) ----
   epic-1: in-progress
   1-1-qv-001-monorepo-module-skeleton-with-dependency-linting: done
-  1-2-qv-002-local-dev-environment-docker-compose: ready-for-dev
+  1-2-qv-002-local-dev-environment-docker-compose: in-progress
   1-3-qv-003-base-ci-pipeline: done
   1-4-qv-008-iac-bootstrap-aws-staging: backlog
   1-5-qv-009-observability-baseline: backlog

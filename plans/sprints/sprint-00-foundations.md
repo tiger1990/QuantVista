@@ -26,6 +26,25 @@ parallel without creating cycles.
 - Seed script runs; healthcheck endpoints green; README documents setup.
 **Notes:** Same image runs api/worker/beat by command (`08` §2).
 
+> **⏸️ Deferred verification (2026-06-19).** All QV-002 artifacts are implemented and statically
+> validated — Dockerfiles (backend multi-stage non-root; frontend Next.js standalone),
+> `docker-compose.yml` (9 services incl. `migrate`/`seed` one-shots), env config, FastAPI
+> `/api/v1/health`, Celery app + `ping`; `docker compose config` renders valid; backend gates
+> (ruff/mypy/pytest/import-linter) + frontend (tsc/eslint/build) all green. **The live
+> `docker compose up` smoke test (AC #1–3) is NOT yet run** — the primary dev machine (macOS 12
+> Monterey, Intel) **cannot run a Docker engine**: Colima/Lima need QEMU, which Homebrew refuses
+> to build on Monterey (Tier-3), and Docker Desktop is unsupported on this OS too. **The live
+> verification will be run on a different machine** (one with a working Docker engine).
+>
+> **When to test (recommendation):** on a Docker-capable machine, and **no later than the start of
+> QV-004** (PostgreSQL + Alembic + RLS scaffolding) — QV-004 is the first story that genuinely
+> needs a running Postgres and depends on the non-superuser `quantvista_app` role wired here. Treat
+> "local stack verified up" as a **blocking pre-req for QV-004**, not an end-of-project task:
+> unverified infra discovered late entangles with feature code and blocks every local/CI run in
+> between. QV-002 stays **in-progress** until this smoke test passes. To verify elsewhere:
+> `git fetch && git checkout feature/qv-002-local-dev-environment`, `cp .env.example .env`,
+> `docker compose up --build`.
+
 ### QV-003 — Base CI pipeline `[PLAT]` · `5pts` · Epic: EPIC-PLAT · depends: QV-001
 **Story:** As a team, I want automated checks on every PR, so quality is enforced from day one.
 **Acceptance criteria:**
