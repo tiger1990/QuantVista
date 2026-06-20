@@ -4,7 +4,7 @@ baseline_commit: 1d430790ce2fad101a5fa1fe32942c45cf649c5c
 
 # Story 2.3: QV-006 — AuthN: register / login / JWT + refresh rotation
 
-Status: review
+Status: done
 
 ## Story
 
@@ -165,3 +165,4 @@ claude-opus-4-8 (Claude Opus 4.8) via BMAD dev-story workflow.
 | Date | Change |
 |------|--------|
 | 2026-06-20 | QV-006 implemented: email+password auth — Argon2id hashing, HS256 access JWT (~15m), opaque rotating refresh (hashed, `family_id`) with **reuse-detection family-revoke**, httpOnly/Secure cookie, `/auth/*` + `/me`. New migration `0013` (`refresh_tokens`), deps `argon2-cffi`+`pyjwt`. Verified on local PG 18.4 (39 tests incl. 3 auth-integration). Status → review. |
+| 2026-06-21 | Reconcile: PR #9 merged to `master` (`4dfcc6b`); all CI gates green. Status review → **done**. |

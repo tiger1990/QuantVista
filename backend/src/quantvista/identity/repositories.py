@@ -114,6 +114,27 @@ def entitlements_for_tenant(session: Session, tenant_id: UUID) -> dict[str, obje
     return {key: (limit if limit is not None else flag) for key, limit, flag in rows}
 
 
+def plan_entitlements(
+    session: Session, tenant_id: UUID
+) -> list[Row[tuple[str, int | None, bool | None]]]:
+    """Structured entitlements (key, limit_int, flag_bool) for a tenant's active plan.
+
+    Distinct columns (unlike the lossy ``entitlements_for_tenant`` used by ``/me``) so the
+    EntitlementService can tell an unlimited quota (``limit_int`` NULL) from a false
+    capability flag. Reads ``subscriptions`` (RLS) → run inside ``session_scope(tenant_id)``.
+    """
+    return list(
+        session.execute(
+            text(
+                "SELECT e.key, e.limit_int, e.flag_bool "
+                "FROM subscriptions s JOIN entitlements e ON e.plan_id = s.plan_id "
+                "WHERE s.tenant_id = :t"
+            ),
+            {"t": tenant_id},
+        ).all()
+    )
+
+
 # --- refresh_tokens (global; app role) ---
 
 
