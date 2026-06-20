@@ -1,6 +1,10 @@
+---
+baseline_commit: 7994af54587e93577f00dba37a47bf439d9d2009
+---
+
 # Story 2.2: QV-005 — Reference seed data (markets, plans, entitlements, Nifty-200 constituents)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -22,18 +26,18 @@ so that **plans/markets/universe exist before any feature needs them, and re-run
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Verify & confirm the existing markets/plans/entitlements seed** (AC: #1, #3)
-  - [ ] Review `backend/src/quantvista/db/seeds/seed_reference.sql` — markets (NSE), plans (free/pro/quant), entitlements (FREE/PRO/QUANT key sets). It already upserts via `ON CONFLICT … DO UPDATE`. Confirm it applies cleanly against the migrated schema and is idempotent on re-run.
-- [ ] **Task 2 — Bootstrap Nifty-200 universe seed (PIT)** (AC: #2, #4, #5)
-  - [ ] Append a **"BOOTSTRAP SUBSET"** section to `seed_reference.sql` (so the same `seed` step loads it) inserting ~10–15 liquid Nifty stocks into `stocks` (`market_id` = NSE's id via subquery; `symbol`, `company_name`, `sector`, `is_active = true`, `listed_on`). Idempotent via `ON CONFLICT (market_id, symbol) DO UPDATE` (the `stocks_market_id_symbol_key` unique constraint exists).
-  - [ ] Insert current `index_constituents` membership: `index_code = 'NIFTY200'`, `stock_id` (join `stocks` by symbol), `effective_from = DATE '2024-01-01'` (a documented bootstrap as-of date), `effective_to = NULL`, `weight = NULL`. **`index_constituents` has no unique key**, so make it idempotent with a guard: `INSERT … SELECT … WHERE NOT EXISTS (SELECT 1 FROM index_constituents ic WHERE ic.index_code='NIFTY200' AND ic.stock_id = s.id AND ic.effective_to IS NULL)`.
-  - [ ] Replace the old lines 88–89 comment with one clarifying: bootstrap current members seeded here; full ~200 names, historical PIT membership, and weights come from QV-019's `sync_index_constituents`.
-- [ ] **Task 3 — Idempotency + content test** (AC: #1, #2, #3, #4)
-  - [ ] Add `backend/tests/integration/test_seed_reference.py` (reuse the QV-004 integration harness / `admin_engine`). A fixture applies the seed twice (via `psql -f` or by executing the SQL file). Assert: NSE market present; plans `{free,pro,quant}`; entitlements rows per plan; ≥10 bootstrap stocks; NIFTY200 `index_constituents` rows with `effective_to IS NULL`; **counts identical after the second run** (idempotent).
-  - [ ] Mark `@pytest.mark.integration` (auto-skips without Postgres, per `conftest.py`).
-- [ ] **Task 4 — CI + docs** (AC: #3, #6)
-  - [ ] Extend the CI `backend-rls` job (or add a step): after `alembic upgrade head`, load the seed (`psql -f …/seed_reference.sql`) **twice**, then run `pytest -m integration` so the seed idempotency test runs against the service Postgres.
-  - [ ] Note the bootstrap-vs-QV-019 split in `backend/src/quantvista/db/README.md`. Re-run all gates green.
+- [x] **Task 1 — Verify & confirm the existing markets/plans/entitlements seed** (AC: #1, #3)
+  - [x] Review `backend/src/quantvista/db/seeds/seed_reference.sql` — markets (NSE), plans (free/pro/quant), entitlements (FREE/PRO/QUANT key sets). It already upserts via `ON CONFLICT … DO UPDATE`. Confirm it applies cleanly against the migrated schema and is idempotent on re-run.
+- [x] **Task 2 — Bootstrap Nifty-200 universe seed (PIT)** (AC: #2, #4, #5)
+  - [x] Append a **"BOOTSTRAP SUBSET"** section to `seed_reference.sql` (so the same `seed` step loads it) inserting ~10–15 liquid Nifty stocks into `stocks` (`market_id` = NSE's id via subquery; `symbol`, `company_name`, `sector`, `is_active = true`, `listed_on`). Idempotent via `ON CONFLICT (market_id, symbol) DO UPDATE` (the `stocks_market_id_symbol_key` unique constraint exists).
+  - [x] Insert current `index_constituents` membership: `index_code = 'NIFTY200'`, `stock_id` (join `stocks` by symbol), `effective_from = DATE '2024-01-01'` (a documented bootstrap as-of date), `effective_to = NULL`, `weight = NULL`. **`index_constituents` has no unique key**, so make it idempotent with a guard: `INSERT … SELECT … WHERE NOT EXISTS (SELECT 1 FROM index_constituents ic WHERE ic.index_code='NIFTY200' AND ic.stock_id = s.id AND ic.effective_to IS NULL)`.
+  - [x] Replace the old lines 88–89 comment with one clarifying: bootstrap current members seeded here; full ~200 names, historical PIT membership, and weights come from QV-019's `sync_index_constituents`.
+- [x] **Task 3 — Idempotency + content test** (AC: #1, #2, #3, #4)
+  - [x] Add `backend/tests/integration/test_seed_reference.py` (reuse the QV-004 integration harness / `admin_engine`). A fixture applies the seed twice (via `psql -f` or by executing the SQL file). Assert: NSE market present; plans `{free,pro,quant}`; entitlements rows per plan; ≥10 bootstrap stocks; NIFTY200 `index_constituents` rows with `effective_to IS NULL`; **counts identical after the second run** (idempotent).
+  - [x] Mark `@pytest.mark.integration` (auto-skips without Postgres, per `conftest.py`).
+- [x] **Task 4 — CI + docs** (AC: #3, #6)
+  - [x] Extend the CI `backend-rls` job (or add a step): after `alembic upgrade head`, load the seed (`psql -f …/seed_reference.sql`) **twice**, then run `pytest -m integration` so the seed idempotency test runs against the service Postgres.
+  - [x] Note the bootstrap-vs-QV-019 split in `backend/src/quantvista/db/README.md`. Re-run all gates green.
 
 ## Dev Notes
 
@@ -81,8 +85,54 @@ Liquid Nifty large-caps (symbol — company — sector), public/static (hand-ent
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) via BMAD dev-story workflow.
+
 ### Debug Log References
+
+- **Latent bug found & fixed:** the pre-existing markets/plans/entitlements seed had **never been run
+  against a database** and failed on PostgreSQL — `VALUES` lists with bare `NULL` (`flag_bool`, and the
+  all-NULL first rows of PRO/QUANT) left columns as `unknown`/`text`, so the insert into
+  `integer`/`boolean` columns raised "could not determine type / rewrite or cast." Fixed at the source
+  per user preference (see [[sql-type-ambiguity-at-source]]): typed the **first `VALUES` row** of each
+  plan block (`50::int`, `NULL::boolean`), which anchors the derived-table column types — minimal and
+  explicit, rather than casting in the outer SELECT.
+- mypy `no-untyped-call` on a `lambda` helper in the test → replaced with a typed inner `def q(sql) -> int`.
+- The seed test applies the seed via `psql -f` (subprocess) — same path compose/CI use — converting the
+  SQLAlchemy `admin_database_url` to a libpq URL (strip `+psycopg`).
 
 ### Completion Notes List
 
+- **All 6 ACs satisfied; all tasks complete. Status → review.** Gates green: ruff, ruff format,
+  mypy --strict, import-linter, pytest **32 passed** (30 prior + 2 new seed tests) against local PG 18.4.
+- **markets/plans/entitlements seed verified + fixed** (AC #1): now applies cleanly and idempotently
+  (run-twice counts identical: markets=1, plans=3 `{free,pro,quant}`, entitlements=37 [11/13/13 per plan]).
+- **Bootstrap Nifty universe** (AC #2,#4): ~12 liquid large-caps → `stocks` (idempotent via
+  `ON CONFLICT (market_id, symbol)`) + current `NIFTY200` membership → `index_constituents`
+  (`effective_from` set, `effective_to NULL`), idempotent via a `WHERE NOT EXISTS` guard (no unique key).
+  Updated the seed's deferral comment: full ~200 + history + weights = QV-019.
+- **Idempotency test** (AC #3): `tests/integration/test_seed_reference.py` applies the seed twice and
+  asserts counts are unchanged + content present + PIT membership dated. Reuses the QV-004 `admin_engine`
+  fixture + reachability gating; auto-skips without Postgres.
+- **Global reference** (AC #5): all seeded data has no `tenant_id`/RLS, written by the admin role.
+- **CI** (AC #4,#6): `backend-rls` job (renamed → "Backend DB (RLS + reference seed)") now loads the seed
+  and runs `pytest -m integration` (RLS denial + seed idempotency) against the Postgres service.
+- **No new migrations, no new deps**; entitlement matrix values untouched (only the first-row type casts).
+
 ### File List
+
+**Modified:**
+- `backend/src/quantvista/db/seeds/seed_reference.sql` (fix VALUES type inference at source; append bootstrap Nifty universe; update deferral comment)
+- `.github/workflows/ci.yml` (`backend-rls`: load seed + run seed idempotency test; job renamed)
+- `backend/src/quantvista/db/README.md` (reference-seed note: bootstrap vs QV-019)
+
+**New:**
+- `backend/tests/integration/test_seed_reference.py`
+
+**Process:**
+- this story file (frontmatter `baseline_commit`, tasks, Dev Agent Record, Status); `sprint-status.yaml`
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-06-20 | QV-005 implemented: fixed + verified the markets/plans/entitlements seed (latent `VALUES`/NULL type bug, fixed at source); added an idempotent PIT bootstrap Nifty universe (~12 names, current `NIFTY200` membership; full set deferred to QV-019); seed idempotency integration test; CI loads the seed and runs it in the `backend-rls` DB job. All gates green (32 tests). Status → review. |
