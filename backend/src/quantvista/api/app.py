@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from quantvista.api.routes import router as auth_router
 from quantvista.identity.models import (
     EmailAlreadyExists,
+    EntitlementExceeded,
     InvalidCredentials,
     InvalidRefreshToken,
 )
@@ -47,6 +48,10 @@ def _register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(InvalidRefreshToken)
     async def _bad_refresh(_req: Request, _exc: InvalidRefreshToken) -> JSONResponse:
         return _fail("unauthenticated", "invalid or expired session")
+
+    @app.exception_handler(EntitlementExceeded)
+    async def _entitlement(_req: Request, exc: EntitlementExceeded) -> JSONResponse:
+        return _fail("entitlement_exceeded", f"your plan does not include '{exc.feature}'")
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_req: Request, exc: RequestValidationError) -> JSONResponse:

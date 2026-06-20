@@ -134,3 +134,32 @@ Email + password auth under `/api/v1/auth` (`identity` context):
   role; `refresh_tokens`/`users` are global; `/me` reads RLS tables with a tenant-bound session.
 - **Local dev runs over http** → set `COOKIE_SECURE=false` (the refresh cookie is `Secure` by
   default); staging/prod (https) use `COOKIE_SECURE=true`. **`JWT_SECRET` must be set in prod.**
+
+## Tenant context & entitlements (QV-007)
+
+The tenant seam is **FastAPI dependencies**, not ASGI middleware — RLS binds *per transaction*
+(`session_scope`), so we resolve the tenant from the verified access token and open a tenant-bound
+session as the unit of work. Dependencies live in `quantvista.api.deps`:
+
+| Dependency | What it gives a route |
+|------------|------------------------|
+| `get_tenant_context` → `TenantContext` | active `tenant_id`/`user_id`/`role`, from JWT claims only (never request input) |
+| `TenantSessionDep` (`get_tenant_session`) | a DB session with `app.tenant_id` set → every query is RLS-filtered to the caller's tenant |
+| `require_entitlement("feature")` | 403 `entitlement_exceeded` unless the tenant's plan grants `feature` |
+
+```python
+from quantvista.api.deps import TenantSessionDep, require_entitlement
+
+@router.get("/things", dependencies=[require_entitlement("backtest")])
+def list_things(session: Session = TenantSessionDep) -> Envelope[...]:
+    rows = session.execute(text("SELECT … FROM things")).all()  # only this tenant's rows
+```
+
+`EntitlementService` (`identity.entitlements`) reads the QV-005 seed
+(`subscriptions → plans → entitlements`): `get(tenant_id)` → all limits/flags, `is_allowed`,
+`limit`, and `check` (raises). It's a **stub** — Stripe-driven sync + a Redis `ent:{tenant_id}`
+cache arrive in Sprint 10 (QV-074/075); the `IEntitlementService` interface is final now.
+
+**Cross-tenant isolation through the dependency is a CI gate**
+(`tests/integration/test_tenant_context.py`): a request for tenant A never sees tenant B's rows,
+and a Free-plan tenant is denied `api_access`/`backtest` while a Quant-plan tenant is allowed.
