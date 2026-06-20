@@ -8,10 +8,17 @@ could not be completed in the implementing environment. Each item names *what* i
 
 | ID | Item | Why deferred | How to verify | Gate (must close before) | Status |
 |----|------|--------------|---------------|--------------------------|--------|
-| PV-001 | **QV-002 local stack** — live `docker compose up` smoke test (AC #1–3: all services healthy, `GET /api/v1/health` → 200 envelope, web on :3000, seed loaded, worker/beat ready, images build) | Primary dev machine (macOS 12 Monterey, Intel) cannot run any Docker engine — Colima/Lima need QEMU (Homebrew won't build it on Monterey, Tier-3) and Docker Desktop is unsupported on macOS 12. Static checks all pass (`docker compose config` valid; backend + frontend gates green). | On a Docker-capable machine: `git checkout master` (QV-002 is merged), `cp .env.example .env`, `docker compose up --build`; confirm all services healthy, `curl localhost:8000/api/v1/health` → 200, `curl localhost:3000` → 200, `worker`/`beat` logs ready, spot-check a seeded reference row. | **Start of QV-004** (PostgreSQL + Alembic + RLS scaffolding — first story needing live Postgres + the `quantvista_app` role wired in QV-002) | ⏳ OPEN |
+| PV-001 | **QV-002 container stack** — live `docker compose up` smoke test (AC #1–3: all services healthy, `GET /api/v1/health` → 200 envelope, web on :3000, seed loaded, worker/beat ready, **images build**) | Primary dev machine (macOS 12 Monterey, Intel) cannot run any Docker engine — Colima/Lima need QEMU (Homebrew won't build it on Monterey, Tier-3) and Docker Desktop is unsupported on macOS 12. Static checks all pass (`docker compose config` valid; backend + frontend gates green). | On a Docker-capable machine: `git checkout master`, `cp .env.example .env`, `docker compose up --build`; confirm all services healthy, `curl localhost:8000/api/v1/health` → 200, `curl localhost:3000` → 200, `worker`/`beat` logs ready, spot-check a seeded reference row. | **Before the container images are relied on** — i.e. before staging/CD (QV-008 IaC / QV-084 CD). **No longer gates QV-004** (see note). | ⏳ OPEN |
 
 ## Notes
 
+- **PV-001 decoupled from QV-004 (2026-06-20):** QV-004 needs *a* Postgres, not the *container
+  stack*. The dev machine has a local **PostgreSQL 18.4** (Homebrew `postgresql@18`) on
+  `localhost:5432`; the `quantvista` DB + non-superuser `quantvista_app` role are provisioned,
+  migrations `0001`→`0012` apply, and RLS isolation was verified manually. So QV-004 proceeds against
+  the local Postgres. PV-001 now only verifies the **Docker images + compose wiring** (Dockerfiles
+  build, services network, `migrate`/`seed` one-shots, `web` serves) — which matters before those
+  images are promoted to staging.
 - **PV-001:** if the live run surfaces a bug (e.g. Celery `-A` discovery, the `migrate`/`seed`
   ordering, the Next.js standalone build, or the `quantvista_app` grants), fix it as a follow-up on
   a `fix/qv-002-*` branch — do not block QV-004 planning, but it must be green before QV-004 code

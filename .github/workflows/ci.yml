@@ -81,8 +81,61 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend (with dev tooling)
         run: python -m pip install -e ".[dev]"
-      - name: Pytest
+      - name: Pytest (unit; integration auto-skips without a DB)
         run: pytest
+
+  backend-rls:
+    name: Backend RLS (cross-tenant denial)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: quantvista
+          POSTGRES_PASSWORD: quantvista
+          POSTGRES_DB: quantvista
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U quantvista -d quantvista"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # App role = non-superuser (RLS enforced); admin role = the postgres superuser.
+      DATABASE_URL: postgresql+psycopg://quantvista_app:quantvista_app@localhost:5432/quantvista
+      ADMIN_DATABASE_URL: postgresql+psycopg://quantvista:quantvista@localhost:5432/quantvista
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend (with dev tooling)
+        run: python -m pip install -e ".[dev]"
+      - name: Create non-superuser app role
+        env:
+          PGPASSWORD: quantvista
+        run: psql -h localhost -U quantvista -d quantvista -v ON_ERROR_STOP=1 -f ../scripts/db/00-create-app-role.sql
+      - name: Apply migrations (admin role)
+        working-directory: backend/src/quantvista/db
+        env:
+          DATABASE_URL: postgresql+psycopg://quantvista:quantvista@localhost:5432/quantvista
+        run: alembic upgrade head
+      - name: Grant app role DML on migrated schema
+        env:
+          PGPASSWORD: quantvista
+        run: |
+          psql -h localhost -U quantvista -d quantvista -v ON_ERROR_STOP=1 -c "
+            GRANT USAGE ON SCHEMA public TO quantvista_app;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO quantvista_app;
+            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO quantvista_app;"
+      - name: RLS / cross-tenant denial tests (as app role)
+        run: pytest -m integration
 
   frontend-quality:
     name: Frontend lint & typecheck
@@ -136,6 +189,7 @@ jobs:
       - detect-changes
       - backend-quality
       - backend-tests
+      - backend-rls
       - frontend-quality
       - frontend-build
     runs-on: ubuntu-latest
