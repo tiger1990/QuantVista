@@ -62,8 +62,8 @@ development_status:
 
   # ---- Epic 2: Identity, Tenancy, Entitlements & Billing (EPIC-IDN) ----
   epic-2: in-progress
-  2-1-qv-004-postgresql-alembic-rls-scaffolding: review  # impl done + verified on local Postgres 18.4 (RLS denial tests green); CI backend-rls job added
-  2-2-qv-005-reference-seed-data-markets-plans-entitlements-nifty-200-constituents: backlog
+  2-1-qv-004-postgresql-alembic-rls-scaffolding: done  # merged PR #7; RLS denial tests green locally + in CI (backend-rls job)
+  2-2-qv-005-reference-seed-data-markets-plans-entitlements-nifty-200-constituents: ready-for-dev  # bootstrap-subset universe (full NIFTY-200 → QV-019)
   2-3-qv-006-authn-register-login-jwt-refresh-rotation: backlog
   2-4-qv-007-tenant-context-middleware-entitlement-service-stub: backlog
   2-5-qv-074-stripe-integration-checkout: backlog

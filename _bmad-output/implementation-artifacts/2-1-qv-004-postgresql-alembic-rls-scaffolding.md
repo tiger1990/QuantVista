@@ -4,7 +4,7 @@ baseline_commit: e88d68d4f434a876cd4904b9e5a12b02eb0a7a7b
 
 # Story 2.1: QV-004 — PostgreSQL + Alembic + RLS scaffolding
 
-Status: review
+Status: done
 
 <!-- DB AVAILABLE (2026-06-20): a local PostgreSQL 18.4 server runs on localhost:5432 (Homebrew
 postgresql@18). The `quantvista` DB + non-superuser `quantvista_app` role are provisioned, migrations
