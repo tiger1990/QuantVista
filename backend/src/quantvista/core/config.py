@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_env: str = "local"
-    database_url: str = "postgresql+psycopg://quantvista:quantvista@localhost:5432/quantvista"
+    # App connection: the NON-superuser role (RLS enforced). Tenant-table access.
+    database_url: str = (
+        "postgresql+psycopg://quantvista_app:quantvista_app@localhost:5432/quantvista"
+    )
+    # Admin/privileged connection: migrations + reference/global-table writes by jobs.
+    admin_database_url: str = "postgresql+psycopg://quantvista:quantvista@localhost:5432/quantvista"
     redis_url: str = "redis://localhost:6379/0"
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "minioadmin"

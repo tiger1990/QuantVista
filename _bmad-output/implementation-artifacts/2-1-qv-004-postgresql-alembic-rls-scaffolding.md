@@ -1,6 +1,10 @@
+---
+baseline_commit: e88d68d4f434a876cd4904b9e5a12b02eb0a7a7b
+---
+
 # Story 2.1: QV-004 — PostgreSQL + Alembic + RLS scaffolding
 
-Status: ready-for-dev
+Status: review
 
 <!-- DB AVAILABLE (2026-06-20): a local PostgreSQL 18.4 server runs on localhost:5432 (Homebrew
 postgresql@18). The `quantvista` DB + non-superuser `quantvista_app` role are provisioned, migrations
@@ -28,24 +32,24 @@ so that **tenant data is isolated by construction via PostgreSQL RLS — not by 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — App DB engine/session layer** (AC: #2, #3)
-  - [ ] Add `quantvista/core/db.py`: `make_engine(url)` (SQLAlchemy 2.0, `psycopg` driver, sane pool); a cached **app engine** (`Settings.database_url`) and **privileged engine** (admin URL — add `admin_database_url` to `core.config.Settings`).
-  - [ ] `@contextmanager session_scope(tenant_id: UUID | None = None)`: begin a transaction; if `tenant_id`, `execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})`; commit/rollback; close. Use `SET LOCAL` (transaction-scoped) — never session-wide `SET`.
-  - [ ] `privileged_session_scope()`: uses the privileged engine, sets **no** tenant — for reference/global table writes by jobs. Document that it must never write tenant tables.
-  - [ ] FastAPI dependency `get_session()` (tenant-bound) for later API stories — wire the value source in QV-007; here it can take tenant from an injected `ITenantContext` placeholder or a param.
-- [ ] **Task 2 — Config: admin/privileged URL** (AC: #2)
-  - [ ] Add `admin_database_url` to `Settings` (maps `ADMIN_DATABASE_URL`, already in `.env.example`/compose). Keep the app `database_url` as the non-superuser role.
-- [ ] **Task 3 — DB test harness** (AC: #4, #5)
-  - [ ] Add `backend/tests/conftest.py` fixtures: detect Postgres via env; `pytest.mark.integration`; an engine fixture; a fixture that ensures `alembic upgrade head` ran once against the test DB; per-test transaction + rollback for isolation.
-  - [ ] Skip integration tests cleanly when no Postgres is configured (so `pytest` with no DB still passes — preserves the existing unit job).
-- [ ] **Task 4 — Cross-tenant RLS denial test** (AC: #4)
-  - [ ] `backend/tests/integration/test_rls_isolation.py`: using an **existing** tenant-scoped RLS table (e.g. `watchlists` or `saved_screens` — do NOT add a throwaway demo table; real RLS tables already exist from `0002`/`0008`/`0009`), create tenant A + tenant B, insert under A (`session_scope(A)`), then under `session_scope(B)` assert the row is invisible and that B cannot update/delete it. Connect as the **non-superuser app role**.
-  - [ ] Add a negative check: with **no** `app.tenant_id` set, tenant-table reads return zero rows (policy denies).
-- [ ] **Task 5 — CI: Postgres service + RLS gate** (AC: #4, #6)
-  - [ ] Extend `.github/workflows/ci.yml` `backend-tests` (or add a `backend-rls` job): a `postgres:16` **service** with health check; create the non-superuser `quantvista_app` role (reuse `scripts/db/00-create-app-role.sql`); run `alembic upgrade head` as admin; run `pytest -m integration` as the **app role**. Keep the existing no-DB unit job intact. Ensure `ci-success` still aggregates correctly.
-- [ ] **Task 6 — Docs + regression** (AC: #1, #6)
-  - [ ] Confirm/extend the expand/contract + RLS notes in `backend/src/quantvista/db/README.md`; document the app-vs-privileged engine split and the "non-superuser app role" rule in `backend/README.md`.
-  - [ ] Re-run all gates (ruff/mypy/pytest unit/import-linter) green; run the integration suite against a Postgres and confirm the denial test passes.
+- [x] **Task 1 — App DB engine/session layer** (AC: #2, #3)
+  - [x] Add `quantvista/core/db.py`: `make_engine(url)` (SQLAlchemy 2.0, `psycopg` driver, sane pool); a cached **app engine** (`Settings.database_url`) and **privileged engine** (admin URL — add `admin_database_url` to `core.config.Settings`).
+  - [x] `@contextmanager session_scope(tenant_id: UUID | None = None)`: begin a transaction; if `tenant_id`, `execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})`; commit/rollback; close. Use `SET LOCAL` (transaction-scoped) — never session-wide `SET`.
+  - [x] `privileged_session_scope()`: uses the privileged engine, sets **no** tenant — for reference/global table writes by jobs. Document that it must never write tenant tables.
+  - [x] FastAPI dependency `get_session()` (tenant-bound) for later API stories — wire the value source in QV-007; here it can take tenant from an injected `ITenantContext` placeholder or a param.
+- [x] **Task 2 — Config: admin/privileged URL** (AC: #2)
+  - [x] Add `admin_database_url` to `Settings` (maps `ADMIN_DATABASE_URL`, already in `.env.example`/compose). Keep the app `database_url` as the non-superuser role.
+- [x] **Task 3 — DB test harness** (AC: #4, #5)
+  - [x] Add `backend/tests/conftest.py` fixtures: detect Postgres via env; `pytest.mark.integration`; an engine fixture; a fixture that ensures `alembic upgrade head` ran once against the test DB; per-test transaction + rollback for isolation.
+  - [x] Skip integration tests cleanly when no Postgres is configured (so `pytest` with no DB still passes — preserves the existing unit job).
+- [x] **Task 4 — Cross-tenant RLS denial test** (AC: #4)
+  - [x] `backend/tests/integration/test_rls_isolation.py`: using an **existing** tenant-scoped RLS table (e.g. `watchlists` or `saved_screens` — do NOT add a throwaway demo table; real RLS tables already exist from `0002`/`0008`/`0009`), create tenant A + tenant B, insert under A (`session_scope(A)`), then under `session_scope(B)` assert the row is invisible and that B cannot update/delete it. Connect as the **non-superuser app role**.
+  - [x] Add a negative check: with **no** `app.tenant_id` set, tenant-table reads return zero rows (policy denies).
+- [x] **Task 5 — CI: Postgres service + RLS gate** (AC: #4, #6)
+  - [x] Extend `.github/workflows/ci.yml` `backend-tests` (or add a `backend-rls` job): a `postgres:16` **service** with health check; create the non-superuser `quantvista_app` role (reuse `scripts/db/00-create-app-role.sql`); run `alembic upgrade head` as admin; run `pytest -m integration` as the **app role**. Keep the existing no-DB unit job intact. Ensure `ci-success` still aggregates correctly.
+- [x] **Task 6 — Docs + regression** (AC: #1, #6)
+  - [x] Confirm/extend the expand/contract + RLS notes in `backend/src/quantvista/db/README.md`; document the app-vs-privileged engine split and the "non-superuser app role" rule in `backend/README.md`.
+  - [x] Re-run all gates (ruff/mypy/pytest unit/import-linter) green; run the integration suite against a Postgres and confirm the denial test passes.
 
 ## Dev Notes
 
@@ -103,8 +107,68 @@ This is the **application-side** DB + isolation layer. The **schema already exis
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) via BMAD dev-story workflow.
+
 ### Debug Log References
+
+- Verified the schema applies on local **PostgreSQL 18.4** (Homebrew) before coding: provisioned
+  `quantvista` DB + non-superuser `quantvista_app` role, `alembic upgrade head` → `0012` (45 tables),
+  and manually proved RLS (app role sees only its tenant). De-risked the whole story up front.
+- mypy: `Session.execute()` is typed `Result[Any]` which lacks `.rowcount` (a `CursorResult` member)
+  → `cast("CursorResult[Any]", …)` in the UPDATE/DELETE isolation assertions.
+- ruff E501 on a long SQL line → wrapped; `database_url` default re-wrapped by `ruff format`.
+- `psycopg` `connect_args={"connect_timeout": 2}` used in the reachability probe so the no-DB unit
+  job / machines without Postgres skip integration tests fast instead of hanging.
 
 ### Completion Notes List
 
+- **All 6 ACs satisfied; all tasks/subtasks complete. Status → review.** Backend gates green: ruff,
+  ruff format, mypy --strict (50 files), import-linter (new `core.db`/`core.config` edges allowed),
+  pytest **30 passed** (26 unit + **4 RLS integration**).
+- **Not Docker-gated** — implemented and fully verified against the native local Postgres. (PV-001,
+  the container stack, stays separately open.)
+- **`quantvista/core/db.py`** (Task 1): app engine (non-superuser, RLS) + privileged engine
+  (reference/admin); `session_scope(tenant_id)` binds `app.tenant_id` per-transaction via
+  `set_config('app.tenant_id', …, true)`; `privileged_session_scope()` for global writes.
+- **Config** (Task 2): added `admin_database_url`; `database_url` default corrected to the
+  `quantvista_app` non-superuser role.
+- **Cross-tenant denial test** (Task 4, the AC #4 gate): `tests/integration/test_rls_isolation.py` —
+  tenant A sees only A, B only B, **B cannot see/update/delete A's rows**, unbound session sees
+  nothing. Runs as the non-superuser app role via `core.db.session_scope`.
+- **Test harness** (Task 3): `conftest.py` auto-skips integration tests when no Postgres is reachable
+  (keeps the DB-free unit job green); `two_tenants` fixture seeds A/B + a user + a watchlist each
+  (admin-seeded, cascade teardown); `integration` marker registered in `pyproject.toml`.
+- **CI** (Task 5): new `backend-rls` job — `postgres:16` service, creates the non-superuser role
+  (`scripts/db/00-create-app-role.sql`), `alembic upgrade head` as admin, grants, then
+  `pytest -m integration` **as the app role**; wired into `ci-success`. Existing no-DB unit job
+  unchanged.
+- **Docs** (Task 6): `backend/README.md` gains a "Database access & tenant isolation (RLS)" section;
+  `db/README.md` migration note updated (Docker *or* native Postgres).
+- **Per the user's request:** added an optional, idempotent, local-dev-only
+  `scripts/db/dev-seed-tenant.sql` (a `tenant-test` tenant + user + watchlist) and seeded it locally
+  so it's visible in pgAdmin. It is NOT reference data and is never auto-run (real tenants come from
+  registration, QV-006). The RLS tests are unaffected (they assert on their own ephemeral tenants).
+- **No new runtime deps**; `httpx` already present, `psycopg`/`sqlalchemy` already declared.
+
 ### File List
+
+**New:**
+- `backend/src/quantvista/core/db.py`
+- `backend/tests/conftest.py`
+- `backend/tests/test_db_unit.py`
+- `backend/tests/integration/__init__.py`
+- `backend/tests/integration/test_rls_isolation.py`
+- `scripts/db/dev-seed-tenant.sql`
+
+**Modified:**
+- `backend/src/quantvista/core/config.py` (`admin_database_url`; app role default)
+- `backend/pyproject.toml` (`integration` marker)
+- `.github/workflows/ci.yml` (`backend-rls` job + `ci-success` wiring)
+- `backend/README.md`, `backend/src/quantvista/db/README.md` (docs)
+- this story file (frontmatter `baseline_commit`, tasks, Dev Agent Record, Status)
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-06-20 | QV-004 implemented: app-side DB layer (`core/db.py` — app vs privileged engines, per-transaction `app.tenant_id` binding), cross-tenant RLS denial test (`session_scope`, runs as non-superuser app role), `conftest` reachability-gated integration harness, CI `backend-rls` job with a Postgres service, docs, and an optional local dev-seed tenant. Verified on native local PostgreSQL 18.4 (not Docker-gated). All gates green (30 tests). Status → review. |
