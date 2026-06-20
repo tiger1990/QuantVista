@@ -85,7 +85,7 @@ jobs:
         run: pytest
 
   backend-rls:
-    name: Backend DB (RLS + reference seed)
+    name: Backend DB (RLS, seed, auth)
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest

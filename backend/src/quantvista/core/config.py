@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "quantvista-local"
 
+    # Auth (QV-006). jwt_secret MUST be overridden in any non-local environment.
+    jwt_secret: str = "dev-insecure-secret-change-me-in-non-local-environments"
+    jwt_algorithm: str = "HS256"
+    access_token_ttl_seconds: int = 900  # ~15 min
+    refresh_token_ttl_seconds: int = 2_592_000  # 30 days
+    cookie_secure: bool = True
+    cookie_samesite: str = "lax"
+    refresh_cookie_name: str = "qv_refresh"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -115,3 +115,22 @@ Optional: seed a demo tenant to explore in psql/pgAdmin (local-dev only, never a
 ```bash
 psql "$ADMIN_DATABASE_URL" -f ../scripts/db/dev-seed-tenant.sql
 ```
+
+## Authentication (QV-006)
+
+Email + password auth under `/api/v1/auth` (`identity` context):
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /auth/register` | creates a tenant + owner user + Free subscription (Argon2id hash); returns an access token + sets the refresh cookie |
+| `POST /auth/login` | verifies credentials → access token + rotating refresh cookie |
+| `POST /auth/refresh` | rotates the refresh token (reuse of a rotated token revokes the whole family) |
+| `POST /auth/logout` | revokes the current refresh token |
+| `GET /me` | user + active tenant + entitlements (Bearer access token) |
+
+- **Access token:** short-lived JWT (HS256, `JWT_SECRET`); **refresh token:** opaque, stored only
+  as a SHA-256 hash in `refresh_tokens` with a `family_id` for rotation + reuse detection.
+- Register/login touch RLS tables before tenant context exists → they use the **privileged** DB
+  role; `refresh_tokens`/`users` are global; `/me` reads RLS tables with a tenant-bound session.
+- **Local dev runs over http** → set `COOKIE_SECURE=false` (the refresh cookie is `Secure` by
+  default); staging/prod (https) use `COOKIE_SECURE=true`. **`JWT_SECRET` must be set in prod.**
