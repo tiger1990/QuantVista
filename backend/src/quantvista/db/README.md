@@ -64,6 +64,9 @@ psql "$DATABASE_URL" -f seeds/seed_reference.sql   # load reference/seed data
   zero-downtime column/constraint changes. Never destructive in a single release.
 - **RLS tests are CI-gated** (`../../../../plans/07` §3, `../../../../plans/sprints` QV-004/061): a cross-tenant access attempt
   must return zero rows / be rejected.
+- **Auth tokens (QV-006):** `refresh_tokens` (migration `0013`) stores **hashed** refresh tokens
+  (rotation lineage via `family_id`; reuse → revoke family). Global identity table — no `tenant_id`,
+  no RLS (auth runs before tenant context; a user spans tenants). Tokens are never stored raw.
 - **Reference seed (QV-005):** `seeds/seed_reference.sql` is idempotent (re-runnable no-op) and seeds markets,
   plans, entitlements, and a **small bootstrap Nifty universe** (~12 liquid large-caps + current `NIFTY200`
   point-in-time membership). The **full ~200 names, historical PIT membership, and weights** are loaded by the

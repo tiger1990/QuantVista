@@ -1,6 +1,10 @@
+---
+baseline_commit: 1d430790ce2fad101a5fa1fe32942c45cf649c5c
+---
+
 # Story 2.3: QV-006 — AuthN: register / login / JWT + refresh rotation
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -23,31 +27,31 @@ so that **I can access the platform with credentials that are safe at rest and r
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Dependencies + config** (AC: #1,#2,#5) — _new deps, see "Approved dependencies"_
-  - [ ] Add `argon2-cffi` and `pyjwt` to `[project.dependencies]` in `backend/pyproject.toml`.
-  - [ ] Extend `quantvista/core/config.py`: `jwt_secret` (env; local dev default ok, **must be set in prod**), `jwt_algorithm = "HS256"`, `access_token_ttl_seconds = 900`, `refresh_token_ttl_seconds = 2592000` (30d), `cookie_secure = True`, `cookie_samesite = "lax"`, `refresh_cookie_name = "qv_refresh"`.
-- [ ] **Task 2 — Migration `0013`: refresh_tokens** (AC: #6)
-  - [ ] New Alembic revision `0013_auth_refresh_tokens` (down_revision `0012`): `refresh_tokens(id uuid pk default gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, family_id uuid NOT NULL, token_hash text NOT NULL, issued_at timestamptz NOT NULL default now(), expires_at timestamptz NOT NULL, revoked_at timestamptz, replaced_by uuid REFERENCES refresh_tokens(id), user_agent text, created_at timestamptz NOT NULL default now())`; UNIQUE `(token_hash)`; indexes on `user_id`, `family_id`. **No `tenant_id`, no RLS** (global identity). Hand-written, naming convention per `env.py`.
-- [ ] **Task 3 — Security helpers** (AC: #1,#2,#5)
-  - [ ] `quantvista/identity/security.py`: Argon2id `hash_password`/`verify_password` (argon2-cffi `PasswordHasher`); `create_access_token(user_id, tenant_id, role)`/`decode_access_token` (PyJWT, HS256, `exp`/`iat`/`type`); `new_refresh_token()` → `(raw, token_hash)` (opaque `secrets.token_urlsafe`, SHA-256 hash stored).
-- [ ] **Task 4 — Identity service (IAuthService impl)** (AC: #1,#2,#3,#4)
-  - [ ] Implement `IAuthService` in `quantvista/identity/services.py` + repositories in `repositories.py`:
+- [x] **Task 1 — Dependencies + config** (AC: #1,#2,#5) — _new deps, see "Approved dependencies"_
+  - [x] Add `argon2-cffi` and `pyjwt` to `[project.dependencies]` in `backend/pyproject.toml`.
+  - [x] Extend `quantvista/core/config.py`: `jwt_secret` (env; local dev default ok, **must be set in prod**), `jwt_algorithm = "HS256"`, `access_token_ttl_seconds = 900`, `refresh_token_ttl_seconds = 2592000` (30d), `cookie_secure = True`, `cookie_samesite = "lax"`, `refresh_cookie_name = "qv_refresh"`.
+- [x] **Task 2 — Migration `0013`: refresh_tokens** (AC: #6)
+  - [x] New Alembic revision `0013_auth_refresh_tokens` (down_revision `0012`): `refresh_tokens(id uuid pk default gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE, family_id uuid NOT NULL, token_hash text NOT NULL, issued_at timestamptz NOT NULL default now(), expires_at timestamptz NOT NULL, revoked_at timestamptz, replaced_by uuid REFERENCES refresh_tokens(id), user_agent text, created_at timestamptz NOT NULL default now())`; UNIQUE `(token_hash)`; indexes on `user_id`, `family_id`. **No `tenant_id`, no RLS** (global identity). Hand-written, naming convention per `env.py`.
+- [x] **Task 3 — Security helpers** (AC: #1,#2,#5)
+  - [x] `quantvista/identity/security.py`: Argon2id `hash_password`/`verify_password` (argon2-cffi `PasswordHasher`); `create_access_token(user_id, tenant_id, role)`/`decode_access_token` (PyJWT, HS256, `exp`/`iat`/`type`); `new_refresh_token()` → `(raw, token_hash)` (opaque `secrets.token_urlsafe`, SHA-256 hash stored).
+- [x] **Task 4 — Identity service (IAuthService impl)** (AC: #1,#2,#3,#4)
+  - [x] Implement `IAuthService` in `quantvista/identity/services.py` + repositories in `repositories.py`:
     - `register(email, password, name)` → **privileged transaction** (admin engine bypasses RLS): insert tenant, user (global), membership(owner), Free-plan subscription; hash password; create verification token (stub-log). Duplicate email → domain conflict.
     - `authenticate(email, password)` → verify hash; on success mint access JWT + persist a new refresh-token row (new `family_id`); return tokens.
     - `refresh(raw_refresh)` → look up by hash; if missing/revoked/expired **or already replaced → reuse**: revoke entire `family_id`, raise. Else rotate: revoke old (`revoked_at`, `replaced_by`), insert new in same family, mint new access.
     - `logout(raw_refresh)` → revoke that token (and/or family).
     - `me(user_id, tenant_id)` → user + active tenant + entitlements summary (read subscription→plan→entitlements; tenant-scoped reads via `session_scope(tenant_id)`).
-- [ ] **Task 5 — API routers + cookie** (AC: #1,#2,#3,#4)
-  - [ ] `quantvista/api/` routers under `/api/v1`: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/me`. Mount in `api/app.py`. All responses use the standard `Envelope`.
-  - [ ] Wire request/response DTOs (Pydantic) in `quantvista/schemas/` (so the generated TS client picks them up): `RegisterRequest`, `LoginRequest`, `TokenResponse{access_token,token_type}`, `MeResponse`.
-  - [ ] Web refresh handling: set/read the refresh token in the **httpOnly/Secure/SameSite** cookie; `/auth/refresh` and `/auth/logout` read it from the cookie (or body for API clients).
-  - [ ] A `get_current_user` FastAPI dependency: parse `Authorization: Bearer`, decode/verify the access JWT → `(user_id, tenant_id, role)`; invalid → `unauthenticated` (401).
-- [ ] **Task 6 — Tests** (AC: all)
-  - [ ] **Unit** (no DB): Argon2id hash≠plaintext + verify round-trip; JWT encode/decode + expiry rejected; refresh-hash helper; envelope error codes.
-  - [ ] **Integration** (`-m integration`, Postgres): register→login→`/me` happy path; duplicate-email → `conflict`; bad creds → `unauthenticated`; **refresh rotation** (old token rejected after rotation); **reuse detection** (replaying a rotated token revokes the family → subsequent refresh fails); `/me` entitlements reflect the Free plan. Tear down created tenant/user (cascade).
-  - [ ] Reuse the QV-004 harness (`conftest.py` reachability skip, `admin_engine`).
-- [ ] **Task 7 — CI + docs** (AC: #7)
-  - [ ] CI `backend-rls`/DB job already migrates + runs `-m integration`; ensure migration `0013` + auth tests run there. Update `backend/README.md` (auth flow, token model) and `db/README.md` (refresh_tokens table note).
+- [x] **Task 5 — API routers + cookie** (AC: #1,#2,#3,#4)
+  - [x] `quantvista/api/` routers under `/api/v1`: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/me`. Mount in `api/app.py`. All responses use the standard `Envelope`.
+  - [x] Wire request/response DTOs (Pydantic) in `quantvista/schemas/` (so the generated TS client picks them up): `RegisterRequest`, `LoginRequest`, `TokenResponse{access_token,token_type}`, `MeResponse`.
+  - [x] Web refresh handling: set/read the refresh token in the **httpOnly/Secure/SameSite** cookie; `/auth/refresh` and `/auth/logout` read it from the cookie (or body for API clients).
+  - [x] A `get_current_user` FastAPI dependency: parse `Authorization: Bearer`, decode/verify the access JWT → `(user_id, tenant_id, role)`; invalid → `unauthenticated` (401).
+- [x] **Task 6 — Tests** (AC: all)
+  - [x] **Unit** (no DB): Argon2id hash≠plaintext + verify round-trip; JWT encode/decode + expiry rejected; refresh-hash helper; envelope error codes.
+  - [x] **Integration** (`-m integration`, Postgres): register→login→`/me` happy path; duplicate-email → `conflict`; bad creds → `unauthenticated`; **refresh rotation** (old token rejected after rotation); **reuse detection** (replaying a rotated token revokes the family → subsequent refresh fails); `/me` entitlements reflect the Free plan. Tear down created tenant/user (cascade).
+  - [x] Reuse the QV-004 harness (`conftest.py` reachability skip, `admin_engine`).
+- [x] **Task 7 — CI + docs** (AC: #7)
+  - [x] CI `backend-rls`/DB job already migrates + runs `-m integration`; ensure migration `0013` + auth tests run there. Update `backend/README.md` (auth flow, token model) and `db/README.md` (refresh_tokens table note).
 
 ## Dev Notes
 
@@ -99,8 +103,65 @@ QV-006 = **email + password** register/login + JWT access + **rotating refresh w
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Opus 4.8) via BMAD dev-story workflow.
+
 ### Debug Log References
+
+- **Security bug caught by the reuse test:** the family-revoke on reuse was being **rolled back** —
+  `rotate()` revoked the family inside `session_scope()` then `raise`d *inside* the `with`, so the
+  context manager rolled the revoke back (family never revoked; the live token still worked).
+  Fixed by doing all writes inside the transaction and **raising only after it commits** (flags
+  `reuse`/`expired` set inside, raised after the block).
+- **Refresh cookie not sent in tests:** the cookie is `Secure` (correct default), but `TestClient`
+  defaults to `http://` → httpx won't send it. Fixed the test client to use `https://testserver`;
+  added `COOKIE_SECURE=false` to `.env.example` so the real local stack works over http.
+- ruff B008 on FastAPI `Depends()` defaults → added `flake8-bugbear extend-immutable-calls`.
+- mypy `no-any-return` on `.scalar_one()` (typed `Any`) returned as `UUID` → `cast(UUID, …)`.
+- PyJWT `InsecureKeyLengthWarning` → lengthened the dev `jwt_secret` default to ≥32 bytes.
 
 ### Completion Notes List
 
+- **All 7 ACs satisfied; all tasks complete. Status → review.** Gates green: ruff, ruff format,
+  mypy --strict, import-linter (new `api→identity→core/schemas` edges allowed), pytest **39 passed**
+  (4 new auth-unit + 3 new auth-integration) against local PG 18.4.
+- **Migration `0013`** adds `refresh_tokens` (global identity, no RLS; hashed tokens + `family_id`).
+- **Security helpers** (`identity/security.py`): Argon2id hash/verify, HS256 access JWT
+  encode/decode (+ `type` check), opaque refresh token + SHA-256 hashing.
+- **`AuthService`** (`identity/services.py` + `repositories.py`): `register` (privileged tx → tenant
+  + owner user + Free subscription, Argon2id, email-verification **stub-logged**), `authenticate`,
+  `issue_tokens`, `rotate` (rotation + **reuse → revoke family**), `logout`, `me`.
+- **API** (`api/routes.py`, `deps.py`, `app.py`): `/auth/register|login|refresh|logout` + `/me`,
+  standard envelope, httpOnly/Secure/SameSite refresh cookie, `get_current_principal` Bearer
+  dependency, and domain-error → envelope-code handlers (`conflict`/`unauthenticated`/`validation_error`).
+- **Tests:** unit (hash≠plaintext, JWT round-trip + expiry, refresh hashing) + integration
+  (register→`/me` happy path with Free-plan entitlements; duplicate→409; bad creds→401;
+  **refresh rotation**; **reuse detection revokes the family**). Cleanup drops tenant+user (cascade).
+- **`IAuthService` interface** updated to the real surface; `.env.example`/README/`db/README`/CI
+  job-name updated. CI `backend-rls` (renamed *"Backend DB (RLS, seed, auth)"*) runs migration `0013`
+  + auth integration tests against the Postgres service.
+- **Approved deps added:** `argon2-cffi`, `pyjwt`. **Deferred (per scope):** MFA, OAuth/SSO, API
+  keys (QV-077), real email delivery.
+
 ### File List
+
+**New:**
+- `backend/src/quantvista/db/migrations/versions/0013_auth_refresh_tokens.py`
+- `backend/src/quantvista/identity/security.py`
+- `backend/src/quantvista/schemas/auth.py`
+- `backend/src/quantvista/api/deps.py`, `backend/src/quantvista/api/routes.py`
+- `backend/tests/test_auth_security.py`, `backend/tests/integration/test_auth.py`
+
+**Modified:**
+- `backend/src/quantvista/identity/{interfaces,models,services,repositories}.py`
+- `backend/src/quantvista/api/app.py` (mount auth routes + error handlers)
+- `backend/src/quantvista/core/config.py` (jwt/cookie settings)
+- `backend/pyproject.toml` (argon2-cffi, pyjwt; ruff flake8-bugbear immutable-calls)
+- `.env.example` (JWT/cookie vars), `.github/workflows/ci.yml` (job rename)
+- `backend/README.md`, `backend/src/quantvista/db/README.md`
+- this story file; `sprint-status.yaml`
+
+## Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-06-20 | QV-006 implemented: email+password auth — Argon2id hashing, HS256 access JWT (~15m), opaque rotating refresh (hashed, `family_id`) with **reuse-detection family-revoke**, httpOnly/Secure cookie, `/auth/*` + `/me`. New migration `0013` (`refresh_tokens`), deps `argon2-cffi`+`pyjwt`. Verified on local PG 18.4 (39 tests incl. 3 auth-integration). Status → review. |

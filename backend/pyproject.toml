@@ -19,6 +19,8 @@ dependencies = [
     "celery>=5.4",
     "redis>=5.0",
     "psycopg[binary]>=3.2",
+    "argon2-cffi>=23.1",
+    "pyjwt>=2.8",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +46,10 @@ extend-exclude = ["src/quantvista/db/migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency-injection markers are evaluated once at import; not real B008 calls.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Header", "fastapi.Cookie"]
 
 [tool.mypy]
 python_version = "3.13"

@@ -8,6 +8,8 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from quantvista.identity.models import IssuedTokens, MeView, Principal
+
 
 @runtime_checkable
 class ITenantContext(Protocol):
@@ -19,9 +21,19 @@ class ITenantContext(Protocol):
 
 @runtime_checkable
 class IAuthService(Protocol):
-    """Authentication: register/login, JWT issuance, refresh rotation."""
+    """Authentication: register/login, JWT issuance, rotating refresh, profile."""
 
-    def verify_credentials(self, email: str, password: str) -> UUID | None: ...
+    def register(self, email: str, password: str, name: str | None) -> Principal: ...
+
+    def authenticate(self, email: str, password: str) -> Principal: ...
+
+    def issue_tokens(self, principal: Principal) -> IssuedTokens: ...
+
+    def rotate(self, raw_refresh: str) -> IssuedTokens: ...
+
+    def logout(self, raw_refresh: str) -> None: ...
+
+    def me(self, principal: Principal) -> MeView: ...
 
 
 @runtime_checkable
