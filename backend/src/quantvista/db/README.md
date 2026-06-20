@@ -27,7 +27,7 @@ db/
 │       ├── 0011_backtests.py
 │       └── 0012_platform.py
 └── seeds/
-    └── seed_reference.sql       # markets, plans, entitlements (idempotent)
+    └── seed_reference.sql       # markets, plans, entitlements + bootstrap Nifty universe (idempotent)
 ```
 
 > This folder now lives at `backend/src/quantvista/db` (relocated in QV-001 with no change to the
@@ -64,5 +64,10 @@ psql "$DATABASE_URL" -f seeds/seed_reference.sql   # load reference/seed data
   zero-downtime column/constraint changes. Never destructive in a single release.
 - **RLS tests are CI-gated** (`../../../../plans/07` §3, `../../../../plans/sprints` QV-004/061): a cross-tenant access attempt
   must return zero rows / be rejected.
+- **Reference seed (QV-005):** `seeds/seed_reference.sql` is idempotent (re-runnable no-op) and seeds markets,
+  plans, entitlements, and a **small bootstrap Nifty universe** (~12 liquid large-caps + current `NIFTY200`
+  point-in-time membership). The **full ~200 names, historical PIT membership, and weights** are loaded by the
+  data pipeline (`sync_index_constituents`, QV-019), which supersedes the bootstrap. All seed data is global
+  reference (no `tenant_id`/RLS), written by the admin/privileged role.
 - **Partition maintenance:** schedule `SELECT create_month_partition('daily_prices', date_trunc('month',
   now() + interval '1 month')::date);` (and for the other partitioned tables) ahead of each month.

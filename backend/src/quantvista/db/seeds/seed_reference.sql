@@ -26,7 +26,8 @@ ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = EXCLUDED.is_a
 WITH p AS (SELECT id FROM plans WHERE code = 'free')
 INSERT INTO entitlements (plan_id, key, limit_int, flag_bool)
 SELECT p.id, k.key, k.limit_int, k.flag_bool FROM p, (VALUES
-    ('universe_scores_top', 50,   NULL),     -- top-50 only
+    -- First row types the derived-table columns (limit_int int, flag_bool boolean).
+    ('universe_scores_top', 50::int, NULL::boolean),  -- top-50 only
     ('saved_screens',       3,    NULL),
     ('watchlists',          1,    NULL),
     ('watchlist_items',     10,   NULL),
@@ -45,7 +46,7 @@ ON CONFLICT (plan_id, key) DO UPDATE
 WITH p AS (SELECT id FROM plans WHERE code = 'pro')
 INSERT INTO entitlements (plan_id, key, limit_int, flag_bool)
 SELECT p.id, k.key, k.limit_int, k.flag_bool FROM p, (VALUES
-    ('universe_scores_top', NULL, NULL),     -- full universe
+    ('universe_scores_top', NULL::int, NULL::boolean),  -- full universe (first row types the columns)
     ('saved_screens',       25,   NULL),
     ('watchlists',          10,   NULL),
     ('watchlist_items',     NULL, NULL),
@@ -66,7 +67,7 @@ ON CONFLICT (plan_id, key) DO UPDATE
 WITH p AS (SELECT id FROM plans WHERE code = 'quant')
 INSERT INTO entitlements (plan_id, key, limit_int, flag_bool)
 SELECT p.id, k.key, k.limit_int, k.flag_bool FROM p, (VALUES
-    ('universe_scores_top', NULL, NULL),
+    ('universe_scores_top', NULL::int, NULL::boolean),  -- first row types the columns
     ('saved_screens',       NULL, NULL),
     ('watchlists',          NULL, NULL),
     ('watchlist_items',     NULL, NULL),
@@ -83,7 +84,46 @@ SELECT p.id, k.key, k.limit_int, k.flag_bool FROM p, (VALUES
 ON CONFLICT (plan_id, key) DO UPDATE
     SET limit_int = EXCLUDED.limit_int, flag_bool = EXCLUDED.flag_bool;
 
-COMMIT;
+-- ---- bootstrap Nifty universe (SUBSET, QV-005) ----
+-- A small set of liquid Nifty large-caps so the universe exists before features and
+-- early manual/dev testing has data. Global reference (no tenant_id, no RLS). The full
+-- ~200 names, historical point-in-time membership, and weights are loaded by the data
+-- pipeline (sync_index_constituents, QV-019) which supersedes this bootstrap.
+INSERT INTO stocks (market_id, symbol, company_name, sector, is_active, listed_on)
+SELECT m.id, v.symbol, v.company_name, v.sector, true, v.listed_on
+FROM markets m, (VALUES
+    ('RELIANCE',   'Reliance Industries Ltd',          'Energy',                 DATE '1977-11-29'),
+    ('TCS',        'Tata Consultancy Services Ltd',    'Information Technology',  DATE '2004-08-25'),
+    ('HDFCBANK',   'HDFC Bank Ltd',                    'Financial Services',     DATE '1995-11-08'),
+    ('INFY',       'Infosys Ltd',                      'Information Technology',  DATE '1993-06-14'),
+    ('ICICIBANK',  'ICICI Bank Ltd',                   'Financial Services',     DATE '1997-09-17'),
+    ('HINDUNILVR', 'Hindustan Unilever Ltd',           'Fast Moving Consumer Goods', DATE '1956-01-01'),
+    ('ITC',        'ITC Ltd',                          'Fast Moving Consumer Goods', DATE '1970-01-01'),
+    ('SBIN',       'State Bank of India',              'Financial Services',     DATE '1994-03-01'),
+    ('BHARTIARTL', 'Bharti Airtel Ltd',                'Telecommunication',      DATE '2002-02-18'),
+    ('LT',         'Larsen & Toubro Ltd',              'Construction',           DATE '1950-01-01'),
+    ('KOTAKBANK',  'Kotak Mahindra Bank Ltd',          'Financial Services',     DATE '1990-01-01'),
+    ('AXISBANK',   'Axis Bank Ltd',                    'Financial Services',     DATE '1998-11-16')
+) AS v(symbol, company_name, sector, listed_on)
+WHERE m.code = 'NSE'
+ON CONFLICT (market_id, symbol) DO UPDATE
+    SET company_name = EXCLUDED.company_name,
+        sector       = EXCLUDED.sector,
+        is_active    = EXCLUDED.is_active;
 
--- Nifty 200 constituents are loaded separately by the data pipeline
--- (sync_index_constituents, sprint QV-019) with point-in-time effective_from/to + weights.
+-- Current NIFTY200 membership (point-in-time: effective_to NULL = active member).
+-- Idempotent without a unique key via a WHERE NOT EXISTS guard on the open membership.
+INSERT INTO index_constituents (index_code, stock_id, effective_from, effective_to)
+SELECT 'NIFTY200', s.id, DATE '2024-01-01', NULL
+FROM stocks s
+JOIN markets m ON m.id = s.market_id AND m.code = 'NSE'
+WHERE s.symbol IN (
+        'RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','HINDUNILVR',
+        'ITC','SBIN','BHARTIARTL','LT','KOTAKBANK','AXISBANK')
+  AND NOT EXISTS (
+        SELECT 1 FROM index_constituents ic
+        WHERE ic.index_code = 'NIFTY200'
+          AND ic.stock_id = s.id
+          AND ic.effective_to IS NULL);
+
+COMMIT;
