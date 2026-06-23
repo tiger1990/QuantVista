@@ -1,5 +1,5 @@
 # generated: 2026-06-15
-# last_updated: 2026-06-21
+# last_updated: 2026-06-24
 # project: FinanceStockManager
 # project_key: NOKEY
 # tracking_system: file-system
@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-06-21
+last_updated: 2026-06-24
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -50,7 +50,7 @@ development_status:
   1-1-qv-001-monorepo-module-skeleton-with-dependency-linting: done
   1-2-qv-002-local-dev-environment-docker-compose: done  # live docker-compose verify deferred → docs/pending-verifications.md (PV-001), gate before QV-004
   1-3-qv-003-base-ci-pipeline: done
-  1-4-qv-008-iac-bootstrap-aws-staging: backlog
+  1-4-qv-008-iac-bootstrap-aws-staging: review  # Terraform authored (VPC/EKS/RDS/Redis/S3/IAM/Secrets, ap-south-1) + remote state/locking + per-env workspaces; offline validation green 8/8; security-reviewer hardening applied; live apply deferred → PV-002 (no AWS creds here)
   1-5-qv-009-observability-baseline: backlog
   1-6-qv-020-job-observability-dashboard: backlog
   1-7-qv-079-security-hardening-pass-owasp-asvs-l2: backlog
@@ -65,7 +65,7 @@ development_status:
   2-1-qv-004-postgresql-alembic-rls-scaffolding: done  # merged PR #7; RLS denial tests green locally + in CI (backend-rls job)
   2-2-qv-005-reference-seed-data-markets-plans-entitlements-nifty-200-constituents: done  # merged PR #8; seed fixed+idempotent + bootstrap universe (full NIFTY-200 → QV-019)
   2-3-qv-006-authn-register-login-jwt-refresh-rotation: done  # merged PR #9 (4dfcc6b); migration 0013 + argon2/jwt; register/login/refresh-rotation+reuse/me; 39 tests green in CI
-  2-4-qv-007-tenant-context-middleware-entitlement-service-stub: review  # tenant-context deps bind app.tenant_id; EntitlementService stub + entitlement_exceeded gate; 51 tests green, all gates pass (no new migration/deps)
+  2-4-qv-007-tenant-context-middleware-entitlement-service-stub: done  # merged PR #10 (8687d16); tenant-context deps bind app.tenant_id; EntitlementService stub + entitlement_exceeded gate; 51 tests green in CI
   2-5-qv-074-stripe-integration-checkout: backlog
   2-6-qv-075-stripe-webhooks-entitlement-sync: backlog
   2-7-qv-076-entitlement-enforcement-pass-all-gated-features: backlog

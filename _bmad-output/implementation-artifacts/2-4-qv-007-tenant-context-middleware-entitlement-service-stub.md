@@ -4,7 +4,7 @@ baseline_commit: 4dfcc6b225cf748df7300c79a10cecf31549748f
 
 # Story 2.4: QV-007 — Tenant-context middleware + Entitlement Service (stub)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -172,3 +172,4 @@ claude-opus-4-8 (Claude Opus 4.8) via BMAD dev-story workflow.
 | Date | Change |
 |------|--------|
 | 2026-06-21 | QV-007 implemented: dependency-based tenant-context seam (`get_tenant_context`, `get_tenant_session` binding `app.tenant_id`), `EntitlementService` stub reading the QV-005 seed (`get`/`is_allowed`/`limit`/`check`), `require_entitlement` gate → `entitlement_exceeded` (403). `IEntitlementService` finalized; new `plan_entitlements` repo query. No migration/deps. Verified on local PG 18 — 51 tests (+12), all gates green. Status → review. |
+| 2026-06-21 | Reconcile: PR #10 merged to `master` (`8687d16`); CI green (backend lint/types/imports, tests, RLS/seed/auth). Status review → **done**. |

@@ -1,0 +1,28 @@
+# --- Terraform ignores (QV-008) -----------------------------------------------
+# State is NEVER committed (may contain secrets, endpoints, ARNs).
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Local working dirs: providers, modules, backend config.
+**/.terraform/*
+.terraform.tfstate.lock.info
+
+# Crash + plan artifacts (plans can embed secret values).
+crash.log
+crash.*.log
+*.tfplan
+*tfplan*
+
+# tfvars may carry secrets — commit only explicitly-vetted, non-secret files.
+# `staging.tfvars` holds sizing/region ONLY (no secrets) and is committed.
+*.tfvars
+*.tfvars.json
+!staging.tfvars
+
+# Local CLI config / credentials.
+.terraformrc
+terraform.rc
+
+# NOTE: `.terraform.lock.hcl` is intentionally NOT ignored — it pins provider
+# and module hashes and MUST be committed.

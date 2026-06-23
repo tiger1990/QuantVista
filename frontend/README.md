@@ -32,3 +32,6 @@ npx tsc --noEmit     # type-check
 - API types come from a **generated typed client** off the FastAPI OpenAPI schema — never
   hand-written (contract-first). Wired in QV-032+.
 - Charts via **Recharts**; UI via **MUI**.
+
+## Use context7 mcp for frontend code and styling
+claude mcp add --transport http context7  --scope project https://mcp.context7.com/mcp user --header "CONTEXT7_API_KEY: ctx7sk-acd1bb44-d969-401e-8dff-560169596c22" 

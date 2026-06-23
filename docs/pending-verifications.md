@@ -9,6 +9,7 @@ could not be completed in the implementing environment. Each item names *what* i
 | ID | Item | Why deferred | How to verify | Gate (must close before) | Status |
 |----|------|--------------|---------------|--------------------------|--------|
 | PV-001 | **QV-002 container stack** — live `docker compose up` smoke test (AC #1–3: all services healthy, `GET /api/v1/health` → 200 envelope, web on :3000, seed loaded, worker/beat ready, **images build**) | Primary dev machine (macOS 12 Monterey, Intel) cannot run any Docker engine — Colima/Lima need QEMU (Homebrew won't build it on Monterey, Tier-3) and Docker Desktop is unsupported on macOS 12. Static checks all pass (`docker compose config` valid; backend + frontend gates green). | On a Docker-capable machine: `git checkout master`, `cp .env.example .env`, `docker compose up --build`; confirm all services healthy, `curl localhost:8000/api/v1/health` → 200, `curl localhost:3000` → 200, `worker`/`beat` logs ready, spot-check a seeded reference row. | **Before the container images are relied on** — i.e. before staging/CD (QV-008 IaC / QV-084 CD). **No longer gates QV-004** (see note). | ⏳ OPEN |
+| PV-002 | **QV-008 AWS staging infra** — live Terraform rollout: bootstrap `apply` → backend `init` → `workspace new staging` → `plan` → human review → `apply` → **confirm staging reachable**. Offline checks (`fmt -check`, `init -backend=false`, `validate`, `tflint`) are done **in** QV-008; this row covers only the steps that create real cloud resources. | Dev environment has **no AWS account/credentials**. EKS control plane + multi-AZ RDS + ElastiCache + NAT gateways accrue hourly cost and are slow/irreversible to destroy — an agent must **not** create them unattended. D8 "no click-ops" intent applies equally as "no robo-ops": a human runs the rollout. | On a credentialed machine (AWS account, Terraform-capable IAM/OIDC role, Terraform ≥ 1.6, AWS CLI v2, `kubectl`), follow the runbook in `infra/terraform/README.md` — ordered steps mirrored in Notes below. Green = `kubectl get nodes` reaches the EKS cluster, RDS/Redis private endpoints resolve from in-cluster, app/parquet S3 buckets exist, Secrets Manager entries populated, env outputs captured. | **Before anything relies on a live staging env** — QV-009 (observability stack) and QV-084 (CD / deploy to staging); and necessarily **before any production environment** is stood up from the same workspace-ready code. | ⏳ OPEN (also blocked on QV-008 Terraform being authored) |
 
 ## Notes
 
@@ -24,6 +25,65 @@ could not be completed in the implementing environment. Each item names *what* i
   a `fix/qv-002-*` branch — do not block QV-004 planning, but it must be green before QV-004 code
   lands. Detail: `_bmad-output/implementation-artifacts/1-2-qv-002-local-dev-environment-docker-compose.md`
   and `plans/sprints/sprint-00-foundations.md` (QV-002 deferred-verification note).
+
+### PV-002 — what QV-008 delivers vs. what is deferred
+
+- **Delivered in QV-008 (offline, in-repo, CI-gated):** the full staging Terraform under
+  `infra/terraform/` (VPC, EKS, RDS Postgres, ElastiCache Redis, S3, IAM/IRSA, Secrets Manager) on
+  registry modules, remote-state `bootstrap/`, per-env **workspace**-ready env composition, and the
+  offline quality gate (`terraform fmt -check -recursive`, `init -backend=false` + `validate`,
+  `tflint`) wired into a paths-filtered `infra` CI job. **No cloud resources are created.**
+- **Deferred to a credentialed human (this PV):** every step that touches real AWS — bootstrap
+  apply, backend init against the S3 bucket, workspace create, `plan`, `apply`, and the
+  "staging reachable" check. Region **`ap-south-1`** (D8). Secret values are **generated**
+  (`random_password`) into Secrets Manager — never committed — so there is nothing secret to leak in
+  the deferral.
+
+### PV-002 — prerequisites before any live run
+
+- A dedicated **AWS account** (recommend separate accounts, or at minimum separate workspaces, for
+  `staging` vs `production`).
+- A Terraform-capable **IAM principal / OIDC role** (create VPC/EKS/RDS/ElastiCache/S3/IAM/Secrets).
+- **Terraform ≥ 1.6**, **AWS CLI v2**, **kubectl**, credentials loaded (`aws sso login` or env keys).
+
+### PV-002 — ordered bring-up runbook (the steps to complete later)
+
+1. **Bootstrap remote state** (once per account): `cd infra/terraform/bootstrap && terraform init &&
+   terraform apply` → S3 state bucket (versioned, encrypted, public-access-blocked) + DynamoDB lock
+   table. Record the output names.
+2. **Wire the backend:** confirm `envs/staging/backend.tf` points at the bootstrap bucket/table
+   (`key` includes the workspace).
+3. **Init the env:** `cd ../envs/staging && terraform init` (s3 backend).
+4. **Create/select workspace:** `terraform workspace new staging` (then `select staging`).
+5. **Plan + human review:** `terraform plan -var-file=staging.tfvars` — scrutinise IAM scope, SG
+   ingress (no `0.0.0.0/0` to RDS/Redis), public-access blocks, encryption.
+6. **Apply:** `terraform apply -var-file=staging.tfvars` — provisions the stack.
+7. **Capture outputs:** VPC id, EKS cluster name/endpoint, RDS endpoint, Redis endpoint, bucket names
+   (no secret values).
+8. **Confirm reachable:** `aws eks update-kubeconfig --region ap-south-1 --name <cluster>` →
+   `kubectl get nodes`; confirm RDS/Redis **private** endpoints resolve from in-cluster; verify
+   Secrets Manager entries are populated.
+9. **Close PV-002:** set ✅ CLOSED (date + account), check the QV-008 live subtask, and remove the
+   gate from QV-009 / QV-084.
+
+### PV-002 — additional steps required specifically before PRODUCTION (beyond staging)
+
+- New **`production` workspace** (isolated state) + `production.tfvars`: larger sizing, **multi-AZ
+  on**, RDS **deletion protection** + automated backups + PITR, longer retention.
+- **CloudFront + WAF**, production DNS + TLS cert, stricter least-privilege IAM; ideally a
+  **separate AWS account** from staging.
+- Re-run **`security-reviewer`** on the production composition; confirm KMS keys, encryption in
+  transit + at rest everywhere, and **Secrets Manager rotation** enabled.
+- **Config/secret alignment:** Terraform outputs + Secrets Manager keys must match the env var names
+  the app reads — `DATABASE_URL`, `ADMIN_DATABASE_URL`, `REDIS_URL`, `S3_*`, `JWT_SECRET`
+  (`backend/src/quantvista/core/config.py`) — so QV-084 CD can inject them unchanged.
+
+### PV-002 — if a live `apply` surfaces a problem
+
+Fix it forward on a `fix/qv-008-*` branch (the IaC analogue of the migrations rule — all infra
+change via reviewed PR; remote state + DynamoDB lock prevent concurrent/clobbering applies). Keep
+PV-002 ⏳ OPEN until the rollout is clean and re-verified. Detail:
+`_bmad-output/implementation-artifacts/1-4-qv-008-iac-bootstrap-aws-staging.md`.
 
 ## How to close an item
 
