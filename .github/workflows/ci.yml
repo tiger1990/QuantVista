@@ -27,8 +27,8 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
       infra: ${{ steps.filter.outputs.infra }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -51,8 +51,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -77,8 +77,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -113,8 +113,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://quantvista_app:quantvista_app@localhost:5432/quantvista
       ADMIN_DATABASE_URL: postgresql+psycopg://quantvista:quantvista@localhost:5432/quantvista
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -154,8 +154,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -176,8 +176,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -204,12 +204,12 @@ jobs:
         modules/network modules/eks modules/rds modules/redis modules/storage modules/secrets
         envs/staging
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.9.8
           terraform_wrapper: false
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: v0.53.0
       - name: Prepare plugin cache
