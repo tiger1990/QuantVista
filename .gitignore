@@ -35,3 +35,4 @@ _bmad/config.user.toml
 
 # Claude Code / ECC tooling install — regenerable skill copies, local config
 .claude/
+.mcp.json

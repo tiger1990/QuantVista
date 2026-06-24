@@ -25,9 +25,10 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -36,6 +37,9 @@ jobs:
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
+              - '.github/workflows/ci.yml'
+            infra:
+              - 'infra/**'
               - '.github/workflows/ci.yml'
 
   backend-quality:
@@ -47,8 +51,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -73,8 +77,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -109,8 +113,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://quantvista_app:quantvista_app@localhost:5432/quantvista
       ADMIN_DATABASE_URL: postgresql+psycopg://quantvista:quantvista@localhost:5432/quantvista
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: 'pip'
@@ -150,8 +154,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -172,8 +176,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -182,6 +186,53 @@ jobs:
         run: npm ci
       - name: Next.js build
         run: npm run build
+
+  infra:
+    name: Infra (Terraform fmt, validate, tflint)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    env:
+      # Offline only — NO `plan`/`apply` (those need cloud credentials). See PV-002.
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.tf-plugin-cache
+      # Every Terraform root + reusable module, validated independently.
+      TF_CONFIGS: >-
+        bootstrap
+        modules/network modules/eks modules/rds modules/redis modules/storage modules/secrets
+        envs/staging
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.53.0
+      - name: Prepare plugin cache
+        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+      - name: Terraform fmt (whole tree)
+        run: terraform fmt -check -recursive
+      - name: Terraform init (offline) + validate (each config)
+        run: |
+          set -euo pipefail
+          for d in $TF_CONFIGS; do
+            echo "::group::validate $d"
+            terraform -chdir="$d" init -backend=false -input=false -no-color
+            terraform -chdir="$d" validate -no-color
+            echo "::endgroup::"
+          done
+      - name: TFLint (each config)
+        run: |
+          set -euo pipefail
+          for d in $TF_CONFIGS; do
+            echo "::group::tflint $d"
+            tflint --chdir="$d" --no-color
+            echo "::endgroup::"
+          done
 
   # Aggregator gate — the single required status check on master.
   # Always runs; fails if any needed job failed or was cancelled. Skipped jobs
@@ -196,6 +247,7 @@ jobs:
       - backend-rls
       - frontend-quality
       - frontend-build
+      - infra
     runs-on: ubuntu-latest
     steps:
       - name: Verify no job failed
