@@ -30,6 +30,28 @@ def test_access_token_round_trip_carries_claims() -> None:
     assert claims["type"] == "access"
 
 
+def test_valid_signature_but_missing_claim_is_unauthenticated() -> None:
+    # Arrange — a correctly-SIGNED token that omits the required tenant_id claim must be
+    # rejected as unauthenticated, never crash with an unhandled KeyError (→ 500).
+    from types import SimpleNamespace
+
+    from quantvista.api.deps import get_current_principal
+    from quantvista.identity.models import InvalidCredentials
+
+    settings = get_settings()
+    forged = jwt.encode(
+        {"sub": str(uuid4()), "role": "owner"},  # no tenant_id
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+    request = SimpleNamespace(
+        headers={"Authorization": f"Bearer {forged}"}, state=SimpleNamespace()
+    )
+    # Act / Assert
+    with pytest.raises(InvalidCredentials):
+        get_current_principal(request)  # type: ignore[arg-type]
+
+
 def test_expired_access_token_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ACCESS_TOKEN_TTL_SECONDS", "1")
     get_settings.cache_clear()

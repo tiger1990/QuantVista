@@ -7,9 +7,17 @@ Discover with ``celery -A quantvista.jobs.celery_app worker`` (instance named ``
 
 from __future__ import annotations
 
+import contextlib
+
 from celery import Celery
+from celery.signals import worker_process_init
 
 from quantvista.core.config import get_settings
+from quantvista.core.observability import configure_observability, instrument_celery
+from quantvista.core.observability.metrics import (
+    install_worker_metrics,
+    start_worker_metrics_server,
+)
 
 
 def create_celery() -> Celery:
@@ -21,7 +29,23 @@ def create_celery() -> Celery:
     )
     celery.conf.task_default_queue = "default"
     celery.conf.timezone = "UTC"
+    # Connect task metrics signals now (lightweight, no side effects / no ports). The
+    # heavier per-process wiring runs in worker_process_init below.
+    install_worker_metrics()
     return celery
+
+
+@worker_process_init.connect
+def _init_worker_observability(**_: object) -> None:
+    """Wire logging/tracing/Sentry + start the metrics server inside a real worker only."""
+    configure_observability("worker")
+    instrument_celery()
+    settings = get_settings()
+    if settings.metrics_enabled:
+        # Port already bound (e.g. multiple worker processes on one host) is fine — the
+        # first server serves the shared registry; subsequent binds are safe to skip.
+        with contextlib.suppress(OSError):
+            start_worker_metrics_server(settings.worker_metrics_port)
 
 
 app = create_celery()

@@ -9,9 +9,17 @@ from __future__ import annotations
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
+from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.routes import router as auth_router
+from quantvista.core.config import get_settings
+from quantvista.core.observability import configure_observability
+from quantvista.core.observability.metrics import (
+    METRICS_PATH,
+    PrometheusMiddleware,
+    render_metrics,
+)
 from quantvista.identity.models import (
     EmailAlreadyExists,
     EntitlementExceeded,
@@ -58,8 +66,25 @@ def _register_error_handlers(app: FastAPI) -> None:
         return _fail("validation_error", "request validation failed")
 
 
+def _register_metrics(app: FastAPI) -> None:
+    """Mount the Prometheus scrape endpoint + RED middleware (ops surface, no envelope)."""
+    app.add_middleware(PrometheusMiddleware)
+
+    @app.get(METRICS_PATH, include_in_schema=False)
+    def metrics() -> Response:
+        payload, content_type = render_metrics()
+        return Response(content=payload, media_type=content_type)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="QuantVista API", version="0.1.0")
+    # Observability first so tracing/logging/Sentry wrap everything below. Middleware is
+    # applied outermost-last, so RequestContext (added last) is the outermost layer:
+    # it binds correlation before the metrics layer measures the request.
+    configure_observability("api", app=app)
+    if get_settings().metrics_enabled:
+        _register_metrics(app)
+    app.add_middleware(RequestContextMiddleware)
     app.include_router(health_router)
     app.include_router(auth_router)
     _register_error_handlers(app)

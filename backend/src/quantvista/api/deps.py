@@ -38,13 +38,19 @@ def get_current_principal(request: Request) -> Principal:
         raise InvalidCredentials("missing bearer token")
     try:
         claims = decode_access_token(token)
+        tenant_id = UUID(str(claims["tenant_id"]))
+        user_id = UUID(str(claims["sub"]))
+        role = str(claims["role"])
     except jwt.PyJWTError as exc:
         raise InvalidCredentials("invalid token") from exc
-    return Principal(
-        user_id=UUID(claims["sub"]),
-        tenant_id=UUID(claims["tenant_id"]),
-        role=str(claims["role"]),
-    )
+    except (KeyError, ValueError) as exc:
+        # A cryptographically valid token missing/misformatting required claims is still
+        # unauthenticated — never a 500 (which could leak a stack trace).
+        raise InvalidCredentials("malformed token claims") from exc
+    # Surface the tenant for per-tenant observability metrics (bounded-cardinality
+    # counter). Authorization still flows only through the token-derived context below.
+    request.state.tenant_id = str(tenant_id)
+    return Principal(user_id=user_id, tenant_id=tenant_id, role=role)
 
 
 def get_tenant_context(principal: Principal = Depends(get_current_principal)) -> TenantContext:
