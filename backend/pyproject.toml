@@ -21,6 +21,14 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "argon2-cffi>=23.1",
     "pyjwt>=2.8",
+    # Observability (QV-009): structured logs, tracing, metrics, error tracking.
+    "structlog>=24.1",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-instrumentation-celery>=0.48b0",
+    "prometheus-client>=0.20",
+    "sentry-sdk>=2.13",
 ]
 
 [project.optional-dependencies]
