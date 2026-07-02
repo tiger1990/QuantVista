@@ -7,17 +7,41 @@ without touching analytics (data-licensing seam).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
+from quantvista.market_data.models import (
+    CorporateAction,
+    FundamentalSnapshot,
+    PriceBar,
+    ShareholdingSnapshot,
+    UniverseEntry,
+)
+
 
 @runtime_checkable
 class IMarketDataProvider(Protocol):
-    """Vendor-agnostic source of prices/fundamentals (adapter boundary)."""
+    """Vendor-agnostic source of market data (the adapter boundary, ``plans/03`` §1).
 
-    def fetch_daily_prices(self, symbol: str, on: date) -> object: ...
+    Every external vendor enters ONLY through this interface, so swapping vendors is a new
+    adapter with zero analytics changes. Methods are symbol-based (no ``stock_id`` — the DB
+    is built later, QV-013+) and return the immutable DTOs from ``market_data.models``.
+    """
+
+    def get_prices(self, symbol: str, start: date, end: date) -> Sequence[PriceBar]: ...
+
+    def get_corporate_actions(
+        self, symbol: str, start: date, end: date
+    ) -> Sequence[CorporateAction]: ...
+
+    def get_fundamentals(self, symbol: str) -> Sequence[FundamentalSnapshot]: ...
+
+    def get_shareholding(self, symbol: str) -> Sequence[ShareholdingSnapshot]: ...
+
+    def list_universe(self, index_code: str = "NIFTY200") -> Sequence[UniverseEntry]: ...
 
 
 @runtime_checkable

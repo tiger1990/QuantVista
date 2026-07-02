@@ -6,6 +6,23 @@ could not be completed in the implementing environment. Each item names *what* i
 
 > Review this list at the start of every sprint and before any story listed as a blocking gate.
 
+## Two kinds of deferral — don't confuse them
+
+This ledger tracks **only one** of the two ways work gets pushed to "later". Know which is which:
+
+- 🔧 **Environment/verification debt → belongs HERE (PV-*).** The code is *written and offline-checked*;
+  only the "run it on real infra and confirm" step is blocked because this machine lacks the environment
+  (no Docker engine on macOS 12 → PV-001; no AWS account/creds → PV-002/PV-003). **Fix:** run the PV's
+  runbook later on a capable machine. Development elsewhere does **not** wait on it.
+
+- 🧭 **Deliberate scope deferral → does NOT belong here.** The code simply isn't built yet because it was
+  *intentionally scheduled into a future story* (e.g. the prod `JWT_SECRET` startup guard → **QV-079**
+  hardening pass). It is not blocked by any machine and is tracked in the **story backlog / sprint**,
+  not this ledger. **Fix:** implement it when that story comes up.
+
+Rule of thumb: if a *different machine* would let you close it, it's a PV. If it just needs *someone to
+write the code* (any machine), it's a backlog story — put it in the epic/sprint, not here.
+
 | ID | Item | Why deferred | How to verify | Gate (must close before) | Status |
 |----|------|--------------|---------------|--------------------------|--------|
 | PV-001 | **QV-002 container stack** — live `docker compose up` smoke test (AC #1–3: all services healthy, `GET /api/v1/health` → 200 envelope, web on :3000, seed loaded, worker/beat ready, **images build**) | Primary dev machine (macOS 12 Monterey, Intel) cannot run any Docker engine — Colima/Lima need QEMU (Homebrew won't build it on Monterey, Tier-3) and Docker Desktop is unsupported on macOS 12. Static checks all pass (`docker compose config` valid; backend + frontend gates green). | On a Docker-capable machine: `git checkout master`, `cp .env.example .env`, `docker compose up --build`; confirm all services healthy, `curl localhost:8000/api/v1/health` → 200, `curl localhost:3000` → 200, `worker`/`beat` logs ready, spot-check a seeded reference row. | **Before the container images are relied on** — i.e. before staging/CD (QV-008 IaC / QV-084 CD). **No longer gates QV-004** (see note). | ⏳ OPEN |
