@@ -50,8 +50,8 @@ development_status:
   1-1-qv-001-monorepo-module-skeleton-with-dependency-linting: done
   1-2-qv-002-local-dev-environment-docker-compose: done  # live docker-compose verify deferred → docs/pending-verifications.md (PV-001), gate before QV-004
   1-3-qv-003-base-ci-pipeline: done
-  1-4-qv-008-iac-bootstrap-aws-staging: review  # Terraform authored (VPC/EKS/RDS/Redis/S3/IAM/Secrets, ap-south-1) + remote state/locking + per-env workspaces; offline validation green 8/8; security-reviewer hardening applied; live apply deferred → PV-002 (no AWS creds here)
-  1-5-qv-009-observability-baseline: review  # OTel tracing + structlog JSON + /metrics RED + Sentry, all env-driven/no-op-safe; 91 tests, cov 93%, ruff/mypy-strict/import-linter green; security-review applied (C-1+4×HIGH fixed); live staging backends deferred → PV-003 (blocked on PV-002)
+  1-4-qv-008-iac-bootstrap-aws-staging: done  # merged PR #11 (fcaa2a8); Terraform VPC/EKS/RDS/Redis/S3/IAM/Secrets (ap-south-1) + remote state/locking + per-env workspaces; offline validation 8/8; live apply deferred → PV-002 (no AWS creds here)
+  1-5-qv-009-observability-baseline: done  # merged PR #12 (9d3354b); OTel tracing + structlog JSON + /metrics RED + Sentry, all env-driven/no-op-safe; 91 tests, cov 93%; security-review applied (C-1+4×HIGH fixed); live staging backends deferred → PV-003 (blocked on PV-002)
   1-6-qv-020-job-observability-dashboard: backlog
   1-7-qv-079-security-hardening-pass-owasp-asvs-l2: backlog
   1-8-qv-082-observability-slos-alerting-finalized: backlog
@@ -74,8 +74,8 @@ development_status:
   epic-2-retrospective: optional
 
   # ---- Epic 3: Market-Data Ingestion & Correctness (EPIC-DATA) ----
-  epic-3: backlog
-  3-1-qv-012-imarketdataprovider-interface-dev-adapter: backlog
+  epic-3: in-progress
+  3-1-qv-012-imarketdataprovider-interface-dev-adapter: review  # IMarketDataProvider 5 methods + vendor-agnostic DTOs (Decimal, provenance) + internal-only yfinance dev adapter (license_class=non_commercial_dev hard-stamp; optional dev-data extra, lazy import, network-free tests); 104 tests, cov 94%, ruff/mypy-strict/import-linter green; no DB/migrations (QV-013+)
   3-2-qv-013-schema-stocks-markets-index-constituents-corporate-actions: backlog
   3-3-qv-014-schema-daily-prices-monthly-range-partitions: backlog
   3-4-qv-015-job-framework-idempotency-jobs-runs-celery-beat-wiring: backlog
