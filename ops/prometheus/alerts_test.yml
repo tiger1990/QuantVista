@@ -22,6 +22,9 @@ tests:
           - exp_labels:
               severity: page
               dataset: daily_prices
+            exp_annotations:
+              summary: "daily_prices freshness lag exceeds 36h"
+              runbook: "Check ingest_daily_prices job runs (jobs_runs) and the provider feed."
 
   # Freshness — recent timestamp → small lag → no alert.
   - interval: 1m
@@ -45,6 +48,9 @@ tests:
           - exp_labels:
               severity: page
               task: quantvista.ingest_daily_prices
+            exp_annotations:
+              summary: "Celery task failures in the last 15m"
+              runbook: "Inspect the failing task in jobs_runs + worker logs; check DLQ."
 
   # Queue backlog sustained above threshold → firing.
   - interval: 1m
@@ -58,6 +64,9 @@ tests:
           - exp_labels:
               severity: warning
               queue: default
+            exp_annotations:
+              summary: "Celery default queue backlog above 100"
+              runbook: "Check worker health/concurrency; look for a stuck or slow task."
 
   # Queue backlog below threshold → no alert.
   - interval: 1m
