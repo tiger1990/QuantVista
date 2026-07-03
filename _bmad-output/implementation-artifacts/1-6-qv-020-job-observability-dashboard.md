@@ -4,7 +4,7 @@ baseline_commit: 3916dbded580fecb9d391801239b54e166b4a8e7
 
 # Story 1.6: QV-020 — Job observability dashboard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
