@@ -18,7 +18,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from quantvista.market_data.adjustments import split_adjustment_steps
-from quantvista.market_data.models import CorporateAction, PriceBar, UniverseEntry
+from quantvista.market_data.models import (
+    CorporateAction,
+    PriceBar,
+    ShareholdingSnapshot,
+    UniverseEntry,
+)
 from quantvista.market_data.quality import PriceQualityMetrics
 
 
@@ -366,3 +371,43 @@ def reconcile_constituents(
             {"index_code": index_code, "stock_id": sid, "weight": weight_by_id[sid]},
         )
     return ConstituentCounts(len(adds), closed, len(unchanged), unresolved)
+
+
+# --- shareholding: PIT-by-date ownership (QV-023) ----------------------------
+# One row per (stock, as_of_date); re-polling a date updates in place, a new quarter is a new row.
+_UPSERT_SHP_SQL = text(
+    """
+    INSERT INTO shareholding
+        (stock_id, as_of_date, promoter_holding, fii_holding, dii_holding,
+         public_holding, pledged_pct, source)
+    VALUES
+        (:stock_id, :as_of_date, :promoter, :fii, :dii, :public, :pledged, :source)
+    ON CONFLICT (stock_id, as_of_date) DO UPDATE SET
+        promoter_holding = EXCLUDED.promoter_holding, fii_holding = EXCLUDED.fii_holding,
+        dii_holding = EXCLUDED.dii_holding, public_holding = EXCLUDED.public_holding,
+        pledged_pct = EXCLUDED.pledged_pct, source = EXCLUDED.source, ingested_at = now()
+    """
+)
+
+
+def upsert_shareholding(
+    session: Session, stock_id: UUID, snapshots: Sequence[ShareholdingSnapshot]
+) -> int:
+    """Idempotently upsert ownership snapshots keyed ``(stock_id, as_of_date)``; returns row count."""
+    if not snapshots:
+        return 0
+    params = [
+        {
+            "stock_id": stock_id,
+            "as_of_date": s.as_of_date,
+            "promoter": s.promoter_holding,
+            "fii": s.fii_holding,
+            "dii": s.dii_holding,
+            "public": s.public_holding,
+            "pledged": s.pledged_pct,
+            "source": s.provenance.source,
+        }
+        for s in snapshots
+    ]
+    session.execute(_UPSERT_SHP_SQL, params)
+    return len(params)

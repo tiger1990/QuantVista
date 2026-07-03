@@ -20,12 +20,14 @@ from quantvista.market_data.services import (
     CorporateActionIngestionService,
     FundamentalsIngestionService,
     PriceIngestionService,
+    ShareholdingIngestionService,
 )
 from quantvista.market_data.trading_calendar import last_completed_session
 
 JOB_NAME = "ingest_daily_prices"
 CORPACT_JOB_NAME = "ingest_corporate_actions"
 FUND_JOB_NAME = "ingest_fundamentals"
+SHP_JOB_NAME = "ingest_shareholding"
 # Corporate actions can be announced any time; the daily run scans a recent window.
 _CORPACT_LOOKBACK_DAYS = 7
 
@@ -150,3 +152,33 @@ def ingest_fundamentals(market: str = "NSE", date_iso: str | None = None) -> str
     target = date.fromisoformat(date_iso) if date_iso else last_completed_session(date.today())
     key = run_key("fund", market, target.isoformat())
     return _run_fundamentals(market, key, "NIFTY200").status.value
+
+
+# --- shareholding (PIT-by-date ownership, QV-023) ----------------------------
+def _run_shareholding(market: str, key: str, index_code: str) -> JobOutcome:
+    service = ShareholdingIngestionService(YFinanceDevProvider(), symbol_mapper=yahoo_symbol)
+
+    def work() -> JobResult:
+        report = service.ingest(market, index_code=index_code)
+        if report.stocks_failed:  # STRICT (same policy as the sibling ingest jobs)
+            raise IngestRunFailed(
+                f"{report.stocks_failed}/{report.stocks_total} stocks failed: "
+                f"{[s for s, _ in report.failures][:10]}"
+            )
+        return JobResult(rows_in=report.stocks_ok, rows_out=report.rows_upserted)
+
+    return run_job(SHP_JOB_NAME, key, work, ledger=JobRunLedger())
+
+
+@app.task(
+    name="quantvista.ingest_shareholding",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
+def ingest_shareholding(market: str = "NSE", date_iso: str | None = None) -> str:
+    """Poll + upsert the latest ownership snapshots for ``market`` (PIT by ``as_of_date``)."""
+    target = date.fromisoformat(date_iso) if date_iso else last_completed_session(date.today())
+    key = run_key("shp", market, target.isoformat())
+    return _run_shareholding(market, key, "NIFTY200").status.value
