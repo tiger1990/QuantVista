@@ -31,7 +31,9 @@ class IMarketDataProvider(Protocol):
     is built later, QV-013+) and return the immutable DTOs from ``market_data.models``.
     """
 
-    def get_prices(self, symbol: str, start: date, end: date) -> Sequence[PriceBar]: ...
+    def get_prices(
+        self, symbol: str, start: date, end: date, interval: str = "1d"
+    ) -> Sequence[PriceBar]: ...
 
     def get_corporate_actions(
         self, symbol: str, start: date, end: date

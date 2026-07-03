@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -41,6 +41,16 @@ _DEV_UNIVERSE: dict[str, str] = {
 }
 
 TickerFactory = Callable[[str], Any]
+
+# Yahoo Finance exchange suffixes by our canonical market code. The DB stores the plain
+# ticker (RELIANCE); Yahoo needs the suffixed form (RELIANCE.NS). Each provider owns its own
+# mapping — a future TrueData adapter has its own, the ingestion service stays symbol-agnostic.
+_YAHOO_SUFFIX: dict[str, str] = {"NSE": ".NS", "BSE": ".BO"}
+
+
+def yahoo_symbol(symbol: str, market_code: str) -> str:
+    """Map a canonical ``(symbol, market)`` to the Yahoo ticker (RELIANCE, NSE → RELIANCE.NS)."""
+    return f"{symbol}{_YAHOO_SUFFIX.get(market_code, '')}"
 
 
 def _default_ticker_factory(symbol: str) -> Any:
@@ -86,18 +96,32 @@ class YFinanceDevProvider:
             license_class=LicenseClass.NON_COMMERCIAL_DEV,
         )
 
-    def get_prices(self, symbol: str, start: date, end: date) -> Sequence[PriceBar]:
+    def get_prices(
+        self, symbol: str, start: date, end: date, interval: str = "1d"
+    ) -> Sequence[PriceBar]:
+        if interval != "1d":
+            raise ValueError(
+                f"YFinanceDevProvider supports only interval='1d' (got {interval!r}); "
+                "intraday is a separate concern (see market-data-provider-strategy)."
+            )
         prov = self._provenance(symbol)
-        # auto_adjust=False keeps raw close and Adj Close distinct (adjustment is QV-017).
-        history = self._ticker(symbol).history(start=start, end=end, auto_adjust=False)
+        # yfinance treats `end` as EXCLUSIVE — add a day so our contract's `end` is inclusive
+        # (a single-session fetch start==end must return that session). auto_adjust=False keeps
+        # raw close and Adj Close distinct (adjustment is QV-017).
+        history = self._ticker(symbol).history(
+            start=start, end=end + timedelta(days=1), auto_adjust=False
+        )
         if getattr(history, "empty", False):
             return []
         bars: list[PriceBar] = []
         for index, row in history.iterrows():
+            bar_date = index.date()
+            if bar_date > end:  # defensive: never return a bar past the requested end
+                continue
             bars.append(
                 PriceBar(
                     symbol=symbol,
-                    date=index.date(),
+                    date=bar_date,
                     open=_dec(row.get("Open")),
                     high=_dec(row.get("High")),
                     low=_dec(row.get("Low")),
