@@ -134,6 +134,14 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline; RED→GREEN→refacto
   `ValidationReport` + strict `run_job` task; provider-agnostic (`market_data` stays a DAG leaf). **No
   security-reviewer** — parameterized SQL, read-only, no auth/PII/user-input. **Not scheduled** on beat
   (→ PV-005 cadence, same as ingest).
+- **Two implementation refinements over the literal AC/Task wording (design-only, behavior unchanged):**
+  (1) the *service* returns a flat house-style `ValidationReport` (market/start/end + `passed` +
+  `violations` + `stocks_validated`/`expected_stocks`) rather than the bare `QualityReport` named in AC4 —
+  the *pure evaluator* still returns `QualityReport`; the wrapper carries the counts `run_job` needs for
+  `rows_in` and matches `IngestReport`/`CorpActionReport`. (2) `price_quality_metrics` takes two extra
+  keyword args beyond AC3's `(session, stock_ids, start, end)` — `expected_sessions` (calendar math stays
+  in the service, so the repo remains pure SQL) and `missing_sample_cap=10` (bounds the missing-symbol
+  sample so a large failure doesn't bloat the log/event payload). Same gates, decision, events, and halt.
 
 ### File List
 
