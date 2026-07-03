@@ -1,0 +1,35 @@
+# QuantVista job/pipeline alert rules (QV-020, plans/08 §7).
+# Thresholds are deliberately generous for a T-1 daily feed across weekends — tune on staging.
+# Freshness lag is derived here (time() - timestamp gauge), never a stale pre-computed number.
+groups:
+  - name: quantvista-pipeline
+    rules:
+      - alert: PipelineFreshnessLagHigh
+        # 129600s = 36h: covers a normal T-1 daily bar plus a weekend gap before we page.
+        expr: time() - data_latest_ingest_timestamp_seconds{dataset="daily_prices"} > 129600
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "daily_prices freshness lag exceeds 36h"
+          runbook: "Check ingest_daily_prices job runs (jobs_runs) and the provider feed."
+
+      - alert: JobFailureRateHigh
+        # Any task failure accumulating over 15m — job success SLO is >99% (08 §7).
+        expr: increase(celery_task_failures_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: page
+        annotations:
+          summary: "Celery task failures in the last 15m"
+          runbook: "Inspect the failing task in jobs_runs + worker logs; check DLQ."
+
+      - alert: QueueBacklogHigh
+        # Sustained backlog on the default queue — proxy for DLQ/backpressure (08 §7).
+        expr: celery_queue_depth{queue="default"} > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery default queue backlog above 100"
+          runbook: "Check worker health/concurrency; look for a stuck or slow task."

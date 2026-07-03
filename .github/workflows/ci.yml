@@ -85,7 +85,14 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install backend (with dev tooling)
         run: python -m pip install -e ".[dev]"
-      - name: Pytest (unit; integration auto-skips without a DB)
+      - name: Setup promtool (deterministic alert-rule tests — QV-020)
+        run: |
+          PROM_VERSION=3.1.0
+          curl -sSL "https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz" -o /tmp/prom.tgz
+          tar -xzf /tmp/prom.tgz -C /tmp
+          sudo mv "/tmp/prometheus-${PROM_VERSION}.linux-amd64/promtool" /usr/local/bin/promtool
+          promtool --version
+      - name: Pytest (unit; integration auto-skips without a DB; promtool rule tests run)
         run: pytest
 
   backend-rls:
