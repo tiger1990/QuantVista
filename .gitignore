@@ -36,3 +36,6 @@ _bmad/config.user.toml
 # Claude Code / ECC tooling install — regenerable skill copies, local config
 .claude/
 .mcp.json
+
+# Celery Beat local scheduler DB (created when running `celery beat` locally)
+celerybeat-schedule*

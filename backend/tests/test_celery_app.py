@@ -35,3 +35,23 @@ def test_ping_task_registered_and_returns_pong() -> None:
     # Assert
     assert "quantvista.ping" in app.tasks
     assert ping() == "pong"
+
+
+def test_beat_schedule_and_retry_defaults_configured() -> None:
+    # Arrange / Act
+    from quantvista.jobs.celery_app import create_celery
+
+    celery = create_celery()
+    # Assert — Beat schedules the sample job root; fail-loud/retry-smart defaults set (06 §1.4)
+    entry = celery.conf.beat_schedule["sample-heartbeat"]
+    assert entry["task"] == "quantvista.sample_scheduled_job"
+    assert celery.conf.task_acks_late is True
+    assert celery.conf.task_reject_on_worker_lost is True
+
+
+def test_sample_scheduled_job_registered() -> None:
+    # Arrange / Act
+    from quantvista.jobs.celery_app import app
+
+    # Assert
+    assert "quantvista.sample_scheduled_job" in app.tasks
