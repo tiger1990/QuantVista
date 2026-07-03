@@ -29,6 +29,8 @@ dependencies = [
     "opentelemetry-instrumentation-celery>=0.48b0",
     "prometheus-client>=0.20",
     "sentry-sdk>=2.13",
+    # Market data (QV-016): NSE/BSE trading calendar (India = XBOM; NSE/BSE share holidays).
+    "exchange-calendars>=4",
 ]
 
 [project.optional-dependencies]
@@ -86,6 +88,16 @@ disallow_untyped_decorators = false
 [[tool.mypy.overrides]]
 module = ["yfinance", "yfinance.*"]
 ignore_missing_imports = true
+
+# Trading-calendar + its pandas dependency ship no usable stubs; treat as untyped.
+[[tool.mypy.overrides]]
+module = ["exchange_calendars", "exchange_calendars.*", "pandas", "pandas.*"]
+ignore_missing_imports = true
+
+# The ingest Celery task uses the untyped @app.task decorator (as celery_app does).
+[[tool.mypy.overrides]]
+module = ["quantvista.jobs.ingest"]
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

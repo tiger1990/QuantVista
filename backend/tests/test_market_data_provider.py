@@ -35,7 +35,10 @@ class _FakeTicker:
         self.actions = actions if actions is not None else _FakeFrame([])
         self.info = info or {}
 
+    captured_end: date | None = None
+
     def history(self, start: date, end: date, auto_adjust: bool) -> _FakeFrame:
+        self.captured_end = end
         return self._history
 
 
@@ -88,6 +91,27 @@ def test_get_prices_maps_rows_to_decimal_bars_with_dev_license() -> None:
     # AC #4: every datum is hard-stamped as non-commercial dev
     assert all(b.provenance.license_class is LicenseClass.NON_COMMERCIAL_DEV for b in bars)
     assert bars[0].provenance.source == "yfinance"
+
+
+def test_get_prices_treats_end_as_inclusive() -> None:
+    # Arrange — yfinance `end` is exclusive; our contract's `end` must be inclusive. A frame
+    # with a bar ON the requested end + one PAST it (the extra day the adapter requests).
+    from datetime import timedelta
+
+    end = date(2026, 6, 30)
+    frame = _FakeFrame(
+        [
+            (datetime(2026, 6, 30), {"Open": 1, "High": 1, "Low": 1, "Close": 100, "Volume": 1}),
+            (datetime(2026, 7, 1), {"Open": 1, "High": 1, "Low": 1, "Close": 200, "Volume": 1}),
+        ]
+    )
+    ticker = _FakeTicker(history=frame)
+    provider = YFinanceDevProvider(ticker_factory=lambda _s: ticker)
+    # Act — single-session fetch (start == end)
+    bars = provider.get_prices("RELIANCE.NS", end, end)
+    # Assert — requested yfinance with end+1 (exclusive), and dropped the bar past `end`
+    assert ticker.captured_end == end + timedelta(days=1)
+    assert [b.date for b in bars] == [date(2026, 6, 30)]
 
 
 def test_get_prices_empty_history_returns_empty() -> None:
