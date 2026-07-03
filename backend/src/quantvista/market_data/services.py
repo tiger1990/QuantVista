@@ -22,12 +22,19 @@ from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
 from quantvista.market_data.interfaces import IMarketDataProvider
 from quantvista.market_data.models import CorporateAction, PriceBar
+from quantvista.market_data.quality import (
+    GateViolation,
+    QualityThresholds,
+    evaluate_quality,
+)
 from quantvista.market_data.repositories import (
     active_universe,
+    price_quality_metrics,
     recompute_adjusted_close,
     upsert_corporate_actions,
     upsert_daily_prices,
 )
+from quantvista.market_data.trading_calendar import sessions_in_range
 
 # (symbol, market) -> provider symbol. Default is identity; the job wires the provider's mapper
 # (e.g. yfinance's yahoo_symbol) so the service never depends on a concrete adapter.
@@ -180,4 +187,91 @@ class CorporateActionIngestionService:
                 "stocks_adjusted": adjusted,
             },
         )
+        return report
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationReport:
+    market: str
+    start: date
+    end: date
+    passed: bool
+    stocks_validated: int  # distinct stocks with data (== metrics.stocks_with_data)
+    expected_stocks: int
+    violations: list[GateViolation] = field(default_factory=list)
+
+
+class DataQualityService:
+    """Post-ingestion data-quality gates over ``daily_prices`` (QV-018, ``06`` §5).
+
+    A *guard*, not a mutation: reads the run's prices for the active universe, evaluates the four
+    gates, and emits exactly one event — ``PricesValidated`` (the downstream trigger) on pass, or
+    ``DataQualityGateFailed`` (the alert seam) on fail. The caller applies the strict policy
+    (fail the run so the pipeline halts rather than scoring on bad data).
+    """
+
+    def __init__(self, event_bus: IEventBus) -> None:
+        self._events = event_bus
+        self._log = structlog.get_logger()
+
+    def validate(
+        self,
+        market: str,
+        start: date,
+        end: date,
+        *,
+        index_code: str = "NIFTY200",
+        thresholds: QualityThresholds | None = None,
+    ) -> ValidationReport:
+        """Evaluate the gates over ``[start, end]`` for ``index_code``'s open constituents."""
+        thresholds = thresholds or QualityThresholds()
+        with privileged_session_scope() as session:
+            universe = active_universe(session, index_code, market)
+        stock_ids = [s.stock_id for s in universe]
+        expected_sessions = len(sessions_in_range(start, end))
+
+        with privileged_session_scope() as session:
+            metrics = price_quality_metrics(
+                session, stock_ids, start, end, expected_sessions=expected_sessions
+            )
+        result = evaluate_quality(metrics, thresholds)
+        report = ValidationReport(
+            market,
+            start,
+            end,
+            result.passed,
+            metrics.stocks_with_data,
+            metrics.expected_stocks,
+            result.violations,
+        )
+
+        base = {"market": market, "start": start.isoformat(), "end": end.isoformat()}
+        if report.passed:
+            self._events.publish(
+                "PricesValidated",
+                {
+                    **base,
+                    "stocks_validated": report.stocks_validated,
+                    "expected_stocks": report.expected_stocks,
+                },
+            )
+        else:
+            self._log.error(
+                "data_quality_gate_failed", **base, gates=[v.gate for v in report.violations]
+            )
+            self._events.publish(
+                "DataQualityGateFailed",
+                {
+                    **base,
+                    "violations": [
+                        {
+                            "gate": v.gate,
+                            "observed": v.observed,
+                            "threshold": v.threshold,
+                            "detail": v.detail,
+                        }
+                        for v in report.violations
+                    ],
+                },
+            )
         return report
