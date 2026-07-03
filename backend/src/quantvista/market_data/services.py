@@ -21,7 +21,7 @@ import structlog
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
 from quantvista.market_data.interfaces import IMarketDataProvider
-from quantvista.market_data.models import CorporateAction, PriceBar
+from quantvista.market_data.models import CorporateAction, PriceBar, UniverseEntry
 from quantvista.market_data.quality import (
     GateViolation,
     QualityThresholds,
@@ -31,8 +31,10 @@ from quantvista.market_data.repositories import (
     active_universe,
     price_quality_metrics,
     recompute_adjusted_close,
+    reconcile_constituents,
     upsert_corporate_actions,
     upsert_daily_prices,
+    upsert_stocks,
 )
 from quantvista.market_data.trading_calendar import sessions_in_range
 
@@ -272,6 +274,90 @@ class DataQualityService:
                         }
                         for v in report.violations
                     ],
+                },
+            )
+        return report
+
+
+@dataclass(frozen=True, slots=True)
+class StockMasterReport:
+    market: str
+    provider_count: int
+    inserted: int
+    updated: int
+
+
+@dataclass(frozen=True, slots=True)
+class ConstituentsReport:
+    index_code: str
+    market: str
+    as_of: date
+    provider_count: int
+    added: int
+    closed: int
+    unchanged: int
+    unresolved: list[str] = field(default_factory=list)
+
+
+class UniverseSyncService:
+    """Keep the security master + index membership current (QV-019, ``06`` §2).
+
+    Provider-agnostic (reads the QV-012 ``list_universe`` seam; imports no yfinance). Master sync is
+    an upsert (never delists); constituent sync is a survivorship-free PIT reconcile. An unresolved
+    provider symbol means the master hasn't caught up — the caller fails the run rather than let an
+    incomplete provider view close a real member.
+    """
+
+    def __init__(self, provider: IMarketDataProvider, event_bus: IEventBus) -> None:
+        self._provider = provider
+        self._events = event_bus
+        self._log = structlog.get_logger()
+
+    def sync_stock_master(self, market: str, *, index_code: str = "NIFTY200") -> StockMasterReport:
+        entries: Sequence[UniverseEntry] = self._provider.list_universe(index_code)
+        with privileged_session_scope() as session:
+            inserted, updated = upsert_stocks(session, market, entries)
+        report = StockMasterReport(market, len(entries), inserted, updated)
+        self._events.publish(
+            "StockMasterUpdated",
+            {"market": market, "inserted": inserted, "updated": updated, "total": len(entries)},
+        )
+        return report
+
+    def sync_index_constituents(
+        self, index_code: str, market: str, as_of: date
+    ) -> ConstituentsReport:
+        entries: Sequence[UniverseEntry] = self._provider.list_universe(index_code)
+        members = [(e.symbol, e.weight) for e in entries]
+        with privileged_session_scope() as session:
+            counts = reconcile_constituents(session, index_code, market, members, as_of)
+        report = ConstituentsReport(
+            index_code,
+            market,
+            as_of,
+            len(members),
+            counts.added,
+            counts.closed,
+            counts.unchanged,
+            counts.unresolved,
+        )
+        if counts.unresolved:  # nothing was mutated — surface it, don't announce a sync
+            self._log.error(
+                "constituents_unresolved",
+                index_code=index_code,
+                market=market,
+                unresolved=counts.unresolved,
+            )
+        else:
+            self._events.publish(
+                "ConstituentsUpdated",
+                {
+                    "index_code": index_code,
+                    "market": market,
+                    "as_of": as_of.isoformat(),
+                    "added": counts.added,
+                    "closed": counts.closed,
+                    "unchanged": counts.unchanged,
                 },
             )
         return report

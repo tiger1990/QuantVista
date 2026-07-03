@@ -173,3 +173,12 @@ def test_list_universe_returns_dev_licensed_entries() -> None:
     assert len(universe) >= 5
     assert all(e.exchange == "NSE" for e in universe)
     assert all(e.provenance.license_class is LicenseClass.NON_COMMERCIAL_DEV for e in universe)
+
+
+def test_list_universe_emits_canonical_symbols_not_yahoo_tickers() -> None:
+    # UniverseEntry.symbol is the platform identity (maps 1:1 to stocks.symbol); the .NS suffix
+    # is the adapter's private Yahoo concern, kept out of the DTO. weight is None in dev.
+    universe = _provider(_FakeTicker()).list_universe()
+    assert all("." not in e.symbol for e in universe)
+    assert any(e.symbol == "RELIANCE" for e in universe)
+    assert all(e.weight is None for e in universe)

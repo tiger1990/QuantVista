@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from quantvista.market_data.adjustments import split_adjustment_steps
-from quantvista.market_data.models import CorporateAction, PriceBar
+from quantvista.market_data.models import CorporateAction, PriceBar, UniverseEntry
 from quantvista.market_data.quality import PriceQualityMetrics
 
 
@@ -219,3 +219,141 @@ def price_quality_metrics(
         observed_slots=observed_slots,
         missing_symbols_sample=missing,
     )
+
+
+# --- universe sync: security master + PIT index membership (QV-019) -----------
+# Master upsert never delists (the security catalogue is not the index). RETURNING (xmax = 0)
+# distinguishes an insert (xmax 0) from an update.
+_UPSERT_STOCK_SQL = text(
+    """
+    INSERT INTO stocks (market_id, symbol, company_name, isin, is_active)
+    SELECT m.id, :symbol, :company_name, :isin, :is_active
+    FROM markets m WHERE m.code = :market_code
+    ON CONFLICT (market_id, symbol) DO UPDATE
+        SET company_name = EXCLUDED.company_name,
+            isin         = COALESCE(EXCLUDED.isin, stocks.isin),
+            is_active    = EXCLUDED.is_active,
+            updated_at   = now()
+    RETURNING (xmax = 0) AS inserted
+    """
+)
+_RESOLVE_STOCKS_SQL = text(
+    """
+    SELECT s.id, s.symbol
+    FROM stocks s JOIN markets m ON m.id = s.market_id AND m.code = :market_code
+    WHERE s.symbol = ANY(:symbols)
+    """
+)
+_OPEN_MEMBERS_SQL = text(
+    "SELECT stock_id, effective_from FROM index_constituents "
+    "WHERE index_code = :index_code AND effective_to IS NULL"
+)
+_INSERT_MEMBER_SQL = text(
+    "INSERT INTO index_constituents (index_code, stock_id, effective_from, effective_to, weight) "
+    "VALUES (:index_code, :stock_id, :effective_from, NULL, :weight)"
+)
+_CLOSE_MEMBER_SQL = text(
+    "UPDATE index_constituents SET effective_to = :effective_to "
+    "WHERE index_code = :index_code AND stock_id = :stock_id AND effective_to IS NULL"
+)
+# Guard with IS DISTINCT FROM so an unchanged weight is a true no-op (no row write); it also
+# handles the NULL <-> value transition (dev supplies NULL, a licensed feed supplies a number).
+_UPDATE_WEIGHT_SQL = text(
+    "UPDATE index_constituents SET weight = :weight "
+    "WHERE index_code = :index_code AND stock_id = :stock_id AND effective_to IS NULL "
+    "AND weight IS DISTINCT FROM :weight"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ConstituentCounts:
+    added: int
+    closed: int
+    unchanged: int
+    unresolved: list[str]
+
+
+def upsert_stocks(
+    session: Session, market_code: str, entries: Sequence[UniverseEntry]
+) -> tuple[int, int]:
+    """Upsert the security master from provider entries. Returns ``(inserted, updated)``."""
+    inserted = 0
+    for e in entries:
+        row = session.execute(
+            _UPSERT_STOCK_SQL,
+            {
+                "market_code": market_code,
+                "symbol": e.symbol,
+                "company_name": e.name or e.symbol,  # company_name is NOT NULL
+                "isin": e.isin,
+                "is_active": e.is_active,
+            },
+        ).one()
+        if row.inserted:
+            inserted += 1
+    return inserted, len(entries) - inserted
+
+
+def reconcile_constituents(
+    session: Session,
+    index_code: str,
+    market_code: str,
+    members: Sequence[tuple[str, Decimal | None]],
+    as_of: date,
+) -> ConstituentCounts:
+    """PIT-reconcile ``index_code`` membership to ``members``: open adds, close drops, set weights.
+
+    Survivorship-free — drops set ``effective_to = as_of`` (never delete). A member whose symbol
+    has no ``stocks`` row is returned as ``unresolved`` (the caller fails the run). ``as_of`` must
+    be strictly after an open row's ``effective_from`` to close it (the schema CHECK).
+    """
+    symbols = [s for s, _ in members]
+    id_by_symbol = {
+        r.symbol: r.id
+        for r in session.execute(
+            _RESOLVE_STOCKS_SQL, {"market_code": market_code, "symbols": symbols}
+        )
+    }
+    unresolved = [s for s in symbols if s not in id_by_symbol]
+    if unresolved:
+        # Abort untouched: an incomplete provider view would wrongly *close* the unresolved member
+        # as a "drop". Fail loud, mutate nothing (the caller raises; master must run first).
+        return ConstituentCounts(0, 0, 0, unresolved)
+    weight_by_id = {id_by_symbol[s]: w for s, w in members if s in id_by_symbol}
+    provider_ids = set(weight_by_id)
+
+    open_from = {
+        r.stock_id: r.effective_from
+        for r in session.execute(_OPEN_MEMBERS_SQL, {"index_code": index_code})
+    }
+    open_ids = set(open_from)
+    adds, drops, unchanged = (
+        provider_ids - open_ids,
+        open_ids - provider_ids,
+        provider_ids & open_ids,
+    )
+
+    for sid in adds:
+        session.execute(
+            _INSERT_MEMBER_SQL,
+            {
+                "index_code": index_code,
+                "stock_id": sid,
+                "effective_from": as_of,
+                "weight": weight_by_id[sid],
+            },
+        )
+    closed = 0
+    for sid in drops:
+        if open_from[sid] < as_of:  # respect effective_to > effective_from
+            session.execute(
+                _CLOSE_MEMBER_SQL,
+                {"index_code": index_code, "stock_id": sid, "effective_to": as_of},
+            )
+            closed += 1
+    for sid in unchanged:
+        session.execute(
+            _UPDATE_WEIGHT_SQL,
+            {"index_code": index_code, "stock_id": sid, "weight": weight_by_id[sid]},
+        )
+    return ConstituentCounts(len(adds), closed, len(unchanged), unresolved)

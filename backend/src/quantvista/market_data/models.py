@@ -106,3 +106,4 @@ class UniverseEntry:
     exchange: str
     is_active: bool
     provenance: Provenance
+    weight: Decimal | None = None  # index weight when the provider supplies it (dev = None)

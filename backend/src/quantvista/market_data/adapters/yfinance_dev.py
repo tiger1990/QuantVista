@@ -53,6 +53,14 @@ def yahoo_symbol(symbol: str, market_code: str) -> str:
     return f"{symbol}{_YAHOO_SUFFIX.get(market_code, '')}"
 
 
+def _canonical(yahoo_ticker: str) -> str:
+    """Strip this adapter's Yahoo suffix to recover the canonical symbol (RELIANCE.NS→RELIANCE)."""
+    for suffix in _YAHOO_SUFFIX.values():
+        if yahoo_ticker.endswith(suffix):
+            return yahoo_ticker[: -len(suffix)]
+    return yahoo_ticker
+
+
 def _default_ticker_factory(symbol: str) -> Any:
     """Lazily construct a ``yfinance.Ticker`` (clear error if the extra isn't installed)."""
     try:
@@ -209,14 +217,22 @@ class YFinanceDevProvider:
         ]
 
     def list_universe(self, index_code: str = "NIFTY200") -> Sequence[UniverseEntry]:
+        """NON-AUTHORITATIVE dev universe — a 5-symbol convenience list, not the real NIFTY200.
+
+        Emits the **canonical** symbol (``RELIANCE``, venue in ``exchange``) so it maps 1:1 to
+        ``stocks.symbol``; the Yahoo suffix is this adapter's private concern. ``weight`` is
+        ``None`` (Yahoo has no index weights). The authoritative membership + weights arrive with
+        the licensed vendor (QV-072) — this list must never drive a production constituent sync.
+        """
         return [
             UniverseEntry(
-                symbol=symbol,
+                symbol=_canonical(yahoo_ticker),
                 name=name,
                 isin=None,
                 exchange="NSE",
                 is_active=True,
-                provenance=self._provenance(symbol),
+                provenance=self._provenance(yahoo_ticker),
+                weight=None,
             )
-            for symbol, name in _DEV_UNIVERSE.items()
+            for yahoo_ticker, name in _DEV_UNIVERSE.items()
         ]

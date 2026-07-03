@@ -94,9 +94,9 @@ ignore_missing_imports = true
 module = ["exchange_calendars", "exchange_calendars.*", "pandas", "pandas.*"]
 ignore_missing_imports = true
 
-# The ingest + quality Celery tasks use the untyped @app.task decorator (as celery_app does).
+# The ingest + quality + universe Celery tasks use the untyped @app.task decorator.
 [[tool.mypy.overrides]]
-module = ["quantvista.jobs.ingest", "quantvista.jobs.quality"]
+module = ["quantvista.jobs.ingest", "quantvista.jobs.quality", "quantvista.jobs.universe"]
 disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
