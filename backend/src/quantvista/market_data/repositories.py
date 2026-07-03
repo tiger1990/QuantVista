@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from quantvista.market_data.adjustments import split_adjustment_steps
 from quantvista.market_data.models import CorporateAction, PriceBar
+from quantvista.market_data.quality import PriceQualityMetrics
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,3 +149,73 @@ def recompute_adjusted_close(session: Session, stock_id: UUID) -> int:
     for ex_date, factor in split_adjustment_steps(splits):  # type: ignore[arg-type]
         session.execute(_ADJ_PREFIX_SQL, {"f": factor, "s": stock_id, "e": ex_date})
     return int(session.execute(_PRICE_COUNT_SQL, {"s": stock_id}).scalar_one())
+
+
+# --- data-quality metrics (QV-018) -------------------------------------------
+# One set-based pass over daily_prices for the universe + window. adj_close is excluded from
+# null/sanity (it is recomputed asynchronously by the corp-action job and may lag a fresh ingest).
+_QUALITY_AGG_SQL = text(
+    """
+    SELECT
+        count(DISTINCT stock_id)                                       AS stocks_with_data,
+        count(*)                                                       AS observed_slots,
+        coalesce(sum(
+            (open IS NULL)::int + (high IS NULL)::int + (low IS NULL)::int
+            + (close IS NULL)::int + (volume IS NULL)::int
+        ), 0)                                                          AS ohlcv_null_cells,
+        count(*) FILTER (
+            WHERE open <= 0 OR high <= 0 OR low <= 0 OR close <= 0
+        )                                                              AS nonpositive_price_rows,
+        count(*) FILTER (
+            WHERE high < low OR high < open OR high < close OR low > open OR low > close
+        )                                                              AS ohlc_bound_violation_rows
+    FROM daily_prices
+    WHERE stock_id = ANY(:ids) AND date BETWEEN :start AND :end
+    """
+)
+_MISSING_SYMBOLS_SQL = text(
+    """
+    SELECT s.symbol
+    FROM stocks s
+    WHERE s.id = ANY(:ids)
+      AND NOT EXISTS (
+          SELECT 1 FROM daily_prices dp
+          WHERE dp.stock_id = s.id AND dp.date BETWEEN :start AND :end
+      )
+    ORDER BY s.symbol
+    LIMIT :cap
+    """
+)
+
+
+def price_quality_metrics(
+    session: Session,
+    stock_ids: Sequence[UUID],
+    start: date,
+    end: date,
+    *,
+    expected_sessions: int,
+    missing_sample_cap: int = 10,
+) -> PriceQualityMetrics:
+    """Gather the aggregate metrics the quality gates evaluate over ``[start, end]``."""
+    ids = list(stock_ids)
+    row = session.execute(_QUALITY_AGG_SQL, {"ids": ids, "start": start, "end": end}).one()
+    missing = [
+        r[0]
+        for r in session.execute(
+            _MISSING_SYMBOLS_SQL,
+            {"ids": ids, "start": start, "end": end, "cap": missing_sample_cap},
+        )
+    ]
+    observed_slots = int(row.observed_slots)
+    return PriceQualityMetrics(
+        expected_stocks=len(ids),
+        stocks_with_data=int(row.stocks_with_data),
+        ohlcv_null_cells=int(row.ohlcv_null_cells),
+        ohlcv_total_cells=observed_slots * 5,
+        nonpositive_price_rows=int(row.nonpositive_price_rows),
+        ohlc_bound_violation_rows=int(row.ohlc_bound_violation_rows),
+        expected_sessions=expected_sessions,
+        observed_slots=observed_slots,
+        missing_symbols_sample=missing,
+    )
