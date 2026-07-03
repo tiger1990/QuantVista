@@ -14,14 +14,20 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 
 import structlog
 
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
+from quantvista.market_data.fundamentals import record_fundamental_version
 from quantvista.market_data.interfaces import IMarketDataProvider
-from quantvista.market_data.models import CorporateAction, PriceBar, UniverseEntry
+from quantvista.market_data.models import (
+    CorporateAction,
+    FundamentalSnapshot,
+    PriceBar,
+    UniverseEntry,
+)
 from quantvista.market_data.quality import (
     GateViolation,
     QualityThresholds,
@@ -360,4 +366,103 @@ class UniverseSyncService:
                     "unchanged": counts.unchanged,
                 },
             )
+        return report
+
+
+@dataclass(frozen=True, slots=True)
+class FundamentalsReport:
+    market: str
+    stocks_total: int
+    stocks_ok: int  # stocks with >=1 filing recorded
+    stocks_no_data: int  # no filing with a period_end (the norm for the dev ttm stub)
+    stocks_failed: int
+    filings_inserted: int
+    filings_revised: int
+    filings_unchanged: int
+    failures: list[tuple[str, str]] = field(default_factory=list)
+
+
+# The 6 measures the QV-012 DTO carries → QV-021 ratio-allowlist columns (rest stay NULL).
+_SNAPSHOT_RATIOS = ("pe", "forward_pe", "pb", "roe", "roce", "debt_equity")
+
+
+class FundamentalsIngestionService:
+    """Ingest fundamentals through the QV-021 bitemporal primitive (QV-022, ``06`` §5).
+
+    Provider-agnostic + per-stock isolated, like the price/corp-action services. Each
+    ``FundamentalSnapshot`` with a non-null ``period_end`` is a filing → the QV-021
+    ``record_fundamental_version`` (inserted/revised/unchanged); a ``period_end=None`` snapshot (the
+    dev ttm stub) is skipped. All filings in a run share one ``knowledge_time``. Emits
+    ``FundamentalsUpdated``.
+    """
+
+    def __init__(
+        self,
+        provider: IMarketDataProvider,
+        event_bus: IEventBus,
+        *,
+        symbol_mapper: SymbolMapper = _identity_mapper,
+    ) -> None:
+        self._provider = provider
+        self._events = event_bus
+        self._map = symbol_mapper
+        self._log = structlog.get_logger()
+
+    def ingest(
+        self,
+        market: str,
+        *,
+        index_code: str = "NIFTY200",
+        knowledge_time: datetime | None = None,
+    ) -> FundamentalsReport:
+        """Ingest the latest filings for every open constituent of ``index_code``."""
+        kt = knowledge_time or datetime.now(UTC)
+        with privileged_session_scope() as session:
+            universe = active_universe(session, index_code, market)
+
+        ok = no_data = failed = inserted = revised = unchanged = 0
+        failures: list[tuple[str, str]] = []
+        for stock in universe:
+            try:
+                provider_symbol = self._map(stock.symbol, stock.market)
+                snapshots: Sequence[FundamentalSnapshot] = self._provider.get_fundamentals(
+                    provider_symbol
+                )
+                filings = [s for s in snapshots if s.period_end is not None]
+                if not filings:
+                    no_data += 1
+                    continue
+                with privileged_session_scope() as session:
+                    for snap in filings:
+                        assert snap.period_end is not None  # filtered above; narrows for mypy
+                        action = record_fundamental_version(
+                            session,
+                            stock.stock_id,
+                            snap.period_end,
+                            snap.statement_type or "quarterly",
+                            {c: getattr(snap, c) for c in _SNAPSHOT_RATIOS},
+                            knowledge_time=kt,
+                        )
+                        inserted += action == "inserted"
+                        revised += action == "revised"
+                        unchanged += action == "unchanged"
+                ok += 1
+            except Exception as exc:  # per-stock isolation
+                failed += 1
+                failures.append((stock.symbol, str(exc)))
+                self._log.warning("fundamentals_ingest_failed", symbol=stock.symbol, error=str(exc))
+
+        report = FundamentalsReport(
+            market, len(universe), ok, no_data, failed, inserted, revised, unchanged, failures
+        )
+        self._events.publish(
+            "FundamentalsUpdated",
+            {
+                "market": market,
+                "knowledge_time": kt.isoformat(),
+                "inserted": inserted,
+                "revised": revised,
+                "unchanged": unchanged,
+            },
+        )
         return report

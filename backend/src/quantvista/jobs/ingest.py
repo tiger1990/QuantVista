@@ -18,12 +18,14 @@ from quantvista.jobs.ledger import JobRunLedger
 from quantvista.market_data.adapters.yfinance_dev import YFinanceDevProvider, yahoo_symbol
 from quantvista.market_data.services import (
     CorporateActionIngestionService,
+    FundamentalsIngestionService,
     PriceIngestionService,
 )
 from quantvista.market_data.trading_calendar import last_completed_session
 
 JOB_NAME = "ingest_daily_prices"
 CORPACT_JOB_NAME = "ingest_corporate_actions"
+FUND_JOB_NAME = "ingest_fundamentals"
 # Corporate actions can be announced any time; the daily run scans a recent window.
 _CORPACT_LOOKBACK_DAYS = 7
 
@@ -113,3 +115,38 @@ def backfill_corporate_actions(
     """One-off historical corporate-actions backfill + adj_close recompute over the window."""
     key = run_key("corpact", market, "backfill", start.isoformat(), end.isoformat())
     return _run_corpactions(market, start, end, key, index_code)
+
+
+# --- fundamentals (bitemporal versioned upsert, QV-022) ----------------------
+def _run_fundamentals(market: str, key: str, index_code: str) -> JobOutcome:
+    service = FundamentalsIngestionService(
+        YFinanceDevProvider(), LoggingEventBus(), symbol_mapper=yahoo_symbol
+    )
+
+    def work() -> JobResult:
+        report = service.ingest(market, index_code=index_code)
+        if report.stocks_failed:  # STRICT (same policy as prices/corp-actions)
+            raise IngestRunFailed(
+                f"{report.stocks_failed}/{report.stocks_total} stocks failed: "
+                f"{[s for s, _ in report.failures][:10]}"
+            )
+        return JobResult(
+            rows_in=report.stocks_ok,
+            rows_out=report.filings_inserted + report.filings_revised,
+        )
+
+    return run_job(FUND_JOB_NAME, key, work, ledger=JobRunLedger())
+
+
+@app.task(
+    name="quantvista.ingest_fundamentals",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
+def ingest_fundamentals(market: str = "NSE", date_iso: str | None = None) -> str:
+    """Poll + version the latest fundamentals filings for ``market`` (bitemporal, idempotent)."""
+    target = date.fromisoformat(date_iso) if date_iso else last_completed_session(date.today())
+    key = run_key("fund", market, target.isoformat())
+    return _run_fundamentals(market, key, "NIFTY200").status.value

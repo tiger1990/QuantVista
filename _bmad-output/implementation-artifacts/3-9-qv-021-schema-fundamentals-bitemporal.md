@@ -4,7 +4,7 @@ baseline_commit: cc243febd5e49a9a4e0979371b75cb1b03213673
 
 # Story 3.9: QV-021 — Schema: fundamentals (bitemporal)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
