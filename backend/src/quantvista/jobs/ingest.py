@@ -9,17 +9,23 @@ Backfill replays the same task over a date window (``06`` §1.3: backfill = same
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from quantvista.core.events import LoggingEventBus
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
 from quantvista.market_data.adapters.yfinance_dev import YFinanceDevProvider, yahoo_symbol
-from quantvista.market_data.services import PriceIngestionService
+from quantvista.market_data.services import (
+    CorporateActionIngestionService,
+    PriceIngestionService,
+)
 from quantvista.market_data.trading_calendar import last_completed_session
 
 JOB_NAME = "ingest_daily_prices"
+CORPACT_JOB_NAME = "ingest_corporate_actions"
+# Corporate actions can be announced any time; the daily run scans a recent window.
+_CORPACT_LOOKBACK_DAYS = 7
 
 
 class IngestRunFailed(RuntimeError):
@@ -66,3 +72,44 @@ def backfill_daily_prices(
     """
     key = run_key("prices", market, "backfill", start.isoformat(), end.isoformat())
     return _run(market, start, end, key, index_code)
+
+
+# --- corporate actions + adjusted close (QV-017) -----------------------------
+def _run_corpactions(market: str, start: date, end: date, key: str, index_code: str) -> JobOutcome:
+    service = CorporateActionIngestionService(
+        YFinanceDevProvider(), LoggingEventBus(), symbol_mapper=yahoo_symbol
+    )
+
+    def work() -> JobResult:
+        report = service.ingest(market, start, end, index_code=index_code)
+        if report.stocks_failed:  # STRICT (same policy as prices)
+            raise IngestRunFailed(
+                f"{report.stocks_failed}/{report.stocks_total} stocks failed: "
+                f"{[s for s, _ in report.failures][:10]}"
+            )
+        return JobResult(rows_in=report.actions_upserted, rows_out=report.stocks_adjusted)
+
+    return run_job(CORPACT_JOB_NAME, key, work, ledger=JobRunLedger())
+
+
+@app.task(
+    name="quantvista.ingest_corporate_actions",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
+def ingest_corporate_actions(market: str = "NSE", date_iso: str | None = None) -> str:
+    """Scan a recent window for corporate actions, upsert them, and recompute ``adj_close``."""
+    target = date.fromisoformat(date_iso) if date_iso else last_completed_session(date.today())
+    start = target - timedelta(days=_CORPACT_LOOKBACK_DAYS)
+    key = run_key("corpact", market, target.isoformat())
+    return _run_corpactions(market, start, target, key, "NIFTY200").status.value
+
+
+def backfill_corporate_actions(
+    market: str = "NSE", *, start: date, end: date, index_code: str = "NIFTY200"
+) -> JobOutcome:
+    """One-off historical corporate-actions backfill + adj_close recompute over the window."""
+    key = run_key("corpact", market, "backfill", start.isoformat(), end.isoformat())
+    return _run_corpactions(market, start, end, key, index_code)
