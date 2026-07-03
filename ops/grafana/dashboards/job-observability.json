@@ -1,0 +1,105 @@
+{
+  "uid": "quantvista-jobs",
+  "title": "QuantVista — Job & Pipeline Health",
+  "tags": ["quantvista", "jobs", "pipeline"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Task latency p50 / p95",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "p50 {{task}}",
+          "expr": "histogram_quantile(0.5, sum(rate(celery_task_duration_seconds_bucket[5m])) by (le, task))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "p95 {{task}}",
+          "expr": "histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[5m])) by (le, task))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Task failure rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{task}}",
+          "expr": "sum(rate(celery_task_failures_total[5m])) by (task)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Tasks by terminal state",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{state}}",
+          "expr": "sum(increase(celery_tasks_total[5m])) by (state)"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Pipeline freshness lag (daily_prices)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 129600 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "lag",
+          "expr": "time() - data_latest_ingest_timestamp_seconds{dataset=\"daily_prices\"}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Queue depth",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{queue}}",
+          "expr": "celery_queue_depth"
+        }
+      ]
+    }
+  ]
+}

@@ -13,7 +13,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -32,6 +32,27 @@ TENANT_REQUESTS = Counter("http_requests_by_tenant_total", "HTTP requests per te
 TASK_TOTAL = Counter("celery_tasks_total", "Celery tasks by terminal state", ["task", "state"])
 TASK_LATENCY = Histogram("celery_task_duration_seconds", "Celery task latency", ["task"])
 TASK_FAILURES = Counter("celery_task_failures_total", "Celery task failures", ["task"])
+
+# --- Pipeline / job health (QV-020) ------------------------------------------
+# Freshness is exported as a timestamp; lag = time() - gauge, derived in PromQL/Grafana so it
+# never goes stale between scrapes. Queue depth is the pending-message backlog per queue.
+DATA_FRESHNESS = Gauge(
+    "data_latest_ingest_timestamp_seconds",
+    "Unix timestamp of the newest ingested data point, per dataset",
+    ["dataset"],
+)
+QUEUE_DEPTH = Gauge("celery_queue_depth", "Pending messages in a Celery/Redis queue", ["queue"])
+
+
+def set_data_freshness(dataset: str, epoch_seconds: float) -> None:
+    """Publish the freshness timestamp for ``dataset`` (thin setter; DB query lives in jobs)."""
+    DATA_FRESHNESS.labels(dataset=dataset).set(epoch_seconds)
+
+
+def set_queue_depth(queue: str, depth: int) -> None:
+    """Publish the pending-message backlog for ``queue`` (thin setter; Redis call lives in jobs)."""
+    QUEUE_DEPTH.labels(queue=queue).set(depth)
+
 
 METRICS_PATH = "/metrics"
 

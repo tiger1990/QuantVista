@@ -105,6 +105,37 @@ change via reviewed PR; remote state + DynamoDB lock prevent concurrent/clobberi
 PV-002 ⏳ OPEN until the rollout is clean and re-verified. Detail:
 `_bmad-output/implementation-artifacts/1-4-qv-008-iac-bootstrap-aws-staging.md`.
 
+### PV-003 — QV-020 dashboard & alert artifacts to import on staging
+
+QV-020 builds the job-observability artifacts **locally** (no longer fully gated on PV-003 — only the
+*live* clauses below are). Built + verified here: the freshness gauge (`data_latest_ingest_timestamp_seconds`)
++ queue-depth gauge (`celery_queue_depth`) on `/metrics`, the `refresh_ops_metrics` Beat task, the
+Prometheus scrape config + alert rules (`ops/prometheus/`, structurally gated by an always-on YAML test),
+and the Grafana dashboard JSON (`ops/grafana/dashboards/job-observability.json`, structurally validated).
+
+> **PV — `promtool test rules` execution.** The deterministic alert-logic proof (fresh→ok, stale→firing,
+> failures→firing, backlog→firing) runs via `promtool`, which **could not be installed on the dev machine**
+> (macOS 12 has no Prometheus bottle → Homebrew source-build pulls a broken patch; a raw-binary download is
+> policy-blocked). **Now gated in CI** — `.github/workflows/ci.yml` `backend-tests` installs `promtool`
+> (Linux release tarball) so `tests/test_prometheus_rules.py` **executes on every PR**. The pytest cases
+> `skip` where `promtool` is absent, so a **teammate can run them locally**: `brew install prometheus`
+> (or download the release tarball), then `cd backend && pytest tests/test_prometheus_rules.py` — expect
+> `check config` + `check rules` + `test rules` all green. Status: ✅ CI-gated; ⏳ local dev-machine run
+> pending a box where promtool installs.
+
+What still needs the running staging stack (add to the PV-003 verify run):
+
+1. **Import the dashboard** (`ops/grafana/dashboards/job-observability.json`) into staging Grafana; confirm
+   all five panels render against live scraped data (task latency p50/p95, failure rate, tasks by state,
+   freshness lag, queue depth).
+2. **Load the alert rules** (`ops/prometheus/alerts.yml`) into staging Prometheus; confirm they evaluate
+   and that `PipelineFreshnessLagHigh` / `JobFailureRateHigh` / `QueueBacklogHigh` transition to **Firing**
+   under real stale-data / failure / backlog conditions.
+3. **Notification delivery:** wire Alertmanager → the real channel (Slack/PagerDuty/email) and confirm a
+   firing alert actually delivers with its runbook annotation.
+4. **Production scrape:** confirm Prometheus scrapes the deployed api (`/metrics`) + worker port and the
+   freshness/queue gauges reflect the live pipeline.
+
 ## How to close an item
 
 1. Run the verification on a capable machine.

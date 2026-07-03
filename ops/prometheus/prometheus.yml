@@ -1,0 +1,25 @@
+# Prometheus scrape config for QuantVista (QV-020).
+# Local/native use: `prometheus --config.file=ops/prometheus/prometheus.yml`.
+# Staging (PV-003) imports the same file with the real api/worker targets substituted.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - alerts.yml
+
+scrape_configs:
+  # FastAPI api role — RED metrics + freshness gauge, served at /metrics.
+  - job_name: quantvista-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["localhost:8000"]
+        labels:
+          role: api
+
+  # Celery worker role — task metrics + freshness/queue-depth gauges (prometheus_client server).
+  - job_name: quantvista-worker
+    static_configs:
+      - targets: ["localhost:9100"]
+        labels:
+          role: worker

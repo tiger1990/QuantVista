@@ -33,6 +33,12 @@ BEAT_SCHEDULE = {
         "task": "quantvista.sample_scheduled_job",
         "schedule": crontab(minute=0, hour=1),  # daily tick — placeholder cadence
     },
+    # Ops-metrics refresh: cheap internal gauges (freshness + queue depth). Unlike data jobs
+    # (which stay off Beat until a real feed/staging), this IS the thing we schedule (QV-020).
+    "refresh-ops-metrics": {
+        "task": "quantvista.refresh_ops_metrics",
+        "schedule": 60.0,  # seconds
+    },
 }
 
 
@@ -42,6 +48,7 @@ def create_celery() -> Celery:
         "quantvista",
         broker=settings.redis_url,
         backend=settings.redis_url,
+        include=["quantvista.jobs.ops_metrics"],  # register the Beat-scheduled ops task
     )
     celery.conf.task_default_queue = "default"
     celery.conf.timezone = "UTC"

@@ -41,6 +41,8 @@ dev = [
     "pytest-cov>=5.0",
     "import-linter>=2.0",
     "httpx>=0.27",
+    "PyYAML>=6.0",       # validate the checked-in Prometheus rule/config YAML (QV-020)
+    "types-PyYAML>=6.0",
 ]
 # Internal-only dev data source (QV-012). yfinance/Yahoo is NOT licensed for commercial
 # use — kept OUT of the default/prod install on purpose (project rule #8). The dev adapter
@@ -94,9 +96,14 @@ ignore_missing_imports = true
 module = ["exchange_calendars", "exchange_calendars.*", "pandas", "pandas.*"]
 ignore_missing_imports = true
 
-# The ingest + quality + universe Celery tasks use the untyped @app.task decorator.
+# The ingest + quality + universe + ops-metrics Celery tasks use the untyped @app.task decorator.
 [[tool.mypy.overrides]]
-module = ["quantvista.jobs.ingest", "quantvista.jobs.quality", "quantvista.jobs.universe"]
+module = [
+    "quantvista.jobs.ingest",
+    "quantvista.jobs.quality",
+    "quantvista.jobs.universe",
+    "quantvista.jobs.ops_metrics",
+]
 disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]

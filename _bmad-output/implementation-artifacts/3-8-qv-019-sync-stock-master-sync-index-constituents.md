@@ -4,7 +4,7 @@ baseline_commit: 7b95cef70dfdc12e41dd5ec288d7a7959e3841a3
 
 # Story 3.8: QV-019 — sync_stock_master + sync_index_constituents
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

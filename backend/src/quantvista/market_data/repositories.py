@@ -68,6 +68,15 @@ def active_universe(session: Session, index_code: str, market_code: str) -> list
     return [UniverseStock(stock_id=r[0], symbol=r[1], market=r[2]) for r in rows]
 
 
+_LATEST_PRICE_DATE_SQL = text("SELECT max(date) FROM daily_prices")
+
+
+def latest_price_date(session: Session) -> date | None:
+    """The newest ``daily_prices.date`` (freshness source for QV-020); ``None`` if empty."""
+    latest: date | None = session.execute(_LATEST_PRICE_DATE_SQL).scalar_one()
+    return latest
+
+
 def upsert_daily_prices(session: Session, stock_id: UUID, bars: Sequence[PriceBar]) -> int:
     """Idempotently upsert OHLCV bars for ``stock_id``; returns the number of bars written."""
     if not bars:

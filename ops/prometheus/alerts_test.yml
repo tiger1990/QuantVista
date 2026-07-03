@@ -1,0 +1,79 @@
+# Deterministic alert-rule tests (QV-020): `promtool test rules ops/prometheus/alerts_test.yml`.
+# Proves the alert LOGIC without a running Prometheus/Grafana.
+#
+# NOTE on freshness: promtool's `time()` starts at Unix epoch 0 and advances with eval_time, so
+# a "fresh" gauge value here is a small number (near time()) and a "stale" value is far below it.
+# We exercise `time() - gauge > threshold`; the absolute epoch is irrelevant to the rule logic.
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  # Freshness — very old timestamp → lag exceeds 36h → firing after the 10m `for`.
+  - interval: 1m
+    input_series:
+      - series: 'data_latest_ingest_timestamp_seconds{dataset="daily_prices"}'
+        values: "-130000x15"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: PipelineFreshnessLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              dataset: daily_prices
+            exp_annotations:
+              summary: "daily_prices freshness lag exceeds 36h"
+              runbook: "Check ingest_daily_prices job runs (jobs_runs) and the provider feed."
+
+  # Freshness — recent timestamp → small lag → no alert.
+  - interval: 1m
+    input_series:
+      - series: 'data_latest_ingest_timestamp_seconds{dataset="daily_prices"}'
+        values: "0x15"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: PipelineFreshnessLagHigh
+        exp_alerts: []
+
+  # Job failures accumulating over the window → firing.
+  - interval: 1m
+    input_series:
+      - series: 'celery_task_failures_total{task="quantvista.ingest_daily_prices"}'
+        values: "0 0 1 1 2 2"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: JobFailureRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              task: quantvista.ingest_daily_prices
+            exp_annotations:
+              summary: "Celery task failures in the last 15m"
+              runbook: "Inspect the failing task in jobs_runs + worker logs; check DLQ."
+
+  # Queue backlog sustained above threshold → firing.
+  - interval: 1m
+    input_series:
+      - series: 'celery_queue_depth{queue="default"}'
+        values: "150x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: QueueBacklogHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              queue: default
+            exp_annotations:
+              summary: "Celery default queue backlog above 100"
+              runbook: "Check worker health/concurrency; look for a stuck or slow task."
+
+  # Queue backlog below threshold → no alert.
+  - interval: 1m
+    input_series:
+      - series: 'celery_queue_depth{queue="default"}'
+        values: "5x10"
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: QueueBacklogHigh
+        exp_alerts: []
