@@ -7,14 +7,17 @@ The upsert is keyed ``(stock_id, date)`` so re-running a session never duplicate
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from quantvista.market_data.models import PriceBar
+from quantvista.market_data.adjustments import split_adjustment_steps
+from quantvista.market_data.models import CorporateAction, PriceBar
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,3 +86,64 @@ def upsert_daily_prices(session: Session, stock_id: UUID, bars: Sequence[PriceBa
     ]
     session.execute(_UPSERT_SQL, params)
     return len(params)
+
+
+# --- corporate actions + adjusted-close (QV-017) -----------------------------
+_UPSERT_CA_SQL = text(
+    """
+    INSERT INTO corporate_actions
+        (stock_id, ex_date, action_type, ratio_or_amount, details, source)
+    VALUES
+        (:stock_id, :ex_date, :action_type, :ratio, CAST(:details AS jsonb), :source)
+    ON CONFLICT (stock_id, ex_date, action_type) DO UPDATE SET
+        ratio_or_amount = EXCLUDED.ratio_or_amount, details = EXCLUDED.details,
+        source = EXCLUDED.source, ingested_at = now()
+    """
+)
+
+# Only split/bonus actions drive price adjustment (dividends are stored, not applied).
+_SPLIT_ROWS_SQL = text(
+    "SELECT ex_date, ratio_or_amount FROM corporate_actions "
+    "WHERE stock_id = :s AND action_type IN ('split', 'bonus') AND ratio_or_amount > 0"
+)
+_RESET_ADJ_SQL = text("UPDATE daily_prices SET adj_close = close WHERE stock_id = :s")
+_ADJ_PREFIX_SQL = text(
+    "UPDATE daily_prices SET adj_close = close * :f WHERE stock_id = :s AND date < :e"
+)
+_PRICE_COUNT_SQL = text("SELECT count(*) FROM daily_prices WHERE stock_id = :s")
+
+
+def upsert_corporate_actions(
+    session: Session, stock_id: UUID, actions: Sequence[CorporateAction]
+) -> int:
+    """Idempotently upsert corporate actions keyed ``(stock_id, ex_date, action_type)``."""
+    if not actions:
+        return 0
+    params = [
+        {
+            "stock_id": stock_id,
+            "ex_date": a.ex_date,
+            "action_type": a.action_type.value,
+            "ratio": a.ratio_or_amount,
+            "details": json.dumps(a.details),
+            "source": a.provenance.source,
+        }
+        for a in actions
+    ]
+    session.execute(_UPSERT_CA_SQL, params)
+    return len(params)
+
+
+def recompute_adjusted_close(session: Session, stock_id: UUID) -> int:
+    """Recompute ``daily_prices.adj_close`` from raw ``close`` + split/bonus actions.
+
+    Deterministic + idempotent: resets ``adj_close = close``, then applies each cumulative
+    factor to the prefix of dates before its ex-date. Returns the number of price rows touched.
+    """
+    splits: list[tuple[object, Decimal]] = [
+        (r[0], r[1]) for r in session.execute(_SPLIT_ROWS_SQL, {"s": stock_id}).all()
+    ]
+    session.execute(_RESET_ADJ_SQL, {"s": stock_id})
+    for ex_date, factor in split_adjustment_steps(splits):  # type: ignore[arg-type]
+        session.execute(_ADJ_PREFIX_SQL, {"f": factor, "s": stock_id, "e": ex_date})
+    return int(session.execute(_PRICE_COUNT_SQL, {"s": stock_id}).scalar_one())

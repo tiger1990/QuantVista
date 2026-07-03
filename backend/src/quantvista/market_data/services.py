@@ -21,8 +21,13 @@ import structlog
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
 from quantvista.market_data.interfaces import IMarketDataProvider
-from quantvista.market_data.models import PriceBar
-from quantvista.market_data.repositories import active_universe, upsert_daily_prices
+from quantvista.market_data.models import CorporateAction, PriceBar
+from quantvista.market_data.repositories import (
+    active_universe,
+    recompute_adjusted_close,
+    upsert_corporate_actions,
+    upsert_daily_prices,
+)
 
 # (symbol, market) -> provider symbol. Default is identity; the job wires the provider's mapper
 # (e.g. yfinance's yahoo_symbol) so the service never depends on a concrete adapter.
@@ -96,6 +101,83 @@ class PriceIngestionService:
                 "end": end.isoformat(),
                 "stocks_ok": ok,
                 "rows_upserted": rows,
+            },
+        )
+        return report
+
+
+@dataclass(frozen=True, slots=True)
+class CorpActionReport:
+    market: str
+    start: date
+    end: date
+    stocks_total: int
+    stocks_ok: int  # stocks with >=1 action ingested
+    stocks_no_data: int  # stocks with no actions in the window (the norm — not an error)
+    stocks_failed: int
+    actions_upserted: int
+    stocks_adjusted: int  # stocks whose adj_close recompute touched >=1 price row
+    failures: list[tuple[str, str]] = field(default_factory=list)
+
+
+class CorporateActionIngestionService:
+    """Ingest splits/bonuses/dividends and recompute split/bonus-adjusted ``adj_close`` (QV-017).
+
+    Same provider-agnostic, per-stock-isolated shape as ``PriceIngestionService``. Dividends are
+    stored but never applied to ``adj_close`` (``03`` §5 — split/bonus adjustment only).
+    """
+
+    def __init__(
+        self,
+        provider: IMarketDataProvider,
+        event_bus: IEventBus,
+        *,
+        symbol_mapper: SymbolMapper = _identity_mapper,
+    ) -> None:
+        self._provider = provider
+        self._events = event_bus
+        self._map = symbol_mapper
+        self._log = structlog.get_logger()
+
+    def ingest(
+        self, market: str, start: date, end: date, *, index_code: str = "NIFTY200"
+    ) -> CorpActionReport:
+        with privileged_session_scope() as session:
+            universe = active_universe(session, index_code, market)
+
+        ok = no_data = failed = actions = adjusted = 0
+        failures: list[tuple[str, str]] = []
+        for stock in universe:
+            try:
+                provider_symbol = self._map(stock.symbol, stock.market)
+                acts: Sequence[CorporateAction] = self._provider.get_corporate_actions(
+                    provider_symbol, start, end
+                )
+                with privileged_session_scope() as session:
+                    n = upsert_corporate_actions(session, stock.stock_id, acts)
+                    # Recompute adj_close from raw close + all split/bonus rows (idempotent;
+                    # reflects late actions across the full history).
+                    touched = recompute_adjusted_close(session, stock.stock_id)
+                actions += n
+                ok += 1 if n else 0
+                no_data += 0 if n else 1
+                adjusted += 1 if touched else 0
+            except Exception as exc:  # per-stock isolation
+                failed += 1
+                failures.append((stock.symbol, str(exc)))
+                self._log.warning("corpaction_ingest_failed", symbol=stock.symbol, error=str(exc))
+
+        report = CorpActionReport(
+            market, start, end, len(universe), ok, no_data, failed, actions, adjusted, failures
+        )
+        self._events.publish(
+            "CorpActionsUpdated",
+            {
+                "market": market,
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "actions_upserted": actions,
+                "stocks_adjusted": adjusted,
             },
         )
         return report
