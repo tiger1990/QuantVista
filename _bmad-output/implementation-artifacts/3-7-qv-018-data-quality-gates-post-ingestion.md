@@ -4,7 +4,7 @@ baseline_commit: 4b653f9af29ad0d7165ccc7e4c21a384de2a0166
 
 # Story 3.7: QV-018 — Data-quality gates (post-ingestion)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
