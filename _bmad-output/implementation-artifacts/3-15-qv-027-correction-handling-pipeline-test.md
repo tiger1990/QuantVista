@@ -4,7 +4,7 @@ baseline_commit: 96bb60a115e31917894ff25f6cd9c3af28359f71
 
 # Story 3.15: QV-027 — Correction-handling pipeline test
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
