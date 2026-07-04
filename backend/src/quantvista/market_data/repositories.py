@@ -411,3 +411,71 @@ def upsert_shareholding(
     ]
     session.execute(_UPSERT_SHP_SQL, params)
     return len(params)
+
+
+# --- technical indicators (QV-025) -------------------------------------------
+# Most-recent N sessions per stock ending at :end — the lookback for rolling indicators.
+_PRICE_HISTORY_SQL = text(
+    """
+    SELECT stock_id, date, adj_close, high, low, close FROM (
+        SELECT stock_id, date, adj_close, high, low, close,
+               row_number() OVER (PARTITION BY stock_id ORDER BY date DESC) AS rn
+        FROM daily_prices
+        WHERE stock_id = ANY(:ids) AND date <= :end
+    ) t
+    WHERE rn <= :sessions
+    ORDER BY stock_id, date
+    """
+)
+
+_TI_COLUMNS = (
+    "sma_50",
+    "sma_200",
+    "ema_20",
+    "rsi_14",
+    "macd",
+    "macd_signal",
+    "bollinger_upper",
+    "bollinger_lower",
+    "atr_14",
+    "ret_3m",
+    "ret_6m",
+    "ret_12m",
+    "vol_30d",
+    "beta_1y",
+)
+_TI_INSERT_COLS = "stock_id, date, " + ", ".join(_TI_COLUMNS)
+_TI_INSERT_VALS = ":stock_id, :date, " + ", ".join(f":{c}" for c in _TI_COLUMNS)
+_TI_UPDATE_SET = ", ".join(f"{c} = EXCLUDED.{c}" for c in _TI_COLUMNS)
+_UPSERT_TI_SQL = text(
+    f"INSERT INTO technical_indicators ({_TI_INSERT_COLS}) VALUES ({_TI_INSERT_VALS}) "
+    f"ON CONFLICT (stock_id, date) DO UPDATE SET {_TI_UPDATE_SET}"
+)
+
+
+def price_history_for_indicators(
+    session: Session, stock_ids: Sequence[UUID], end: date, sessions: int = 300
+) -> list[dict[str, object]]:
+    """The most-recent ``sessions`` price rows per stock (≤ ``end``) for indicator lookback."""
+    rows = session.execute(
+        _PRICE_HISTORY_SQL, {"ids": list(stock_ids), "end": end, "sessions": sessions}
+    ).all()
+    return [
+        {
+            "stock_id": r.stock_id,
+            "date": r.date,
+            "adj_close": float(r.adj_close) if r.adj_close is not None else None,
+            "high": float(r.high) if r.high is not None else None,
+            "low": float(r.low) if r.low is not None else None,
+            "close": float(r.close) if r.close is not None else None,
+        }
+        for r in rows
+    ]
+
+
+def upsert_technical_indicators(session: Session, rows: Sequence[dict[str, object]]) -> int:
+    """Upsert indicator rows keyed ``(stock_id, date)``; Postgres rounds floats into the columns."""
+    if not rows:
+        return 0
+    session.execute(_UPSERT_TI_SQL, list(rows))
+    return len(rows)
