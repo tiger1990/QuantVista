@@ -13,7 +13,7 @@ Per-stock isolation: one symbol's failure never sinks the run — an empty resul
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 
 import structlog
@@ -22,6 +22,7 @@ from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
 from quantvista.market_data.fundamentals import record_fundamental_version
 from quantvista.market_data.interfaces import IMarketDataProvider
+from quantvista.market_data.macro import IMacroProvider, MacroSeries
 from quantvista.market_data.models import (
     CorporateAction,
     FundamentalSnapshot,
@@ -41,6 +42,7 @@ from quantvista.market_data.repositories import (
     reconcile_constituents,
     upsert_corporate_actions,
     upsert_daily_prices,
+    upsert_macro_series,
     upsert_shareholding,
     upsert_stocks,
 )
@@ -524,3 +526,31 @@ class ShareholdingIngestionService:
                 self._log.warning("shareholding_ingest_failed", symbol=stock.symbol, error=str(exc))
 
         return ShareholdingReport(market, len(universe), ok, no_data, failed, rows, failures)
+
+
+@dataclass(frozen=True, slots=True)
+class MacroSyncReport:
+    series_code: str  # the CANONICAL key stored (provider-stable)
+    start: date
+    end: date
+    observations_upserted: int
+
+
+class MacroSyncService:
+    """Sync a macro series through the generic provider seam (QV-026), storing the CANONICAL key.
+
+    The provider resolves the canonical ``MacroSeries`` to its own code + fetches; the service
+    re-stamps the canonical ``series_code`` before upsert so the persisted key is provider-stable.
+    No event (the ``06`` catalog emits none for macro).
+    """
+
+    def __init__(self, provider: IMacroProvider) -> None:
+        self._provider = provider
+        self._log = structlog.get_logger()
+
+    def sync(self, series: MacroSeries, start: date, end: date) -> MacroSyncReport:
+        observations = self._provider.get_series(self._provider.code_for(series), start, end)
+        canonical = [replace(o, series_code=series.value) for o in observations]
+        with privileged_session_scope() as session:
+            written = upsert_macro_series(session, canonical)
+        return MacroSyncReport(series.value, start, end, written)

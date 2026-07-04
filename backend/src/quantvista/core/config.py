@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     event_bus_group: str = "quantvista"  # consumer-group name (redis_streams / kafka)
     kafka_bootstrap_servers: str = "localhost:9092"
 
+    # Macro data (QV-026): FRED API key (free, redistributable). Unset → macro sync can't run.
+    fred_api_key: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:
