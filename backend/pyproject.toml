@@ -120,6 +120,7 @@ module = [
     "quantvista.jobs.ops_metrics",
     "quantvista.jobs.compute",
     "quantvista.jobs.macro",
+    "quantvista.jobs.corrections",
 ]
 disallow_untyped_decorators = false
 

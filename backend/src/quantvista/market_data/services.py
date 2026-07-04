@@ -425,6 +425,7 @@ class FundamentalsIngestionService:
             universe = active_universe(session, index_code, market)
 
         ok = no_data = failed = inserted = revised = unchanged = 0
+        revisions: list[dict[str, str]] = []  # affected filings → self-heal recompute (QV-027)
         failures: list[tuple[str, str]] = []
         for stock in universe:
             try:
@@ -439,17 +440,26 @@ class FundamentalsIngestionService:
                 with privileged_session_scope() as session:
                     for snap in filings:
                         assert snap.period_end is not None  # filtered above; narrows for mypy
+                        statement_type = snap.statement_type or "quarterly"
                         action = record_fundamental_version(
                             session,
                             stock.stock_id,
                             snap.period_end,
-                            snap.statement_type or "quarterly",
+                            statement_type,
                             {c: getattr(snap, c) for c in _SNAPSHOT_RATIOS},
                             knowledge_time=kt,
                         )
                         inserted += action == "inserted"
-                        revised += action == "revised"
                         unchanged += action == "unchanged"
+                        if action == "revised":
+                            revised += 1
+                            revisions.append(
+                                {
+                                    "stock_id": str(stock.stock_id),
+                                    "period_end": snap.period_end.isoformat(),
+                                    "statement_type": statement_type,
+                                }
+                            )
                 ok += 1
             except Exception as exc:  # per-stock isolation
                 failed += 1
@@ -469,6 +479,12 @@ class FundamentalsIngestionService:
                 "unchanged": unchanged,
             },
         )
+        # Correction signal (06 §5): only when a revision actually occurred → downstream self-heal.
+        if revisions:
+            self._events.publish(
+                "FundamentalsRevised",
+                {"market": market, "knowledge_time": kt.isoformat(), "revisions": revisions},
+            )
         return report
 
 
