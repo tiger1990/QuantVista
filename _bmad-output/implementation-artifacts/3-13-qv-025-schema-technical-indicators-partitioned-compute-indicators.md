@@ -4,7 +4,7 @@ baseline_commit: 1c9f521a2af1758e314d80e21e07a442dcde2cae
 
 # Story 3.13: QV-025 — Schema: technical_indicators (partitioned) + compute_indicators
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

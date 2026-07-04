@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from quantvista.market_data.adjustments import split_adjustment_steps
+from quantvista.market_data.macro import MacroObservation
 from quantvista.market_data.models import (
     CorporateAction,
     PriceBar,
@@ -479,3 +480,26 @@ def upsert_technical_indicators(session: Session, rows: Sequence[dict[str, objec
         return 0
     session.execute(_UPSERT_TI_SQL, list(rows))
     return len(rows)
+
+
+# --- macro series (QV-026) ---------------------------------------------------
+_UPSERT_MACRO_SQL = text(
+    """
+    INSERT INTO macro_series (series_code, date, value, source)
+    VALUES (:series_code, :date, :value, :source)
+    ON CONFLICT (series_code, date) DO UPDATE SET
+        value = EXCLUDED.value, source = EXCLUDED.source, ingested_at = now()
+    """
+)
+
+
+def upsert_macro_series(session: Session, observations: Sequence[MacroObservation]) -> int:
+    """Idempotently upsert macro observations keyed ``(series_code, date)``. Returns row count."""
+    if not observations:
+        return 0
+    params = [
+        {"series_code": o.series_code, "date": o.date, "value": o.value, "source": o.source}
+        for o in observations
+    ]
+    session.execute(_UPSERT_MACRO_SQL, params)
+    return len(params)

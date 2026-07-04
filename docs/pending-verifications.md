@@ -142,3 +142,24 @@ What still needs the running staging stack (add to the PV-003 verify run):
 2. If green: set Status to ✅ CLOSED (date + machine), check the corresponding story subtask, and
    remove the gate from any blocked story.
 3. If red: open a `fix/*` branch, link it here, keep Status ⏳ OPEN until merged + re-verified.
+
+## Deferred data sources (🧭 scope deferrals — fast-follow stories, NOT verification debt)
+
+Per the taxonomy above these are **scope** deferrals (code not written yet), not PV env-debt — logged
+here only for **visibility at sprint review** so we don't lose track of what macro coverage remains.
+They become their own backlog stories (own QV numbers) behind the existing `IMacroProvider` seam
+(`market_data/macro.py`) — each is a drop-in adapter + a `MacroSeries`→provider-code map; **no core change.**
+
+QV-026 shipped **FRED** (US/global, fresh) + **World Bank** (India + cross-country, *annual*, current-year).
+The gap is **monthly/daily fresh Indian** macro, which neither FRED nor World Bank provides:
+
+| Deferred source | Serves (fresh) | Why not now | Effort |
+|-----------------|----------------|-------------|--------|
+| **RBI** (Reserve Bank of India / DBIE) | Repo & reverse-repo, CRR/SLR, G-sec yields, USD/INR, forex reserves, M1/M2/M3 — **daily/weekly** | No single FRED-like REST API; per-dataset endpoints/downloads → provider-specific adapter work | Medium–High |
+| **MOSPI** (Min. of Statistics) | **CPI monthly** (~12th), IIP monthly, GDP quarterly, national accounts | Distributed as CSV/Excel/PDF; Unitdata API needs registration + key | Medium–High |
+| **IMF** | Cross-country inflation, fiscal balance, public debt, current account | Lower priority — World Bank already covers cross-country annual | Low–Medium |
+
+**Gate:** before the factor/scoring layer (Epic 4+) needs *timely monthly* Indian macro (e.g. live CPI
+momentum), stand up the **MOSPI** (monthly CPI/IIP) and **RBI** (rates/yields/FX) adapters. Until then,
+World Bank annual India + FRED US/global is the accepted coverage. Roadmap detail in the
+`macro-provider-strategy` memory.
