@@ -4,7 +4,7 @@ baseline_commit: 4f3db7c2c7b3a30e15e0f6d6520f7247d825d380
 
 # Story 3.14: QV-026 — sync_macro_series (rates / inflation / GDP)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

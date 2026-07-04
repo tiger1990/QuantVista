@@ -61,6 +61,18 @@ class FundamentalsUpdated(_Event):
 
 
 @dataclass(frozen=True, slots=True)
+class FundamentalsRevised(_Event):
+    """Fires only when ≥1 filing is *revised* — the correction signal that drives self-heal (QV-027,
+    ``06`` §5). ``revisions`` = the affected filings whose derived scores must recompute."""
+
+    TOPIC: ClassVar[str] = "FundamentalsRevised"
+    VERSION: ClassVar[int] = 1
+    market: str
+    knowledge_time: str
+    revisions: tuple[dict[str, str], ...]  # [{stock_id, period_end, statement_type}]
+
+
+@dataclass(frozen=True, slots=True)
 class IndicatorsComputed(_Event):
     TOPIC: ClassVar[str] = "IndicatorsComputed"
     VERSION: ClassVar[int] = 1
