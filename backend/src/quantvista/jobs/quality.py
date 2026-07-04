@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from quantvista.core.events import LoggingEventBus
+from quantvista.core.events import get_event_bus
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
@@ -26,7 +26,7 @@ class DataQualityGateError(RuntimeError):
 
 
 def _run_validate(market: str, start: date, end: date, key: str, index_code: str) -> JobOutcome:
-    service = DataQualityService(LoggingEventBus())
+    service = DataQualityService(get_event_bus())
 
     def work() -> JobResult:
         report = service.validate(market, start, end, index_code=index_code)

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from quantvista.core.events import LoggingEventBus
+from quantvista.core.events import get_event_bus
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
@@ -32,7 +32,7 @@ class UniverseSyncError(RuntimeError):
 
 
 def _service() -> UniverseSyncService:
-    return UniverseSyncService(YFinanceDevProvider(), LoggingEventBus())
+    return UniverseSyncService(YFinanceDevProvider(), get_event_bus())
 
 
 def _run_master(market: str, index_code: str, key: str) -> JobOutcome:

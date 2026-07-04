@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     metrics_enabled: bool = True
     worker_metrics_port: int = 9100  # prometheus_client HTTP server for the worker role
 
+    # Event bus backend (QV-024): in_process | redis_streams | kafka. Toggle by traffic —
+    # in_process for dev/idle, redis_streams / kafka in production. Same IEventBus + envelope.
+    event_bus_backend: str = "in_process"
+    event_bus_group: str = "quantvista"  # consumer-group name (redis_streams / kafka)
+    kafka_bootstrap_servers: str = "localhost:9092"
+
 
 @lru_cache
 def get_settings() -> Settings:

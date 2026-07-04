@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from quantvista.core.events import LoggingEventBus
+from quantvista.core.events import get_event_bus
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
@@ -38,7 +38,7 @@ class IngestRunFailed(RuntimeError):
 
 def _run(market: str, start: date, end: date, key: str, index_code: str) -> JobOutcome:
     provider = YFinanceDevProvider()
-    service = PriceIngestionService(provider, LoggingEventBus(), symbol_mapper=yahoo_symbol)
+    service = PriceIngestionService(provider, get_event_bus(), symbol_mapper=yahoo_symbol)
 
     def work() -> JobResult:
         report = service.ingest(market, start, end, index_code=index_code)
@@ -81,7 +81,7 @@ def backfill_daily_prices(
 # --- corporate actions + adjusted close (QV-017) -----------------------------
 def _run_corpactions(market: str, start: date, end: date, key: str, index_code: str) -> JobOutcome:
     service = CorporateActionIngestionService(
-        YFinanceDevProvider(), LoggingEventBus(), symbol_mapper=yahoo_symbol
+        YFinanceDevProvider(), get_event_bus(), symbol_mapper=yahoo_symbol
     )
 
     def work() -> JobResult:
@@ -122,7 +122,7 @@ def backfill_corporate_actions(
 # --- fundamentals (bitemporal versioned upsert, QV-022) ----------------------
 def _run_fundamentals(market: str, key: str, index_code: str) -> JobOutcome:
     service = FundamentalsIngestionService(
-        YFinanceDevProvider(), LoggingEventBus(), symbol_mapper=yahoo_symbol
+        YFinanceDevProvider(), get_event_bus(), symbol_mapper=yahoo_symbol
     )
 
     def work() -> JobResult:
