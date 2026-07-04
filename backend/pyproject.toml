@@ -31,6 +31,8 @@ dependencies = [
     "sentry-sdk>=2.13",
     # Market data (QV-016): NSE/BSE trading calendar (India = XBOM; NSE/BSE share holidays).
     "exchange-calendars>=4",
+    # Technical indicators (QV-025): Polars-vectorized compute (ships py.typed).
+    "polars>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -114,6 +116,7 @@ module = [
     "quantvista.jobs.quality",
     "quantvista.jobs.universe",
     "quantvista.jobs.ops_metrics",
+    "quantvista.jobs.compute",
 ]
 disallow_untyped_decorators = false
 

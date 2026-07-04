@@ -74,6 +74,12 @@ def _init_worker_observability(**_: object) -> None:
         # first server serves the shared registry; subsequent binds are safe to skip.
         with contextlib.suppress(OSError):
             start_worker_metrics_server(settings.worker_metrics_port)
+    # QV-025: subscribe the pipeline consumers on the shared event bus (PricesIngested→validate,
+    # PricesValidated→compute_indicators). Import here to avoid a module-load import cycle.
+    from quantvista.core.events import get_event_bus
+    from quantvista.jobs.consumers import register_pipeline_consumers
+
+    register_pipeline_consumers(get_event_bus())
 
 
 app = create_celery()

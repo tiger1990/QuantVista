@@ -4,7 +4,7 @@ baseline_commit: 3348875ab19eebe6c9d6a3fdf08612669d2d151b
 
 # Story 3.12: QV-024 — Event bus (IEventBus): in-process + Redis Streams + Kafka, config-toggled
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
