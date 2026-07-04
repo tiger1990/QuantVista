@@ -393,7 +393,7 @@ _UPSERT_SHP_SQL = text(
 def upsert_shareholding(
     session: Session, stock_id: UUID, snapshots: Sequence[ShareholdingSnapshot]
 ) -> int:
-    """Idempotently upsert ownership snapshots keyed ``(stock_id, as_of_date)``; returns row count."""
+    """Idempotently upsert ownership snapshots keyed ``(stock_id, as_of_date)``. Returns rows."""
     if not snapshots:
         return 0
     params = [
