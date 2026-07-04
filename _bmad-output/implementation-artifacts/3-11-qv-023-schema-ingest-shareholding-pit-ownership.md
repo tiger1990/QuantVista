@@ -4,7 +4,7 @@ baseline_commit: 15cf3ec31e37b9f9d0450cf5b2e488616b3489fc
 
 # Story 3.11: QV-023 — Schema + ingest_shareholding (PIT ownership)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

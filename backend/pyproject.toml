@@ -50,6 +50,12 @@ dev = [
 dev-data = [
     "yfinance>=0.2",
 ]
+# Kafka event-bus backend (QV-024). Optional — only needed when event_bus_backend=kafka.
+# kafka-python-ng is pure-Python (no librdkafka C build → installs on macOS 12 + CI Linux).
+# The KafkaEventBus lazy-imports it; the default install never requires it.
+kafka = [
+    "kafka-python-ng>=2.2",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -91,6 +97,11 @@ disallow_untyped_decorators = false
 module = ["yfinance", "yfinance.*"]
 ignore_missing_imports = true
 
+# kafka-python-ng ships no stubs and is an optional extra; treat as untyped third-party.
+[[tool.mypy.overrides]]
+module = ["kafka", "kafka.*"]
+ignore_missing_imports = true
+
 # Trading-calendar + its pandas dependency ship no usable stubs; treat as untyped.
 [[tool.mypy.overrides]]
 module = ["exchange_calendars", "exchange_calendars.*", "pandas", "pandas.*"]
@@ -112,5 +123,9 @@ addopts = "-q"
 markers = [
     "integration: requires a reachable PostgreSQL database (skipped when none is reachable)",
 ]
+
+[tool.coverage.run]
+# Count code that runs in reader threads (the Redis Streams / Kafka event-bus consumers, QV-024).
+concurrency = ["thread"]
 # Coverage target for the project is >=80% (CI gate, wired in QV-003). Not enforced
 # on this empty skeleton — there is no production logic to cover yet.

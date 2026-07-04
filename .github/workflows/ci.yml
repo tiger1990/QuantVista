@@ -115,6 +115,14 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U quantvista -d quantvista"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        # For the QV-024 RedisStreamEventBus integration test (skips if unreachable).
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       # App role = non-superuser (RLS enforced); admin role = the postgres superuser.
       DATABASE_URL: postgresql+psycopg://quantvista_app:quantvista_app@localhost:5432/quantvista
