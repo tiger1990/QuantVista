@@ -4,7 +4,7 @@ baseline_commit: 884bca8f738f2997d3904d45e6471a7f82fec7ae
 
 # Story 3.10: QV-022 — ingest_fundamentals (versioned upsert)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

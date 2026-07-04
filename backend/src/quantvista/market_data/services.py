@@ -26,6 +26,7 @@ from quantvista.market_data.models import (
     CorporateAction,
     FundamentalSnapshot,
     PriceBar,
+    ShareholdingSnapshot,
     UniverseEntry,
 )
 from quantvista.market_data.quality import (
@@ -40,6 +41,7 @@ from quantvista.market_data.repositories import (
     reconcile_constituents,
     upsert_corporate_actions,
     upsert_daily_prices,
+    upsert_shareholding,
     upsert_stocks,
 )
 from quantvista.market_data.trading_calendar import sessions_in_range
@@ -466,3 +468,59 @@ class FundamentalsIngestionService:
             },
         )
         return report
+
+
+@dataclass(frozen=True, slots=True)
+class ShareholdingReport:
+    market: str
+    stocks_total: int
+    stocks_ok: int  # stocks with >=1 ownership row upserted
+    stocks_no_data: int  # no snapshot (the norm — Yahoo shareholding is sparse for India)
+    stocks_failed: int
+    rows_upserted: int
+    failures: list[tuple[str, str]] = field(default_factory=list)
+
+
+class ShareholdingIngestionService:
+    """Ingest PIT-by-date ownership snapshots (QV-023, ``06`` §2).
+
+    Provider-agnostic + per-stock isolated, like the sibling ingest services — but with **no event**
+    (the ``06`` job catalog emits none for shareholding). Persistence is a plain upsert keyed
+    ``(stock_id, as_of_date)``: re-polling a quarter updates in place, a new quarter is a new row.
+    """
+
+    def __init__(
+        self,
+        provider: IMarketDataProvider,
+        *,
+        symbol_mapper: SymbolMapper = _identity_mapper,
+    ) -> None:
+        self._provider = provider
+        self._map = symbol_mapper
+        self._log = structlog.get_logger()
+
+    def ingest(self, market: str, *, index_code: str = "NIFTY200") -> ShareholdingReport:
+        """Upsert the latest ownership snapshots for every open constituent of ``index_code``."""
+        with privileged_session_scope() as session:
+            universe = active_universe(session, index_code, market)
+
+        ok = no_data = failed = rows = 0
+        failures: list[tuple[str, str]] = []
+        for stock in universe:
+            try:
+                provider_symbol = self._map(stock.symbol, stock.market)
+                snapshots: Sequence[ShareholdingSnapshot] = self._provider.get_shareholding(
+                    provider_symbol
+                )
+                if not snapshots:
+                    no_data += 1
+                    continue
+                with privileged_session_scope() as session:
+                    rows += upsert_shareholding(session, stock.stock_id, snapshots)
+                ok += 1
+            except Exception as exc:  # per-stock isolation
+                failed += 1
+                failures.append((stock.symbol, str(exc)))
+                self._log.warning("shareholding_ingest_failed", symbol=stock.symbol, error=str(exc))
+
+        return ShareholdingReport(market, len(universe), ok, no_data, failed, rows, failures)
