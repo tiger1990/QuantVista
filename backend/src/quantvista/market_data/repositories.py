@@ -503,3 +503,26 @@ def upsert_macro_series(session: Session, observations: Sequence[MacroObservatio
     ]
     session.execute(_UPSERT_MACRO_SQL, params)
     return len(params)
+
+
+# --- technical indicators PIT read (QV-028) ----------------------------------
+_TI_AS_OF_SQL = text(
+    f"""
+    SELECT {", ".join(_TI_COLUMNS)} FROM technical_indicators
+    WHERE stock_id = :stock_id AND date <= :as_of
+    ORDER BY date DESC
+    LIMIT 1
+    """
+)
+
+
+def technical_indicators_as_of(
+    session: Session, stock_id: UUID, as_of: date
+) -> dict[str, Decimal | None] | None:
+    """The latest indicator row with ``date <= as_of`` (PIT — no future row), else ``None``."""
+    row = (
+        session.execute(_TI_AS_OF_SQL, {"stock_id": stock_id, "as_of": as_of})
+        .mappings()
+        .one_or_none()
+    )
+    return {c: row[c] for c in _TI_COLUMNS} if row is not None else None
