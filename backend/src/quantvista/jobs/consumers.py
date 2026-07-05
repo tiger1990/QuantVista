@@ -7,7 +7,7 @@ worker, not inside the (synchronous, in-process) publish. Registered at worker s
     PricesIngested    ─▶ validate_prices        ─▶ PricesValidated / DataQualityGateFailed
     PricesValidated   ─▶ compute_indicators     ─▶ IndicatorsComputed
     IndicatorsComputed ─▶ compute_factors        ─▶ FactorsComputed
-    FactorsComputed   ─▶ compute_scores          ─▶ ScoresComputed
+    FactorsComputed   ─▶ compute_scores          ─▶ ScoresComputed ─▶ invalidate rankings cache
     FundamentalsRevised ─▶ recompute_on_correction (self-heal, QV-027 / 06 §5)
 """
 
@@ -17,6 +17,7 @@ from typing import Any
 
 import structlog
 
+from quantvista.core.cache import get_cache
 from quantvista.core.interfaces import IEventBus
 from quantvista.jobs.compute import compute_indicators
 from quantvista.jobs.corrections import recompute_on_correction
@@ -55,6 +56,14 @@ def on_factors_computed(envelope: dict[str, Any]) -> None:
     compute_scores.delay(payload["market"], payload["date"])
 
 
+def on_scores_computed(envelope: dict[str, Any]) -> None:
+    """Fresh scores landed → invalidate the cached rankings for that market/date (03 §8)."""
+    payload = envelope["payload"]
+    market, day = payload["universe"], payload["date"]
+    _log.info("consume_scores_computed", market=market, date=day)
+    get_cache().delete(f"rank:{market}:{day}", f"score:{market}:{day}")
+
+
 def on_fundamentals_revised(envelope: dict[str, Any]) -> None:
     """A fundamentals correction landed → recompute derived analytics for each affected filing."""
     payload = envelope["payload"]
@@ -73,4 +82,5 @@ def register_pipeline_consumers(bus: IEventBus) -> None:
     bus.subscribe("PricesValidated", on_prices_validated)
     bus.subscribe("IndicatorsComputed", on_indicators_computed)
     bus.subscribe("FactorsComputed", on_factors_computed)
+    bus.subscribe("ScoresComputed", on_scores_computed)
     bus.subscribe("FundamentalsRevised", on_fundamentals_revised)

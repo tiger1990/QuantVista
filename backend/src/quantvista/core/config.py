@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # Macro data (QV-026): FRED API key (free, redistributable). Unset → macro sync can't run.
     fred_api_key: str | None = None
 
+    # Caching (QV-031): Redis cache-aside for scores/rankings, invalidated on ScoresComputed.
+    cache_enabled: bool = True  # false → NullCache (dev/tests with no Redis)
+    cache_ttl_seconds: int = 3600  # TTL backstop if an invalidation event is ever missed
+
 
 @lru_cache
 def get_settings() -> Settings:
