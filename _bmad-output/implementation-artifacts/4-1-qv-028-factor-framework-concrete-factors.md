@@ -4,7 +4,7 @@ baseline_commit: dd7ad524bf7094c3504a93699fe52d1e0bc9a861
 
 # Story 4.1: QV-028 — Factor framework + concrete factors
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

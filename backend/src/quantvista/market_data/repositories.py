@@ -526,3 +526,13 @@ def technical_indicators_as_of(
         .one_or_none()
     )
     return {c: row[c] for c in _TI_COLUMNS} if row is not None else None
+
+
+# --- stock sectors (QV-029 scoring: sector-relative normalization) ------------
+_STOCK_SECTORS_SQL = text("SELECT id, sector FROM stocks WHERE id = ANY(:ids)")
+
+
+def stock_sectors(session: Session, stock_ids: Sequence[UUID]) -> dict[UUID, str | None]:
+    """``{stock_id: sector}`` for the universe (the Normalizer's peer grouping)."""
+    rows = session.execute(_STOCK_SECTORS_SQL, {"ids": list(stock_ids)}).all()
+    return {r.id: r.sector for r in rows}
