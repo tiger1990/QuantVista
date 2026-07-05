@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from quantvista.analytics import scoring
 from quantvista.analytics.factors import Factor, FactorCategory
 from quantvista.analytics.normalizer import Normalizer
-from quantvista.analytics.scoring import DEFAULT_WEIGHTS, ScoreEngine
+from quantvista.analytics.scoring import DEFAULT_WEIGHTS, ScoreEngine, compute_universe
 
 A, B, C = uuid4(), uuid4(), uuid4()
 _AS_OF = date(2026, 1, 20)
@@ -61,8 +61,13 @@ def test_compute_universe_aggregates_decomposes_and_covers(monkeypatch: pytest.M
         _FakeFactor("ret_6m", FactorCategory.MOMENTUM, 1, {A: 0.05, B: 0.10, C: 0.08}),
     ]
     # session unused: fake factors ignore ctx, stock_sectors is patched.
-    scores = ScoreEngine(factors, Normalizer(), DEFAULT_WEIGHTS).compute_universe(
-        cast(Session, None), [A, B, C], _AS_OF
+    scores = compute_universe(
+        cast(Session, None),
+        [A, B, C],
+        _AS_OF,
+        factors=factors,
+        normalizer=Normalizer(),
+        weights=DEFAULT_WEIGHTS,
     )
     by = {s.stock_id: s for s in scores}
     assert set(by) == {A, B, C}

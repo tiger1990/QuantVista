@@ -25,8 +25,10 @@ _EVENTS = [
         market="NSE", knowledge_time="2026-06-01T00:00:00+00:00", inserted=1, revised=0, unchanged=2
     ),
     IndicatorsComputed(market="NSE", date="2026-06-01", stocks=12),
-    FactorsComputed(market="NSE", date="2026-06-01", factors=8),
-    ScoresComputed(universe="NIFTY200", date="2026-06-01", count=200),
+    FactorsComputed(
+        market="NSE", date="2026-06-01", model_version="score-v1", stock_count=12, factor_count=96
+    ),
+    ScoresComputed(universe="NIFTY200", date="2026-06-01", model_version="score-v1", count=200),
     NewsScored(news_batch="b-1", count=5),
 ]
 

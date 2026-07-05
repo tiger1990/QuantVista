@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from quantvista.analytics.factors import ALL_FACTORS
 from quantvista.analytics.repositories import upsert_factor_values, upsert_scores
-from quantvista.analytics.scoring import ScoreEngine
+from quantvista.analytics.scoring import compute_universe
 from quantvista.market_data.fundamentals import record_fundamental_version
 
 pytestmark = pytest.mark.integration
@@ -92,8 +92,9 @@ def universe(admin_engine: Engine) -> Iterator[list[UUID]]:
 
 def _persist(admin_engine: Engine, universe: list[UUID]) -> int:
     with admin_engine.connect() as conn, Session(bind=conn) as session:
-        scores = ScoreEngine().compute_universe(session, universe, _AS_OF)
-        n_fv = upsert_factor_values(session, scores)
+        scores = compute_universe(session, universe, _AS_OF)
+        snapshot = {s.stock_id: s.factor_values for s in scores}
+        n_fv = upsert_factor_values(session, _AS_OF, snapshot)
         upsert_scores(session, scores)
         session.commit()
     return n_fv

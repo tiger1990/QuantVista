@@ -121,6 +121,7 @@ module = [
     "quantvista.jobs.compute",
     "quantvista.jobs.macro",
     "quantvista.jobs.corrections",
+    "quantvista.jobs.scoring",
 ]
 disallow_untyped_decorators = false
 

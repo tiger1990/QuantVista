@@ -83,11 +83,14 @@ class IndicatorsComputed(_Event):
 
 @dataclass(frozen=True, slots=True)
 class FactorsComputed(_Event):
+    # Rich metadata (model_version + counts) so downstream can judge snapshot completeness/identity.
     TOPIC: ClassVar[str] = "FactorsComputed"
     VERSION: ClassVar[int] = 1
     market: str
     date: str
-    factors: int
+    model_version: str
+    stock_count: int  # stocks with ≥1 factor value in the snapshot
+    factor_count: int  # total factor_values rows persisted
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +99,8 @@ class ScoresComputed(_Event):
     VERSION: ClassVar[int] = 1
     universe: str
     date: str
-    count: int
+    model_version: str
+    count: int  # stocks scored
 
 
 @dataclass(frozen=True, slots=True)

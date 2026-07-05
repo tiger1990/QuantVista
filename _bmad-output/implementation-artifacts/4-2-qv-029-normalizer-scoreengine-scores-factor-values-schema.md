@@ -4,7 +4,7 @@ baseline_commit: df1bf29b9279dc57942ba1709adc96a3767fc864
 
 # Story 4.2: QV-029 — Normalizer + ScoreEngine + scores/factor_values schema
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -10,12 +10,17 @@ loop is real + testable end-to-end before the scoring math exists.
 from __future__ import annotations
 
 from datetime import date
+from uuid import UUID
 
 import structlog
 
+from quantvista.core.db import privileged_session_scope
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
+from quantvista.jobs.scoring import compute_factors
+from quantvista.market_data.repositories import stock_market
+from quantvista.market_data.trading_calendar import last_completed_session
 
 RECOMPUTE_JOB_NAME = "recompute_on_correction"
 _log = structlog.get_logger()
@@ -23,14 +28,14 @@ _log = structlog.get_logger()
 
 def _run_recompute(stock_id: str, period_end: str, statement_type: str, key: str) -> JobOutcome:
     def work() -> JobResult:
-        # Epic 4 fills this in: compute_factors(stock_id, period_end) → compute_scores(...) for the
-        # dates whose scores consumed the revised filing. Until then, record the correction intent.
-        _log.info(
-            "correction_recompute",
-            stock_id=stock_id,
-            period_end=period_end,
-            statement_type=statement_type,
-        )
+        # Self-heal (QV-030): invalidate + recompute the market's factor SNAPSHOT for the current
+        # cross-section → cascades to compute_scores. Cross-sectional, so one stock's correction
+        # refreshes the whole universe. (Re-scoring historical dates is a future enhancement.)
+        with privileged_session_scope() as session:
+            market = stock_market(session, UUID(stock_id))
+        _log.info("correction_recompute", stock_id=stock_id, period_end=period_end, market=market)
+        if market is not None:
+            compute_factors.delay(market, last_completed_session(date.today()).isoformat())
         return JobResult(rows_in=1, rows_out=0)
 
     return run_job(RECOMPUTE_JOB_NAME, key, work, ledger=JobRunLedger())

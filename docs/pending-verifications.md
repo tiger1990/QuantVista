@@ -163,3 +163,64 @@ The gap is **monthly/daily fresh Indian** macro, which neither FRED nor World Ba
 momentum), stand up the **MOSPI** (monthly CPI/IIP) and **RBI** (rates/yields/FX) adapters. Until then,
 World Bank annual India + FRED US/global is the accepted coverage. Roadmap detail in the
 `macro-provider-strategy` memory.
+
+## Deferred scoring methodology — score-v2 (🧭 scope deferrals, NOT verification debt)
+
+The scoring engine (QV-028 factors → QV-029 Normalizer/ScoreEngine → QV-030 jobs) shipped as
+**score-v1**, deliberately kept simple + auditable. These enhancements were reviewed and **consciously
+deferred** — logged here for sprint-review visibility (full rationale in the `scoring-methodology-roadmap`
+memory). `scores.model_version` is a **whole-methodology fingerprint**: any of these bumps it (e.g.
+`score-v2`) so historical scores stay reproducible.
+
+### A. Methodology (behind a bumped `model_version` — no schema change)
+| Item | v1 today | v2 upgrade | Why deferred |
+|------|----------|-----------|--------------|
+| Normalization stats | mean/std sector-z + winsorize-raw | **Robust z (median / MAD)** | Resistant to accounting outliers; a methodology swap, not needed for a small dev universe |
+| Factor transforms | raw ratio × direction | **earnings-yield (1/PE), −log(D/E), log(mktcap)** | Better-behaved distributions; changes QV-028 factor definitions |
+| Peer grouping | `stocks.sector` | **industry / sub-industry** | Industry buckets too small (2–3 peers) for stable z-scores until the universe is large |
+| Intra-category weights | equal-weight | **learned weights (IC / RankIC / ICIR)** | Needs return history to calibrate predictive power |
+| Recency | none (PIT only) | **time decay** on momentum/sentiment (exp(−days/τ)) | Marginal until sentiment/live signals matter |
+| Factor QA | finite-guard (NaN/inf→None) | **full gate** (plausible-range, staleness, peer-count, dup detection) | v1 guard is sufficient for clean seeded data |
+
+### B. Determinism / snapshot infra (needs a **migration** — new table/columns)
+| Item | v1 today | v2 upgrade | Why deferred |
+|------|----------|-----------|--------------|
+| Snapshot identity | *derived from* `(market, date, model_version)` | **`factor_snapshots` table + `universe_hash`** — immutable, race-proof | Over-engineering for ~200 stocks; v1 relies on atomic writes + post-commit events |
+| Version-divergence guard | shared `MODEL_VERSION` constant (dev must remember to bump) | **`normalization_version`/fingerprint column on `factor_values`**, verified on read → **fail loudly** | `0006` `factor_values` has no version column; becomes mandatory the moment a `score-v2` normalization exists |
+| Confidence / weighted coverage | `coverage` = available/total (equal) | **confidence score + weighted coverage** columns on `scores` | Need new `scores` columns |
+
+### C. Cross-epic score columns (already in `scores`, filled elsewhere — `NULL` now)
+- **`sentiment_score`** → Epic 5 (needs news data + a `SentimentFactor`). **`ml_score`** → the ML signal story (`06`/`12`).
+
+### D. Functional
+- **Historical re-score on correction** — v1 self-heal re-scores only the *current* cross-section; re-scoring every historical `as_of` a corrected filing touched (backtest integrity) is deferred.
+- **User-customizable weights (Quant tier)** — `ScoreWeights` is already versioned for it; the per-tenant override UI/API is later.
+
+**Gates (when v2 happens):**
+1. **Methodology (A)** — before scores are used as *real investment signal* (not dev-data): realistically **after QV-072 licensed data** makes fundamentals reliable, and/or the universe is large enough for industry peer counts. Trigger: backtesting shows v1 limitations, or production launch.
+2. **Snapshot infra (B)** — the **version-check column is mandatory the moment a `score-v2` normalization exists** (must not read a v1 snapshot with a v2 engine); the `factor_snapshots` table when concurrent/high-throughput scoring or multiple score models run against the same `factor_values`.
+3. **C / D** — their own stories (Epic 5, ML, backtesting, Quant-tier weights).
+
+### Why not now — and the trigger for "when"
+
+The blocker is **sequencing + validation, not difficulty.** Most of v2 is a set of *hypotheses that
+they score better* — and there is no way to prove score-v2 > score-v1 without a **backtest harness**
+(a later story) + **real forward-return history** (needs PV-005's backfill + ideally QV-072 licensed
+data). Shipping unvalidated methodology tuned against dev-tier data is premature optimization.
+
+| v2 item | What actually stops it now |
+|---------|-----------------------------|
+| Robust-z, factor transforms, time-decay, factor-QA gates | **Nothing technical** — but they'd be tuned against dev-tier data (clean seed / sparse yfinance). No outliers to bite on until real licensed data (QV-072); tuning now = tuning against the wrong distribution. |
+| Learned weights (IC/ICIR) | **Hard-blocked** — needs return history to compute information coefficients; we have no forward returns. |
+| Industry normalization | **Data-scale blocked** — ~200-stock universe has 2–3 peers/industry; z-scores need ~15–20+ peers. |
+| `factor_snapshots` table, confidence/coverage columns | Cheap migrations, but they **defend against problems that don't exist yet** (concurrency races, multi-model). |
+| `normalization_version` fail-loud check | Same — **except** its hard tripwire (below). |
+| Sentiment / ML columns | **Hard-blocked** — no news data (Epic 5), no ML model. |
+
+**Plan / when:** stay on **v1** — it's the foundation QV-031 (caching) → scoring API → portfolio build
+on. **v2 methodology becomes actionable once (a) a backtest harness exists, (b) QV-072 licensed data
+flows, (c) the universe is production-scale, (d) upstream epics (news/ML) land** — naturally a dedicated
+"score-v2 / factor research" epic *after* the platform runs end-to-end on real data, where every change
+is validated against returns. **Not agent-scheduled — owner-driven via the story sequence.** The single
+non-negotiable tripwire: add the `normalization_version` fail-loud check the instant a score-v2
+normalization is *started* (before a v2 engine can read a v1 snapshot).

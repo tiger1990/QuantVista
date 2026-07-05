@@ -157,10 +157,15 @@ def test_correction_self_heals_end_to_end(
     assert enqueued == [(str(stock_id), _PERIOD.isoformat(), "quarterly")]
 
 
-def test_recompute_seam_runs_under_run_job(
-    admin_engine: Engine, stock: tuple[str, str, UUID]
+def test_recompute_seam_enqueues_factor_recompute(
+    admin_engine: Engine, stock: tuple[str, str, UUID], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _, _, stock_id = stock
+    from quantvista.jobs.scoring import compute_factors
+
+    market, _, stock_id = stock
+    enqueued: list[tuple[object, ...]] = []
+    monkeypatch.setattr(compute_factors, "delay", lambda *a: enqueued.append(a))
+
     key = run_key("recompute", str(stock_id), _PERIOD.isoformat())
     outcome = _run_recompute(str(stock_id), _PERIOD.isoformat(), "quarterly", key)
     assert outcome.status.value == "succeeded"
@@ -169,3 +174,5 @@ def test_recompute_seam_runs_under_run_job(
             text("SELECT status FROM jobs_runs WHERE run_key = :k"), {"k": key}
         ).scalar_one()
     assert status == "succeeded"
+    # self-heal: the correction enqueued a factor-snapshot recompute for the stock's market.
+    assert len(enqueued) == 1 and enqueued[0][0] == market
