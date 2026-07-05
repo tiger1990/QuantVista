@@ -536,3 +536,13 @@ def stock_sectors(session: Session, stock_ids: Sequence[UUID]) -> dict[UUID, str
     """``{stock_id: sector}`` for the universe (the Normalizer's peer grouping)."""
     rows = session.execute(_STOCK_SECTORS_SQL, {"ids": list(stock_ids)}).all()
     return {r.id: r.sector for r in rows}
+
+
+_STOCK_MARKET_SQL = text(
+    "SELECT m.code FROM stocks s JOIN markets m ON m.id = s.market_id WHERE s.id = :sid"
+)
+
+
+def stock_market(session: Session, stock_id: UUID) -> str | None:
+    """The market code a stock trades on (QV-030 self-heal → recompute that market's snapshot)."""
+    return session.execute(_STOCK_MARKET_SQL, {"sid": stock_id}).scalar_one_or_none()
