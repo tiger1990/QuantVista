@@ -12,7 +12,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 
 from quantvista.api.middleware import RequestContextMiddleware
+from quantvista.api.pagination import InvalidCursor
 from quantvista.api.routes import router as auth_router
+from quantvista.api.routes_stocks import StockNotFound
+from quantvista.api.routes_stocks import router as stocks_router
 from quantvista.core.config import get_settings
 from quantvista.core.observability import configure_observability
 from quantvista.core.observability.metrics import (
@@ -65,6 +68,14 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _validation(_req: Request, exc: RequestValidationError) -> JSONResponse:
         return _fail("validation_error", "request validation failed")
 
+    @app.exception_handler(StockNotFound)
+    async def _stock_not_found(_req: Request, exc: StockNotFound) -> JSONResponse:
+        return _fail("not_found", f"stock '{exc.symbol}' not found")
+
+    @app.exception_handler(InvalidCursor)
+    async def _bad_cursor(_req: Request, _exc: InvalidCursor) -> JSONResponse:
+        return _fail("validation_error", "invalid pagination cursor")
+
 
 def _register_metrics(app: FastAPI) -> None:
     """Mount the Prometheus scrape endpoint + RED middleware (ops surface, no envelope)."""
@@ -87,6 +98,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestContextMiddleware)
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(stocks_router)
     _register_error_handlers(app)
     return app
 

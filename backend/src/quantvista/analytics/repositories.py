@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from datetime import date
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
@@ -160,3 +161,120 @@ def rankings_for(session: Session, market: str, as_of: date) -> list[dict[str, o
         }
         for r in rows
     ]
+
+
+# --- stock read-models (QV-032 API) ------------------------------------------
+def _f(x: Any) -> float | None:
+    return None if x is None else float(x)  # Decimal → float, None passthrough
+
+
+_LIST_STOCKS_SQL = text(
+    """
+    SELECT s.symbol, s.company_name, s.sector, s.market_cap_bucket, m.code AS market,
+        (SELECT sc.composite_score FROM scores sc
+         WHERE sc.stock_id = s.id ORDER BY sc.date DESC LIMIT 1) AS composite_score
+    FROM stocks s
+    JOIN markets m ON m.id = s.market_id
+    WHERE m.code = :market
+      AND (CAST(:sector AS text) IS NULL OR s.sector = :sector)
+      AND (CAST(:cap AS text) IS NULL OR s.market_cap_bucket = :cap)
+      AND (CAST(:after AS text) IS NULL OR s.symbol > :after)
+    ORDER BY s.symbol
+    LIMIT :limit
+    """
+)
+
+
+def list_stocks(
+    session: Session,
+    *,
+    market: str,
+    sector: str | None,
+    market_cap_bucket: str | None,
+    limit: int,
+    after_symbol: str | None,
+) -> list[dict[str, object]]:
+    """Universe browse: filtered, keyset-paginated (``symbol`` asc) stocks + latest composite."""
+    rows = (
+        session.execute(
+            _LIST_STOCKS_SQL,
+            {
+                "market": market,
+                "sector": sector,
+                "cap": market_cap_bucket,
+                "after": after_symbol,
+                "limit": limit,
+            },
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        {
+            "symbol": r["symbol"],
+            "company_name": r["company_name"],
+            "sector": r["sector"],
+            "market_cap_bucket": r["market_cap_bucket"],
+            "market": r["market"],
+            "composite_score": _f(r["composite_score"]),
+        }
+        for r in rows
+    ]
+
+
+_STOCK_DETAIL_SQL = text(
+    """
+    SELECT s.symbol, s.company_name, s.sector, s.industry, s.market_cap_bucket, m.code AS market,
+        s.is_active, p.date AS price_date, p.close,
+        sc.composite_score, sc.fundamental_score, sc.momentum_score, sc.quality_score,
+        sc.sentiment_score, sc.risk_score, sc.coverage, sc.model_version, sc.weights_version,
+        f.pe, f.pb, f.roe, f.roce, f.debt_equity
+    FROM stocks s
+    JOIN markets m ON m.id = s.market_id
+    LEFT JOIN LATERAL (
+        SELECT date, close FROM daily_prices WHERE stock_id = s.id ORDER BY date DESC LIMIT 1
+    ) p ON true
+    LEFT JOIN LATERAL (
+        SELECT * FROM scores WHERE stock_id = s.id ORDER BY date DESC LIMIT 1
+    ) sc ON true
+    LEFT JOIN LATERAL (
+        SELECT pe, pb, roe, roce, debt_equity FROM fundamentals
+        WHERE stock_id = s.id AND knowledge_to IS NULL ORDER BY period_end DESC LIMIT 1
+    ) f ON true
+    WHERE s.symbol = :symbol
+    """
+)
+
+
+def stock_detail(session: Session, symbol: str) -> dict[str, object] | None:
+    """Master + latest snapshot (price/scores/fundamentals) for ``symbol``; ``None`` if unknown."""
+    r = session.execute(_STOCK_DETAIL_SQL, {"symbol": symbol}).mappings().one_or_none()
+    if r is None:
+        return None
+    return {
+        "symbol": r["symbol"],
+        "company_name": r["company_name"],
+        "sector": r["sector"],
+        "industry": r["industry"],
+        "market_cap_bucket": r["market_cap_bucket"],
+        "market": r["market"],
+        "is_active": r["is_active"],
+        "snapshot": {
+            "price_date": r["price_date"].isoformat() if r["price_date"] else None,
+            "close": _f(r["close"]),
+            "composite_score": _f(r["composite_score"]),
+            "fundamental_score": _f(r["fundamental_score"]),
+            "momentum_score": _f(r["momentum_score"]),
+            "quality_score": _f(r["quality_score"]),
+            "sentiment_score": _f(r["sentiment_score"]),
+            "risk_score": _f(r["risk_score"]),
+            "coverage": _f(r["coverage"]),
+            "model_version": r["model_version"],
+            "weights_version": r["weights_version"],
+            "pe": _f(r["pe"]),
+            "pb": _f(r["pb"]),
+            "roe": _f(r["roe"]),
+            "roce": _f(r["roce"]),
+            "debt_equity": _f(r["debt_equity"]),
+        },
+    }

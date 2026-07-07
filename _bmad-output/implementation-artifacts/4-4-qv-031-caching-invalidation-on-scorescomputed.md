@@ -4,7 +4,7 @@ baseline_commit: c1be88385aeebf9c481f73dad0a9765a870acde9
 
 # Story 4.4: QV-031 — Caching + invalidation on ScoresComputed
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

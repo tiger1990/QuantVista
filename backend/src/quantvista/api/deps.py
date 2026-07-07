@@ -15,7 +15,7 @@ import jwt
 from fastapi import Depends, Request, params
 from sqlalchemy.orm import Session
 
-from quantvista.core.db import session_scope
+from quantvista.core.db import privileged_session_scope, session_scope
 from quantvista.identity.entitlements import EntitlementService
 from quantvista.identity.models import InvalidCredentials, Principal, TenantContext
 from quantvista.identity.security import decode_access_token
@@ -84,8 +84,19 @@ def require_entitlement(feature: str) -> params.Depends:
     return cast(params.Depends, Depends(_require))
 
 
+def get_global_session() -> Iterator[Session]:
+    """Yield a session for GLOBAL/reference reads (stocks/scores/prices/fundamentals) — no RLS.
+
+    These tables carry no ``tenant_id``; the privileged engine reads them without a tenant binding.
+    MUST NOT be used to write tenant-scoped tables — those go through ``get_tenant_session``.
+    """
+    with privileged_session_scope() as session:
+        yield session
+
+
 CurrentPrincipal = Depends(get_current_principal)
 AuthServiceDep = Depends(get_auth_service)
 TenantContextDep = Depends(get_tenant_context)
 TenantSessionDep = Depends(get_tenant_session)
+GlobalSessionDep = Depends(get_global_session)
 EntitlementServiceDep = Depends(get_entitlement_service)

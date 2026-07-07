@@ -16,6 +16,7 @@ ERROR_STATUS: dict[str, int] = {
     "validation_error": 422,
     "unauthenticated": 401,
     "forbidden": 403,
+    "not_found": 404,
     "entitlement_exceeded": 403,
     "rate_limited": 429,
     "conflict": 409,
