@@ -4,7 +4,7 @@ baseline_commit: 81b87a0c6de8e895d57085e075bf407413467fbf
 
 # Story 4.5: QV-032 — API: /stocks, /stocks/{symbol}
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
