@@ -224,3 +224,25 @@ flows, (c) the universe is production-scale, (d) upstream epics (news/ML) land**
 is validated against returns. **Not agent-scheduled — owner-driven via the story sequence.** The single
 non-negotiable tripwire: add the `normalization_version` fail-loud check the instant a score-v2
 normalization is *started* (before a v2 engine can read a v1 snapshot).
+
+## Deferred capability — real-time / intraday market data (🧭 scope deferral)
+
+QuantVista's core is a **daily EOD research/scoring engine** — the whole pipeline (ingest→validate→
+indicators→factors→scores) is batch/event-choreographed around post-close **daily bars** (`06` §3,
+SLO "scores ready before 09:15 IST next day"). Nothing in scoring consumes sub-daily data, so we ship
+on **REST/EOD** (TrueData Real-Time+Historical REST, ~₹3,999/mo → **QV-072**). This is a deliberate
+choice, not a shortcut: a tick stream adds nothing to a *daily* score.
+
+**Deferred (own future epic — "real-time market data"):** a **WebSocket streaming** feed (TrueData /
+broker WS) for **real-time UX + trading features** — live dashboard quote/ticker, intraday charts +
+intraday indicators, tick-driven price alerts (breakout/level-cross), live portfolio mark-to-market,
+and any future execution/trading product.
+
+- **Why deferred:** streaming is a whole subsystem (persistent connections, reconnect/heartbeat,
+  backpressure, tick→bar aggregation, gap-fill on disconnect, an always-on consumer) — pure overhead
+  for a once-a-day score. It solves a *different* problem (real-time presentation/trading), not research scoring.
+- **Clean to add later:** the `IMarketDataProvider` seam is pull-shaped; a WS adapter is a **drop-in new
+  provider + an intraday ingestion path + intraday tables**, behind the same seam — zero change to the
+  scoring engine (the provider memory already flags `get_quote`/intraday as separate concerns).
+- **Gate (when):** when the product wants **live/intraday dashboard UX** or moves toward **intraday/trading**.
+  Not before — the EOD engine neither needs nor benefits from it. Detail in the `market-data-provider-strategy` memory.

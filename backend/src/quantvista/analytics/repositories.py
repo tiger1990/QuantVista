@@ -130,3 +130,33 @@ def factor_values_for(
             )
         )
     return dict(by_stock)
+
+
+# --- rankings read (QV-031 caching) ------------------------------------------
+_RANKINGS_SQL = text(
+    """
+    SELECT st.symbol, sc.composite_score, sc.coverage, sc.model_version, sc.weights_version
+    FROM scores sc
+    JOIN stocks st ON st.id = sc.stock_id
+    JOIN markets m ON m.id = st.market_id
+    WHERE sc.date = :date AND m.code = :market
+    ORDER BY sc.composite_score DESC NULLS LAST, st.symbol
+    """
+)
+
+
+def rankings_for(session: Session, market: str, as_of: date) -> list[dict[str, object]]:
+    """Ranked composite scores (desc) for ``market`` on ``as_of`` — the cacheable read (03 §8)."""
+    rows = session.execute(_RANKINGS_SQL, {"date": as_of, "market": market}).mappings().all()
+    return [
+        {
+            "symbol": r["symbol"],
+            "composite_score": None
+            if r["composite_score"] is None
+            else float(r["composite_score"]),
+            "coverage": None if r["coverage"] is None else float(r["coverage"]),
+            "model_version": r["model_version"],
+            "weights_version": r["weights_version"],
+        }
+        for r in rows
+    ]

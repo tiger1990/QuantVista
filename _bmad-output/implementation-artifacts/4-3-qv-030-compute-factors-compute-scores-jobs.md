@@ -4,7 +4,7 @@ baseline_commit: cd1441de7f0286af82f78b284f2aa5ff27aee6a6
 
 # Story 4.3: QV-030 — compute_factors + compute_scores jobs
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
