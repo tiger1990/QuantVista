@@ -278,3 +278,58 @@ def stock_detail(session: Session, symbol: str) -> dict[str, object] | None:
             "debt_equity": _f(r["debt_equity"]),
         },
     }
+
+
+# --- score reads (QV-033 API) ------------------------------------------------
+_SCORE_OF_SQL = text(
+    """
+    SELECT sc.stock_id, sc.date, sc.fundamental_score, sc.momentum_score, sc.quality_score,
+        sc.sentiment_score, sc.risk_score, sc.composite_score, sc.coverage,
+        sc.weights_version, sc.model_version
+    FROM scores sc
+    JOIN stocks s ON s.id = sc.stock_id
+    WHERE s.symbol = :symbol AND (CAST(:as_of AS date) IS NULL OR sc.date <= :as_of)
+    ORDER BY sc.date DESC
+    LIMIT 1
+    """
+)
+
+
+def score_of(session: Session, symbol: str, as_of: date | None = None) -> dict[str, object] | None:
+    """The latest score for ``symbol`` with ``date <= as_of`` (or latest); ``None`` if unscored."""
+    r = session.execute(_SCORE_OF_SQL, {"symbol": symbol, "as_of": as_of}).mappings().one_or_none()
+    if r is None:
+        return None
+    return {
+        "stock_id": r["stock_id"],
+        "date": r["date"],
+        "fundamental": _f(r["fundamental_score"]),
+        "momentum": _f(r["momentum_score"]),
+        "quality": _f(r["quality_score"]),
+        "sentiment": _f(r["sentiment_score"]),
+        "risk": _f(r["risk_score"]),
+        "composite": _f(r["composite_score"]),
+        "coverage": _f(r["coverage"]),
+        "weights_version": r["weights_version"],
+        "model_version": r["model_version"],
+    }
+
+
+_LATEST_SCORE_DATE_SQL = text(
+    """
+    SELECT max(sc.date) FROM scores sc
+    JOIN stocks s ON s.id = sc.stock_id
+    JOIN markets m ON m.id = s.market_id
+    WHERE m.code = :market AND (CAST(:ob AS date) IS NULL OR sc.date <= :ob)
+    """
+)
+
+
+def latest_score_date(
+    session: Session, *, market: str, on_or_before: date | None = None
+) -> date | None:
+    """The newest ``scores.date`` for ``market`` (≤ ``on_or_before`` if given); ``None`` if none."""
+    newest: date | None = session.execute(
+        _LATEST_SCORE_DATE_SQL, {"market": market, "ob": on_or_before}
+    ).scalar_one()
+    return newest

@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.pagination import InvalidCursor
 from quantvista.api.routes import router as auth_router
+from quantvista.api.routes_scores import router as scores_router
 from quantvista.api.routes_stocks import StockNotFound
 from quantvista.api.routes_stocks import router as stocks_router
 from quantvista.core.config import get_settings
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(stocks_router)
+    app.include_router(scores_router)
     _register_error_handlers(app)
     return app
 
