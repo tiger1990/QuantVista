@@ -16,7 +16,7 @@ import type { components } from "@/lib/api/schema";
 type TokenEnvelope = components["schemas"]["Envelope_TokenResponse_"];
 
 /** Pull the access token out of a token-response envelope (typed by the generated client). */
-function accessTokenFrom(body: TokenEnvelope | undefined): string | null {
+export function accessTokenFrom(body: TokenEnvelope | undefined): string | null {
   return body?.data?.access_token ?? null;
 }
 
