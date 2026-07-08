@@ -15,6 +15,8 @@ from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.pagination import InvalidCursor
 from quantvista.api.routes import router as auth_router
 from quantvista.api.routes_scores import router as scores_router
+from quantvista.api.routes_screener import ScreenerError
+from quantvista.api.routes_screener import router as screener_router
 from quantvista.api.routes_stocks import StockNotFound
 from quantvista.api.routes_stocks import router as stocks_router
 from quantvista.core.config import get_settings
@@ -77,6 +79,10 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _bad_cursor(_req: Request, _exc: InvalidCursor) -> JSONResponse:
         return _fail("validation_error", "invalid pagination cursor")
 
+    @app.exception_handler(ScreenerError)
+    async def _bad_screen(_req: Request, exc: ScreenerError) -> JSONResponse:
+        return _fail("validation_error", str(exc))
+
 
 def _register_metrics(app: FastAPI) -> None:
     """Mount the Prometheus scrape endpoint + RED middleware (ops surface, no envelope)."""
@@ -101,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(stocks_router)
     app.include_router(scores_router)
+    app.include_router(screener_router)
     _register_error_handlers(app)
     return app
 

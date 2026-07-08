@@ -4,7 +4,7 @@ baseline_commit: f5b63e3d302ec9f7b5a33864d87c944888ec6b9a
 
 # Story 4.10: QV-037 — Leakage/PIT regression test for scoring
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
