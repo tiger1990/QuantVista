@@ -4,7 +4,7 @@ baseline_commit: 2e402f3dbf9a81efcfda6c5ad734c08bf85fee57
 
 # Story 4.6: QV-033 — API: /scores/{symbol} + /decomposition + /rankings
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
