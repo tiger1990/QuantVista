@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef, OnChangeFn, SortingState } from "@tanstack/react-table";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -15,7 +16,14 @@ const columns: ColumnDef<StockListItem, unknown>[] = [
   {
     accessorKey: "symbol",
     header: "Symbol",
-    cell: ({ row }) => <span className="font-medium">{row.original.symbol}</span>,
+    cell: ({ row }) => (
+      <Link
+        href={`/stocks/${row.original.symbol}`}
+        className="font-medium hover:text-primary hover:underline"
+      >
+        {row.original.symbol}
+      </Link>
+    ),
   },
   {
     accessorKey: "company_name",

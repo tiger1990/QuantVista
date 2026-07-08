@@ -4,7 +4,7 @@ baseline_commit: 00d331068d6378b9fa96f0645e3b03f40ebdd5da
 
 # Story 4.8: QV-035 — Frontend: Dashboard + Stocks list
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 
 import { DataTable } from "@/components/data-table";
 import { Disclaimer } from "@/components/disclaimer";
@@ -17,7 +18,14 @@ const columns: ColumnDef<RankingItem, unknown>[] = [
   {
     accessorKey: "symbol",
     header: "Symbol",
-    cell: ({ row }) => <span className="font-medium">{row.original.symbol}</span>,
+    cell: ({ row }) => (
+      <Link
+        href={`/stocks/${row.original.symbol}`}
+        className="font-medium hover:text-primary hover:underline"
+      >
+        {row.original.symbol}
+      </Link>
+    ),
   },
   {
     accessorKey: "composite_score",
