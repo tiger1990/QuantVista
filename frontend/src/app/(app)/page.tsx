@@ -1,60 +1,37 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
-import Link from "next/link";
-
 import { useAuth } from "@/components/auth-provider";
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
-
-const ENTRIES = [
-  {
-    href: "/rankings",
-    title: "Rankings",
-    description: "The NIFTY 200 universe ranked by composite score.",
-  },
-  {
-    href: "/stocks",
-    title: "Stocks",
-    description: "Browse the universe — filter, sort, inspect a stock's snapshot.",
-  },
-];
+import { MarketOverview, SectorHeatmap, TopRanked } from "@/components/dashboard";
+import { Disclaimer } from "@/components/disclaimer";
+import { useRankings, useStocks } from "@/lib/api/queries";
 
 export default function OverviewPage() {
   const { user } = useAuth();
+  const rankings = useRankings();
+  const stocks = useStocks({});
+
+  const items = rankings.data?.data ?? [];
+  const asOf = (rankings.data?.meta as { as_of?: string | null } | undefined)?.as_of;
+  const allStocks = stocks.data?.pages.flatMap((p) => p.data ?? []) ?? [];
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
   return (
-    <div className="space-y-10">
-      <section className="space-y-3">
+    <div className="space-y-6">
+      <section className="space-y-1">
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
           Equity research · India
         </p>
-        <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-          Welcome back, {firstName}.
-        </h1>
-        <p className="max-w-xl text-muted-foreground">
-          Explainable, point-in-time equity scores for the NIFTY 200. The dashboard and live rankings
-          land next — the engine and API are ready.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">Welcome back, {firstName}.</h1>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        {ENTRIES.map((entry) => (
-          <Link key={entry.href} href={entry.href} className="group">
-            <Card className="h-full transition-colors group-hover:border-primary/50">
-              <CardContent className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">{entry.title}</CardTitle>
-                  <CardDescription>{entry.description}</CardDescription>
-                </div>
-                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </section>
+      <MarketOverview items={items} asOf={asOf} />
 
-      <p className="text-xs text-muted-foreground">Research signal, not investment advice.</p>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <TopRanked items={items} />
+        <SectorHeatmap stocks={allStocks} />
+      </div>
+
+      <Disclaimer />
     </div>
   );
 }
