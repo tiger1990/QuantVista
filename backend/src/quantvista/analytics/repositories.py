@@ -333,3 +333,72 @@ def latest_score_date(
         _LATEST_SCORE_DATE_SQL, {"market": market, "ob": on_or_before}
     ).scalar_one()
     return newest
+
+
+# --- screener (QV-038) -------------------------------------------------------
+_SCREEN_CTE = """
+    WITH screened AS (
+        SELECT s.symbol, s.company_name, s.sector, s.market_cap_bucket, m.code AS market,
+            sc.composite_score, sc.fundamental_score, sc.momentum_score, sc.quality_score,
+            sc.sentiment_score, sc.risk_score, sc.coverage,
+            f.pe, f.pb, f.roe, f.roce, f.debt_equity
+        FROM stocks s
+        JOIN markets m ON m.id = s.market_id
+        LEFT JOIN LATERAL (
+            SELECT * FROM scores WHERE stock_id = s.id ORDER BY date DESC LIMIT 1
+        ) sc ON true
+        LEFT JOIN LATERAL (
+            SELECT pe, pb, roe, roce, debt_equity FROM fundamentals
+            WHERE stock_id = s.id AND knowledge_to IS NULL ORDER BY period_end DESC LIMIT 1
+        ) f ON true
+        WHERE m.code = :market
+    )
+"""
+
+_SCREEN_COLS = (
+    "symbol",
+    "company_name",
+    "sector",
+    "market_cap_bucket",
+    "market",
+    "composite_score",
+    "fundamental_score",
+    "momentum_score",
+    "quality_score",
+    "sentiment_score",
+    "risk_score",
+    "coverage",
+    "pe",
+    "pb",
+    "roe",
+    "roce",
+    "debt_equity",
+)
+_SCREEN_NUMERIC = frozenset(_SCREEN_COLS[5:])
+
+
+def _screener_row(r: Any) -> dict[str, object]:
+    return {c: (_f(r[c]) if c in _SCREEN_NUMERIC else r[c]) for c in _SCREEN_COLS}
+
+
+def screen(
+    session: Session,
+    *,
+    market: str,
+    where_sql: str,
+    params: dict[str, object],
+    order_sql: str,
+    limit: int,
+    offset: int,
+) -> tuple[list[dict[str, object]], int]:
+    """Run a validated screener query. ``where_sql``/``order_sql`` are allow-list-built (trusted);
+    every user value is a bound parameter. Returns (rows, total_match_count)."""
+    sql = text(
+        f"{_SCREEN_CTE}"
+        "SELECT *, COUNT(*) OVER() AS total_count FROM screened "
+        f"WHERE {where_sql} ORDER BY {order_sql} LIMIT :limit OFFSET :offset"
+    )
+    bound = {**params, "market": market, "limit": limit, "offset": offset}
+    rows = session.execute(sql, bound).mappings().all()
+    count = int(rows[0]["total_count"]) if rows else 0
+    return [_screener_row(r) for r in rows], count
