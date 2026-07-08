@@ -7,6 +7,9 @@ import type { components } from "@/lib/api/schema";
 
 export type StockListItem = components["schemas"]["StockListItem"];
 export type RankingItem = components["schemas"]["RankingItem"];
+export type StockDetail = components["schemas"]["StockDetail"];
+export type DecompositionResponse = components["schemas"]["DecompositionResponse"];
+export type FactorContribution = components["schemas"]["FactorContribution"];
 
 const PAGE_SIZE = 50;
 
@@ -40,6 +43,36 @@ export function useRankings(params: { market?: string } = {}) {
       });
       if (error || !data) throw new Error("Failed to load rankings.");
       return data;
+    },
+  });
+}
+
+/** Stock master + latest snapshot. Returns `null` on 404 (unknown symbol). */
+export function useStockDetail(symbol: string) {
+  return useQuery({
+    queryKey: ["stock", symbol],
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/api/v1/stocks/{symbol}", {
+        params: { path: { symbol } },
+      });
+      if (response.status === 404) return null;
+      if (error || !data) throw new Error("Failed to load stock.");
+      return data.data ?? null;
+    },
+  });
+}
+
+/** Per-factor decomposition that sums to the composite (US-02). `null` on 404. */
+export function useDecomposition(symbol: string) {
+  return useQuery({
+    queryKey: ["decomposition", symbol],
+    queryFn: async () => {
+      const { data, error, response } = await api.GET("/api/v1/scores/{symbol}/decomposition", {
+        params: { path: { symbol } },
+      });
+      if (response.status === 404) return null;
+      if (error || !data) throw new Error("Failed to load decomposition.");
+      return data.data ?? null;
     },
   });
 }

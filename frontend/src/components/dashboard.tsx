@@ -54,7 +54,9 @@ export function TopRanked({ items }: { items: RankingItem[] }) {
               <li key={i.symbol} className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2">
                   <span className="w-4 tabular-nums text-muted-foreground">{i.rank}</span>
-                  <span className="font-medium">{i.symbol}</span>
+                  <Link href={`/stocks/${i.symbol}`} className="font-medium hover:text-primary hover:underline">
+                    {i.symbol}
+                  </Link>
                 </span>
                 <span className={cn("tabular-nums", toneTextClass(scoreTone(i.composite_score)))}>
                   {formatScore(i.composite_score)}
