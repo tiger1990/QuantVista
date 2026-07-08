@@ -4,7 +4,7 @@ baseline_commit: e6391e0c398d92d96c471aeab098c41d28ca1d08
 
 # Story 4.7: QV-034 — Frontend: app shell, auth flows, design-system base
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
