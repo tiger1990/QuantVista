@@ -40,7 +40,7 @@ def _with_disclaimer(response: Response) -> None:
     response.headers[_DISCLAIMER_HEADER] = _DISCLAIMER_HEADER_VALUE
 
 
-@router.get("/stocks", response_model=None)
+@router.get("/stocks", response_model=Envelope[list[StockListItem]])
 def list_stocks_endpoint(
     response: Response,
     market: str = Query("NSE"),
@@ -70,7 +70,7 @@ def list_stocks_endpoint(
     return Envelope.ok(items, meta={"next_cursor": next_cursor, "disclaimer": DISCLAIMER})
 
 
-@router.get("/stocks/{symbol}", response_model=None)
+@router.get("/stocks/{symbol}", response_model=Envelope[StockDetail])
 def get_stock_endpoint(
     symbol: str,
     response: Response,

@@ -114,9 +114,13 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
   FastAPI so the httpOnly refresh cookie flows, no CORS). `npm run gen:api` regenerates.
 - **Auth flows:** `AuthProvider`/`useAuth` — access JWT in memory (never localStorage), **silent refresh on
   mount** (httpOnly cookie → new access token), `login`/`register` (RHF+Zod, envelope-aware errors) + `logout`.
-- **Honest limits:** the paths + request bodies are typed; *responses* are loosely typed because the backend
-  routes use `response_model=None` (narrowed manually) — response-model typing is a backend follow-up.
-  **No Vitest/RTL yet** — satisfied the CI FE gate (lint + tsc + build); a Vitest/RTL unit harness + a
+- **Responses are now fully typed (principal-architect call, done — not deferred):** the backend `Envelope[T]`
+  became a **Pydantic generic** and every endpoint declares `response_model=Envelope[XResponse]`, so FastAPI
+  validates + documents responses. The OpenAPI now emits `Envelope_ScoreResponse_` / `Envelope_TokenResponse_`
+  / `Envelope_MeResponse_` etc.; the regenerated client types responses end-to-end, and `AuthProvider`'s manual
+  `unknown` casts collapsed to one **typed** `accessTokenFrom` helper. All 12 endpoints covered; backend suite
+  green (JSON shape unchanged — only now validated).
+- **Honest limits:** **No Vitest/RTL yet** — satisfied the CI FE gate (lint + tsc + build); a Vitest/RTL unit harness + a
   **Playwright E2E** (auth flow, needs a running FastAPI + a browser) are the FE testing follow-up (web rules).
   **Live auth is a manual smoke** (run FastAPI + `npm run dev`, register/login/refresh/logout) — like the
   real-data check; not automatable here without a running stack. **Visual polish needs owner eyeballs.**
@@ -134,6 +138,10 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
 - `src/app/globals.css` (Swiss token layer) · `src/app/layout.tsx` (theme hydration guard + base classes) · `src/components/providers.tsx`
 
 **Removed:** `src/app/page.tsx`, `src/app/page.module.css` (default starter).
+
+**Modified (backend/ — response-schema formalization):** `src/quantvista/schemas/envelope.py` (`Envelope[T]` +
+`Error` → Pydantic generics) · `api/routes.py`, `api/routes_stocks.py`, `api/routes_scores.py`, `api/app.py`
+(`response_model=None` → `response_model=Envelope[XResponse]` on all 12 endpoints).
 **Modified (repo):** `_bmad-output/.../sprint-status.yaml` — QV-034 status; QV-033 → done (housekeeping).
 
 ### Change Log

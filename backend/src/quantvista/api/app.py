@@ -35,7 +35,7 @@ from quantvista.schemas.envelope import ERROR_STATUS, Envelope
 health_router = APIRouter(prefix="/api/v1", tags=["health"])
 
 
-@health_router.get("/health", response_model=None)
+@health_router.get("/health", response_model=Envelope[dict[str, str]])
 def health() -> Envelope[dict[str, str]]:
     """Liveness probe — dependency-free so it stays green during boot."""
     return Envelope.ok({"status": "ok"}, meta={})

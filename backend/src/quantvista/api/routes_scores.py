@@ -39,7 +39,7 @@ def effective_limit(requested: int, tier: int | None) -> int:
     return min(requested, tier) if tier is not None else requested
 
 
-@router.get("/scores/{symbol}", response_model=None)
+@router.get("/scores/{symbol}", response_model=Envelope[ScoreResponse])
 def get_score_endpoint(
     symbol: str,
     response: Response,
@@ -70,7 +70,7 @@ def get_score_endpoint(
     return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})
 
 
-@router.get("/scores/{symbol}/decomposition", response_model=None)
+@router.get("/scores/{symbol}/decomposition", response_model=Envelope[DecompositionResponse])
 def get_decomposition_endpoint(
     symbol: str,
     response: Response,
@@ -87,7 +87,7 @@ def get_decomposition_endpoint(
     return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})
 
 
-@router.get("/rankings", response_model=None)
+@router.get("/rankings", response_model=Envelope[list[RankingItem]])
 def get_rankings_endpoint(
     response: Response,
     universe: str = Query("NIFTY200"),  # informational; dev universe = the market's constituents

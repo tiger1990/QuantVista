@@ -2,14 +2,18 @@
 
 Every ``/api/v1`` endpoint returns this shape: ``{ success, data, error, meta }``.
 Errors set ``success=False, data=None, error={code, message}``. Cursor pagination
-metadata goes in ``meta`` (``next_cursor``). Stdlib-only here so ``schemas`` stays a
-zero-dependency leaf in the module DAG; Pydantic models land with the API in QV-005+.
+metadata goes in ``meta`` (``next_cursor``).
+
+Pydantic generics so FastAPI can derive each endpoint's *full* response schema via
+``response_model=Envelope[XResponse]`` — the OpenAPI spec then describes responses, not
+just paths/bodies, and the generated frontend client is end-to-end typed (04 §1, contract-first).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel
 
 # Canonical error codes → HTTP status (see project-context.md / plans/04-api-contracts.md).
 ERROR_STATUS: dict[str, int] = {
@@ -26,14 +30,12 @@ ERROR_STATUS: dict[str, int] = {
 }
 
 
-@dataclass(frozen=True, slots=True)
-class Error:
+class Error(BaseModel):
     code: str
     message: str
 
 
-@dataclass(frozen=True, slots=True)
-class Envelope[T]:
+class Envelope[T](BaseModel):
     success: bool
     data: T | None = None
     error: Error | None = None

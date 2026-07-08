@@ -213,10 +213,177 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** DecompositionResponse */
+        DecompositionResponse: {
+            /** Symbol */
+            symbol: string;
+            /** As Of */
+            as_of: string;
+            /** Composite */
+            composite: number;
+            /** Sum Of Contributions */
+            sum_of_contributions: number;
+            /** Factors */
+            factors: components["schemas"]["FactorContribution"][];
+        };
+        /** Envelope[DecompositionResponse] */
+        Envelope_DecompositionResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["DecompositionResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[MeResponse] */
+        Envelope_MeResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["MeResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[ScoreResponse] */
+        Envelope_ScoreResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["ScoreResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[StockDetail] */
+        Envelope_StockDetail_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["StockDetail"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[TokenResponse] */
+        Envelope_TokenResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["TokenResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[dict[str, str]] */
+        Envelope_dict_str__str__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: {
+                [key: string]: string;
+            } | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[RankingItem]] */
+        Envelope_list_RankingItem__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["RankingItem"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[StockListItem]] */
+        Envelope_list_StockListItem__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["StockListItem"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Error */
+        Error: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** FactorContribution */
+        FactorContribution: {
+            /** Factor Key */
+            factor_key: string;
+            /** Category */
+            category: string;
+            /** Raw Value */
+            raw_value: number | null;
+            /** Zscore */
+            zscore: number | null;
+            /** Percentile Sector */
+            percentile_sector: number | null;
+            /** Percentile Universe */
+            percentile_universe: number | null;
+            /** Contribution */
+            contribution: number;
+            /** As Of */
+            as_of: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** LatestSnapshot */
+        LatestSnapshot: {
+            /** Price Date */
+            price_date: string | null;
+            /** Close */
+            close: number | null;
+            /** Composite Score */
+            composite_score: number | null;
+            /** Fundamental Score */
+            fundamental_score: number | null;
+            /** Momentum Score */
+            momentum_score: number | null;
+            /** Quality Score */
+            quality_score: number | null;
+            /** Sentiment Score */
+            sentiment_score: number | null;
+            /** Risk Score */
+            risk_score: number | null;
+            /** Coverage */
+            coverage: number | null;
+            /** Model Version */
+            model_version: string | null;
+            /** Weights Version */
+            weights_version: string | null;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Roe */
+            roe: number | null;
+            /** Roce */
+            roce: number | null;
+            /** Debt Equity */
+            debt_equity: number | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -224,6 +391,36 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** MeResponse */
+        MeResponse: {
+            /** User Id */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name: string | null;
+            /** Tenant Id */
+            tenant_id: string;
+            /** Tenant Name */
+            tenant_name: string;
+            /** Role */
+            role: string;
+            /** Entitlements */
+            entitlements: {
+                [key: string]: unknown;
+            };
+        };
+        /** RankingItem */
+        RankingItem: {
+            /** Rank */
+            rank: number;
+            /** Symbol */
+            symbol: string;
+            /** Composite Score */
+            composite_score: number | null;
+            /** Coverage */
+            coverage: number | null;
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -233,6 +430,74 @@ export interface components {
             password: string;
             /** Name */
             name?: string | null;
+        };
+        /** ScoreResponse */
+        ScoreResponse: {
+            /** Symbol */
+            symbol: string;
+            /** As Of */
+            as_of: string;
+            /** Fundamental */
+            fundamental: number | null;
+            /** Momentum */
+            momentum: number | null;
+            /** Quality */
+            quality: number | null;
+            /** Sentiment */
+            sentiment: number | null;
+            /** Risk */
+            risk: number | null;
+            /** Composite */
+            composite: number;
+            /** Coverage */
+            coverage: number | null;
+            /** Weights Version */
+            weights_version: string;
+            /** Model Version */
+            model_version: string;
+        };
+        /** StockDetail */
+        StockDetail: {
+            /** Symbol */
+            symbol: string;
+            /** Company Name */
+            company_name: string;
+            /** Sector */
+            sector: string | null;
+            /** Industry */
+            industry: string | null;
+            /** Market Cap Bucket */
+            market_cap_bucket: string | null;
+            /** Market */
+            market: string;
+            /** Is Active */
+            is_active: boolean;
+            snapshot: components["schemas"]["LatestSnapshot"];
+        };
+        /** StockListItem */
+        StockListItem: {
+            /** Symbol */
+            symbol: string;
+            /** Company Name */
+            company_name: string;
+            /** Sector */
+            sector: string | null;
+            /** Market Cap Bucket */
+            market_cap_bucket: string | null;
+            /** Market */
+            market: string;
+            /** Composite Score */
+            composite_score: number | null;
+        };
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -271,7 +536,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_dict_str__str__"];
                 };
             };
         };
@@ -295,7 +560,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_TokenResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -328,7 +593,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_TokenResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -357,7 +622,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_TokenResponse_"];
                 };
             };
         };
@@ -377,7 +642,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_dict_str__str__"];
                 };
             };
         };
@@ -397,7 +662,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_MeResponse_"];
                 };
             };
         };
@@ -423,7 +688,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_list_StockListItem__"];
                 };
             };
             /** @description Validation Error */
@@ -454,7 +719,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_StockDetail_"];
                 };
             };
             /** @description Validation Error */
@@ -487,7 +752,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_ScoreResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -520,7 +785,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_DecompositionResponse_"];
                 };
             };
             /** @description Validation Error */
@@ -554,7 +819,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Envelope_list_RankingItem__"];
                 };
             };
             /** @description Validation Error */

@@ -11,6 +11,14 @@ import {
 } from "react";
 
 import { api, setAccessToken } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
+
+type TokenEnvelope = components["schemas"]["Envelope_TokenResponse_"];
+
+/** Pull the access token out of a token-response envelope (typed by the generated client). */
+function accessTokenFrom(body: TokenEnvelope | undefined): string | null {
+  return body?.data?.access_token ?? null;
+}
 
 export interface AuthUser {
   userId: string;
@@ -30,27 +38,9 @@ interface AuthContextValue {
   logout: () => Promise<void>;
 }
 
-// The backend routes return the standard envelope; responses are `response_model=None`, so we
-// narrow the loosely-typed body here (paths + request bodies stay fully typed by the client).
-interface Envelope<T> {
-  success: boolean;
-  data: T | null;
-  error: { code: string; message: string } | null;
-}
-
-interface MePayload {
-  user_id: string;
-  email: string;
-  name: string | null;
-  tenant_id: string;
-  tenant_name: string;
-}
-
+// Responses are now fully typed by the generated client (backend endpoints declare
+// `response_model=Envelope[XResponse]`), so no manual narrowing is needed.
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function accessTokenFrom(body: unknown): string | null {
-  return (body as Envelope<{ access_token: string }>)?.data?.access_token ?? null;
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -59,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyToken = useCallback(async (token: string) => {
     setAccessToken(token);
     const { data } = await api.GET("/api/v1/me");
-    const me = (data as Envelope<MePayload>)?.data ?? null;
+    const me = data?.data ?? null;
     setUser(
       me
         ? {
