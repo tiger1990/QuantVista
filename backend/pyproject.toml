@@ -82,7 +82,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "f
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["src/quantvista", "tests"]
+files = ["src/quantvista", "tests", "scripts"]
 # Hand-written Alembic migrations are not part of the typed public surface.
 exclude = "src/quantvista/db/migrations/"
 
