@@ -33,7 +33,7 @@ def _tokens(access_token: str) -> dict[str, Any]:
     return TokenResponse(access_token=access_token).model_dump()
 
 
-@router.post("/auth/register", response_model=None, status_code=201)
+@router.post("/auth/register", response_model=Envelope[TokenResponse], status_code=201)
 def register(
     body: RegisterRequest, response: Response, svc: AuthService = Depends(get_auth_service)
 ) -> Envelope[dict[str, Any]]:
@@ -43,7 +43,7 @@ def register(
     return Envelope.ok(_tokens(tokens.access_token))
 
 
-@router.post("/auth/login", response_model=None)
+@router.post("/auth/login", response_model=Envelope[TokenResponse])
 def login(
     body: LoginRequest, response: Response, svc: AuthService = Depends(get_auth_service)
 ) -> Envelope[dict[str, Any]]:
@@ -53,7 +53,7 @@ def login(
     return Envelope.ok(_tokens(tokens.access_token))
 
 
-@router.post("/auth/refresh", response_model=None)
+@router.post("/auth/refresh", response_model=Envelope[TokenResponse])
 def refresh(
     request: Request, response: Response, svc: AuthService = Depends(get_auth_service)
 ) -> Envelope[dict[str, Any]]:
@@ -65,7 +65,7 @@ def refresh(
     return Envelope.ok(_tokens(tokens.access_token))
 
 
-@router.post("/auth/logout", response_model=None)
+@router.post("/auth/logout", response_model=Envelope[dict[str, str]])
 def logout(
     request: Request, response: Response, svc: AuthService = Depends(get_auth_service)
 ) -> Envelope[dict[str, Any]]:
@@ -76,7 +76,7 @@ def logout(
     return Envelope.ok({"status": "logged-out"})
 
 
-@router.get("/me", response_model=None)
+@router.get("/me", response_model=Envelope[MeResponse])
 def me(
     principal: Principal = Depends(get_current_principal),
     svc: AuthService = Depends(get_auth_service),
