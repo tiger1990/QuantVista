@@ -4,7 +4,7 @@ baseline_commit: 1781f3f50408b76e87dd7f3ce9216fa36931ba85
 
 # Story 4.9: QV-036 — Frontend: Stock detail with score decomposition
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
