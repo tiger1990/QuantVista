@@ -88,13 +88,16 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
   `api/routes_screens.py`, `schemas/screens.py` all **100%** (95% overall).
 - **QV-039 tests:** 5 integration (real PG + auth, 2 tenants) — round-trip, **403 at the Free cap of 3**,
   **422 invalid criteria**, **409 duplicate name**, **cross-tenant isolation** (B sees none / delete → 404).
-- **Migration:** `0014` applied; **down→up cycle clean** (`0014→0013→0014`).
-- **Local-DB note (not a code issue):** the dev DB's existing tables are owned by `deepakpanwar` with a
-  one-time provisioning grant; alembic (as the `quantvista` admin role, per config + CI) created
-  `saved_screens` owned by `quantvista`, so the app role needed the grant re-run —
-  `GRANT SELECT,INSERT,UPDATE,DELETE ON saved_screens TO quantvista_app`. **CI does this automatically**
-  (the `Grant app role DML on migrated schema` step runs `GRANT … ON ALL TABLES …` after `alembic upgrade`),
-  so the migration correctly carries **no grant statement** — consistent with every other migration.
+- **Migration correction (CI caught it):** `saved_screens` is **already created by `0009_watchlists_screens`**
+  (with the GIN index on `criteria` + RLS). My first `0014` mistakenly did `CREATE TABLE` again → passed
+  locally only because I'd earlier dropped the 0009 table thinking it was a stray, but **collided on CI's
+  fresh DB** ("relation already exists"). **Fixed:** `0014_saved_screen_unique_name` now only
+  `ALTER TABLE saved_screens ADD CONSTRAINT uq_saved_screens_tenant_name UNIQUE (tenant_id, name)` — the
+  per-tenant unique name the API's 409 relies on (0009 lacked it). Local DB restored to the 0009 schema +
+  the constraint; **`0014` down→up cycle clean**; full suite green.
+- **Grant note:** migrations run as the `quantvista` admin role; CI's `Grant app role DML on migrated schema`
+  step (`GRANT … ON ALL TABLES … TO quantvista_app` after `alembic upgrade`) covers new tables — so migrations
+  carry no grant statement, consistent with every other migration.
 
 ### Completion Notes List
 
@@ -115,7 +118,7 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
 ### File List
 
 **New (backend/)**
-- `src/quantvista/db/migrations/versions/0014_saved_screens.py`
+- `src/quantvista/db/migrations/versions/0014_saved_screen_unique_name.py` — **adds** `UNIQUE(tenant_id, name)` to the `saved_screens` table that **already exists from `0009`** (not a new table).
 - `src/quantvista/analytics/saved_screens.py` · `src/quantvista/schemas/screens.py` · `src/quantvista/api/routes_screens.py`
 - `tests/integration/test_api_screens.py`
 
@@ -124,9 +127,10 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
 
 ### Change Log
 
-- **2026-07-08 — QV-039 saved screens (entitlement-limited).** `POST/GET/DELETE /api/v1/screens` (`04` §3.4):
-  a tenant-scoped, RLS-isolated `saved_screens` table (migration `0014`) storing a validated screener
-  `criteria`; create enforces the `saved_screens` tier limit (Free 3 / Pro 25 / Quant ∞ → 403 over cap),
+- **2026-07-08 — QV-039 saved screens (entitlement-limited).** `POST/GET/DELETE /api/v1/screens` (`04` §3.4)
+  over the tenant-scoped, RLS-isolated `saved_screens` table (**created in `0009`**; `0014` adds
+  `UNIQUE(tenant_id, name)`) storing a validated screener `criteria`; create enforces the `saved_screens`
+  tier limit (Free 3 / Pro 25 / Quant ∞ → 403 over cap),
   validates criteria via the QV-038 allow-list (→ 422), and rejects duplicate names (→ 409). Running a screen
   = re-POST its criteria to `/screener`. 325 tests green (5 new; new code 100%); ruff/mypy-strict/import-linter
   clean; migration up+down clean. QV-040 (screener + saved-screens UI) builds on this.
