@@ -120,10 +120,15 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
   / `Envelope_MeResponse_` etc.; the regenerated client types responses end-to-end, and `AuthProvider`'s manual
   `unknown` casts collapsed to one **typed** `accessTokenFrom` helper. All 12 endpoints covered; backend suite
   green (JSON shape unchanged — only now validated).
-- **Honest limits:** **No Vitest/RTL yet** — satisfied the CI FE gate (lint + tsc + build); a Vitest/RTL unit harness + a
-  **Playwright E2E** (auth flow, needs a running FastAPI + a browser) are the FE testing follow-up (web rules).
-  **Live auth is a manual smoke** (run FastAPI + `npm run dev`, register/login/refresh/logout) — like the
-  real-data check; not automatable here without a running stack. **Visual polish needs owner eyeballs.**
+- **Testing (was a follow-up — now done):** **Vitest + RTL** harness with **9 unit tests** (cn, typed
+  `accessTokenFrom`, `AuthProvider` refresh→anon/authed transitions with a mocked client, LoginPage Zod
+  validation, ThemeToggle theme flip) — wired into CI (`frontend-quality` now runs `npm test`). **Playwright
+  E2E** scaffolded *and run in a real browser* (register → protected shell → logout, **1 passed**).
+- **Live auth verified end-to-end** (uvicorn + `next dev` + the BFF proxy): register → login → `/me` → refresh
+  (rotated) → logout → post-logout 401, plus **refresh-reuse → 401** (rotation/reuse detection). Cookie is
+  `HttpOnly; Secure; Path=/api/v1/auth; SameSite=lax`. (curl can't replay `Secure` over HTTP — proven by
+  forcing the cookie value; the browser E2E sends it natively on localhost.)
+- **Remaining owner step:** **visual polish** — only the owner can judge rendered pixels; `next dev` is the surface to review.
 
 ### File List
 
