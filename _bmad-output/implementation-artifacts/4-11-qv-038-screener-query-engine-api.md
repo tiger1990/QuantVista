@@ -4,7 +4,7 @@ baseline_commit: 36af9d6a52279c647022f79229a06be6cc25fe0a
 
 # Story 4.11: QV-038 — Screener query engine + API
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
