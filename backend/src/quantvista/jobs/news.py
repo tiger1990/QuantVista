@@ -1,12 +1,10 @@
-"""ingest_news job (QV-041) — pull market news through the provider seam into ``news``.
+"""news jobs — ``ingest_news`` (QV-041) + ``tag_news`` (QV-042).
 
-Under the QV-015 job framework (``run_key = news:{provider}:{hour}``, recorded in ``jobs_runs``).
-Provider-agnostic: ``get_news_provider`` picks the configured adapter (NewsAPI now; Finnhub/GNews
-are drop-ins). Emits ``NewsIngested``; tagging to stocks is QV-042.
-
-**Intended cadence: hourly.** Like prices/macro, this data job is kept **off live Beat** until a
-``news_api_key`` + a live scheduler exist (→ PV-007); scheduling it now would spam failing, key-less
-runs. Wire the hourly ``crontab(minute=0)`` entry into ``beat_schedule`` at that point.
+Under the QV-015 job framework (recorded in ``jobs_runs``). ``ingest_news`` fans out over the
+enabled providers (emits ``NewsIngested``); ``tag_news`` links untagged articles to a ``stock_id``
+via the pure ``news.tagging`` matcher, fed the stocks catalog read from ``market_data`` (this job is
+the composition root — ``news`` itself never imports ``market_data``). Both off live Beat until a
+scheduler (→ PV-007); ``tag_news`` also runs as a ``NewsIngested`` consumer.
 """
 
 from __future__ import annotations
@@ -16,10 +14,12 @@ from datetime import UTC, datetime, timedelta
 import structlog
 
 from quantvista.core.config import Settings, get_settings
+from quantvista.core.db import privileged_session_scope
 from quantvista.core.events import get_event_bus
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
+from quantvista.market_data.repositories import stock_catalog
 from quantvista.news.interfaces import INewsProvider
 from quantvista.news.providers import (
     FinnhubProvider,
@@ -27,11 +27,13 @@ from quantvista.news.providers import (
     MarketauxProvider,
     NewsApiProvider,
 )
-from quantvista.news.services import NewsIngestionService
+from quantvista.news.services import NewsIngestionService, NewsTaggingService
+from quantvista.news.tagging import StockRef
 
 _log = structlog.get_logger()
 
 NEWS_JOB_NAME = "ingest_news"
+TAG_JOB_NAME = "tag_news"
 # Fetch a window slightly wider than the hourly cadence so a delayed run never leaves a gap; the
 # source_url dedup makes the overlap free.
 _WINDOW = timedelta(hours=2)
@@ -86,3 +88,33 @@ def ingest_news() -> str:
     now = datetime.now(UTC)
     key = run_key("news", now.strftime("%Y-%m-%dT%H"))
     return _run_news(now, key).status.value
+
+
+def _run_tag(key: str) -> JobOutcome:
+    def work() -> JobResult:
+        with privileged_session_scope() as session:
+            catalog = [
+                StockRef(c.stock_id, c.symbol, c.isin, c.company_name)
+                for c in stock_catalog(session)
+            ]
+            report = NewsTaggingService(catalog).tag_untagged(session)
+        return JobResult(rows_in=report.scanned, rows_out=report.tagged)
+
+    return run_job(TAG_JOB_NAME, key, work, ledger=JobRunLedger())
+
+
+@app.task(
+    name="quantvista.tag_news",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    max_retries=3,
+)
+def tag_news() -> str:
+    """Tag untagged news to stocks (QV-042). Runs on ``NewsIngested`` + is manually triggerable.
+
+    Keyed per-second (not per-day): each run tags whatever is *currently* untagged, so it must run
+    after every ingest — the tagging itself is naturally idempotent (tagged rows are never re-read).
+    """
+    key = run_key("tag_news", datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S"))
+    return _run_tag(key).status.value

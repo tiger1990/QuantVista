@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from uuid import UUID
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,3 +34,21 @@ class NewsIngestReport:
     fetched: int
     inserted: int
     fetches_failed: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class UntaggedArticle:
+    """An untagged article's matchable fields (QV-042 tagging work item)."""
+
+    id: UUID
+    headline: str
+    summary: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TagReport:
+    """Outcome of one ``tag_news`` run (precision over recall — ambiguous stays NULL)."""
+
+    scanned: int
+    tagged: int
+    ambiguous_or_unmatched: int

@@ -37,6 +37,27 @@ class UniverseStock:
     market: str
 
 
+@dataclass(frozen=True, slots=True)
+class CatalogStock:
+    """A stock's identity fields for name/symbol/ISIN matching (QV-042 news tagging)."""
+
+    stock_id: UUID
+    symbol: str
+    isin: str | None
+    company_name: str
+
+
+_STOCK_CATALOG_SQL = text(
+    "SELECT id, symbol, isin, company_name FROM stocks WHERE is_active = true"
+)
+
+
+def stock_catalog(session: Session) -> list[CatalogStock]:
+    """All active stocks' id/symbol/ISIN/name — the match source for news tagging (QV-042)."""
+    rows = session.execute(_STOCK_CATALOG_SQL).all()
+    return [CatalogStock(stock_id=r[0], symbol=r[1], isin=r[2], company_name=r[3]) for r in rows]
+
+
 _ACTIVE_UNIVERSE_SQL = text(
     """
     SELECT s.id, s.symbol, m.code
