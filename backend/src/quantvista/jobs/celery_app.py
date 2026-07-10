@@ -48,7 +48,8 @@ def create_celery() -> Celery:
         "quantvista",
         broker=settings.redis_url,
         backend=settings.redis_url,
-        include=["quantvista.jobs.ops_metrics"],  # register the Beat-scheduled ops task
+        # register Beat-scheduled + manually-triggerable tasks (news ingestion is off-beat, PV-007)
+        include=["quantvista.jobs.ops_metrics", "quantvista.jobs.news"],
     )
     celery.conf.task_default_queue = "default"
     celery.conf.timezone = "UTC"
