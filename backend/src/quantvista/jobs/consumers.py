@@ -22,6 +22,7 @@ from quantvista.core.interfaces import IEventBus
 from quantvista.jobs.compute import compute_indicators
 from quantvista.jobs.corrections import recompute_on_correction
 from quantvista.jobs.ingest import ingest_daily_prices  # noqa: F401  (task registry side-effect)
+from quantvista.jobs.news import tag_news
 from quantvista.jobs.quality import validate_prices
 from quantvista.jobs.scoring import compute_factors, compute_scores
 
@@ -64,6 +65,17 @@ def on_scores_computed(envelope: dict[str, Any]) -> None:
     get_cache().delete(f"rank:{market}:{day}", f"score:{market}:{day}")
 
 
+def on_news_ingested(envelope: dict[str, Any]) -> None:
+    """Fresh news landed → tag the untagged articles to stocks (QV-042)."""
+    payload = envelope["payload"]
+    _log.info(
+        "consume_news_ingested",
+        providers=payload.get("providers"),
+        inserted=payload.get("inserted"),
+    )
+    tag_news.delay()
+
+
 def on_fundamentals_revised(envelope: dict[str, Any]) -> None:
     """A fundamentals correction landed → recompute derived analytics for each affected filing."""
     payload = envelope["payload"]
@@ -83,4 +95,5 @@ def register_pipeline_consumers(bus: IEventBus) -> None:
     bus.subscribe("IndicatorsComputed", on_indicators_computed)
     bus.subscribe("FactorsComputed", on_factors_computed)
     bus.subscribe("ScoresComputed", on_scores_computed)
+    bus.subscribe("NewsIngested", on_news_ingested)
     bus.subscribe("FundamentalsRevised", on_fundamentals_revised)

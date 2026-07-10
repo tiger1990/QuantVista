@@ -12,12 +12,14 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import structlog
+from sqlalchemy.orm import Session
 
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
 from quantvista.news.interfaces import INewsProvider
-from quantvista.news.models import NewsIngestReport
-from quantvista.news.repositories import upsert_news
+from quantvista.news.models import NewsIngestReport, TagReport
+from quantvista.news.repositories import iter_untagged_news, set_news_stock, upsert_news
+from quantvista.news.tagging import StockRef, build_match_index, match_text
 
 # Broad market queries (not per-stock — that would blow the free-tier cap; tagging is QV-042).
 MARKET_QUERIES: tuple[str, ...] = (
@@ -65,3 +67,26 @@ class NewsIngestionService:
             },
         )
         return report
+
+
+class NewsTaggingService:
+    """Tag untagged news to a single stock via the pure matcher (QV-042). Precision over recall:
+    only confident single matches are linked; ambiguous/unmatched stay ``stock_id = NULL``."""
+
+    def __init__(self, catalog: Sequence[StockRef]) -> None:
+        self._index = build_match_index(catalog)
+        self._log = structlog.get_logger()
+
+    def tag_untagged(self, session: Session, *, limit: int = 5000) -> TagReport:
+        articles = iter_untagged_news(session, limit)
+        tagged = 0
+        for article in articles:
+            text = article.headline + (f" {article.summary}" if article.summary else "")
+            stock_id = match_text(text, self._index)
+            if stock_id is not None:
+                set_news_stock(session, article.id, stock_id)
+                tagged += 1
+        self._log.info("news_tagged", scanned=len(articles), tagged=tagged)
+        return TagReport(
+            scanned=len(articles), tagged=tagged, ambiguous_or_unmatched=len(articles) - tagged
+        )
