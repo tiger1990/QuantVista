@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,6 +59,16 @@ class Settings(BaseSettings):
 
     # Macro data (QV-026): FRED API key (free, redistributable). Unset → macro sync can't run.
     fred_api_key: str | None = None
+
+    # News (QV-041): provider-agnostic multi-source ingestion. `news_providers` is the enabled set
+    # (comma-separated); the service fans out over those that have a key configured. All free tiers
+    # are dev-grade (NewsAPI is development-only) — production needs paid tiers, like yfinance.
+    news_providers: str = "newsapi,gnews,marketaux,finnhub"
+    # Env names are pinned via aliases where they differ from the field name (user's .env spelling).
+    newsapi_org_api_key: str | None = Field(default=None, validation_alias="NEWS_API_ORG_API_KEY")
+    gnews_api_key: str | None = None  # env: GNEWS_API_KEY
+    marketaux_api_key: str | None = None  # env: MARKETAUX_API_KEY
+    finnhub_api_key: str | None = Field(default=None, validation_alias="FINHUB_API_KEY")
 
     # Caching (QV-031): Redis cache-aside for scores/rankings, invalidated on ScoresComputed.
     cache_enabled: bool = True  # false → NullCache (dev/tests with no Redis)
