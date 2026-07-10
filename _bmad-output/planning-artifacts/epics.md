@@ -141,6 +141,10 @@ Provider abstraction, schema, ingestion jobs, PIT/bitemporal correctness, vendor
 ### Story 3.17: QV-073 — Production data cutover + lineage verification
 `[DATA]` · 5pts · depends: QV-072 · Sprint 10 · detail: `plans/sprints/sprint-10-monetization.md`
 
+### Story 3.18: QV-092 — Dev universe expansion to full Nifty 200 (yfinance)
+`[DATA]` · 3pts · depends: QV-016, QV-019, QV-030 · added post-hoc · detail: `_bmad-output/implementation-artifacts/3-18-qv-092-dev-nifty200-universe-expansion-yfinance.md`
+> Interim breadth: bring the dev universe from the 12-stock bootstrap to the full Nifty 200 via the yfinance EOD pipeline, because QV-072 (licensed vendor) is blocked (TrueData free trial is real-time-only, no historical backfill). Bundled NSE constituent snapshot + idempotent dev loader; provider `list_universe` stub untouched. Ceiling unchanged (momentum+risk only, no fundamentals/weights).
+
 ---
 
 ## Epic 4: Factors, Scoring & Intelligence (EPIC-INTEL)

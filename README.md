@@ -1,5 +1,9 @@
 # QuantVista (FinanceStockManager)
 
+<p align="center">
+  <img src="design-artifacts/quantvista-hero.png" alt="QuantVista — stock analyser & backtester: market-regime detection, factor grades, portfolio performance, and correlation analytics" width="100%" />
+</p>
+
 India-first equity research platform — a **modular monolith** (Python 3.13 / FastAPI) with a
 Next.js / TypeScript frontend. Research signals only, **not** personalised advice.
 
@@ -61,3 +65,9 @@ Per-stack details: `backend/README.md`, `frontend/README.md`.
 
 > **Note:** the live stack needs a Docker engine. On macOS 13+ use Docker Desktop; on macOS 12
 > (Monterey) use **Colima** (`brew install colima && colima start`) or Docker Desktop ~4.27.
+
+## Screenshot
+
+The Stocks page — the full NIFTY 200 universe with sector filters and composite scores.
+
+![QuantVista Stocks page — NIFTY 200 universe with sector filter chips and composite scores](design-artifacts/screenshot-stocks.png)
