@@ -209,6 +209,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/screener": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Screen Endpoint
+         * @description Filter/sort the universe by any allow-listed factor/fundamental.
+         */
+        post: operations["screen_endpoint_api_v1_screener_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens Endpoint */
+        get: operations["list_screens_endpoint_api_v1_screens_get"];
+        put?: never;
+        /**
+         * Create Screen Endpoint
+         * @description Save a screen, tier-limited by the ``saved_screens`` entitlement.
+         */
+        post: operations["create_screen_endpoint_api_v1_screens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Screen Endpoint */
+        delete: operations["delete_screen_endpoint_api_v1_screens__screen_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -242,6 +300,17 @@ export interface components {
             /** Success */
             success: boolean;
             data?: components["schemas"]["MeResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[SavedScreen] */
+        Envelope_SavedScreen_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["SavedScreen"] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -307,6 +376,30 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** Envelope[list[SavedScreen]] */
+        Envelope_list_SavedScreen__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["SavedScreen"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[ScreenerRow]] */
+        Envelope_list_ScreenerRow__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["ScreenerRow"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** Envelope[list[StockListItem]] */
         Envelope_list_StockListItem__: {
             /** Success */
@@ -344,6 +437,15 @@ export interface components {
             contribution: number;
             /** As Of */
             as_of: string;
+        };
+        /** FilterClause */
+        FilterClause: {
+            /** Field */
+            field: string;
+            /** Op */
+            op: string;
+            /** Value */
+            value: number | string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -431,6 +533,25 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** SaveScreenRequest */
+        SaveScreenRequest: {
+            /** Name */
+            name: string;
+            criteria: components["schemas"]["ScreenCriteria"];
+        };
+        /** SavedScreen */
+        SavedScreen: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Criteria */
+            criteria: {
+                [key: string]: unknown;
+            };
+            /** Created At */
+            created_at: string;
+        };
         /** ScoreResponse */
         ScoreResponse: {
             /** Symbol */
@@ -455,6 +576,82 @@ export interface components {
             weights_version: string;
             /** Model Version */
             model_version: string;
+        };
+        /**
+         * ScreenCriteria
+         * @description A runnable screener spec (a ``/screener`` body sans ``limit``/``cursor``).
+         */
+        ScreenCriteria: {
+            /**
+             * Market
+             * @default NSE
+             */
+            market: string;
+            /** Filters */
+            filters?: components["schemas"]["FilterClause"][];
+            /** Sort */
+            sort?: string | null;
+        };
+        /** ScreenRequest */
+        ScreenRequest: {
+            /**
+             * Universe
+             * @default NIFTY200
+             */
+            universe: string;
+            /**
+             * Market
+             * @default NSE
+             */
+            market: string;
+            /** Filters */
+            filters?: components["schemas"]["FilterClause"][];
+            /** Sort */
+            sort?: string | null;
+            /**
+             * Limit
+             * @default 100
+             */
+            limit: number;
+            /** Cursor */
+            cursor?: string | null;
+        };
+        /** ScreenerRow */
+        ScreenerRow: {
+            /** Symbol */
+            symbol: string;
+            /** Company Name */
+            company_name: string;
+            /** Sector */
+            sector: string | null;
+            /** Market Cap Bucket */
+            market_cap_bucket: string | null;
+            /** Market */
+            market: string;
+            /** Composite Score */
+            composite_score: number | null;
+            /** Fundamental Score */
+            fundamental_score: number | null;
+            /** Momentum Score */
+            momentum_score: number | null;
+            /** Quality Score */
+            quality_score: number | null;
+            /** Sentiment Score */
+            sentiment_score: number | null;
+            /** Risk Score */
+            risk_score: number | null;
+            /** Coverage */
+            coverage: number | null;
+            /** Pe */
+            pe: number | null;
+            /** Pb */
+            pb: number | null;
+            /** Roe */
+            roe: number | null;
+            /** Roce */
+            roce: number | null;
+            /** Debt Equity */
+            debt_equity: number | null;
         };
         /** StockDetail */
         StockDetail: {
@@ -821,6 +1018,121 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Envelope_list_RankingItem__"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_endpoint_api_v1_screener_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_ScreenerRow__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screens_endpoint_api_v1_screens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_SavedScreen__"];
+                };
+            };
+        };
+    };
+    create_screen_endpoint_api_v1_screens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_SavedScreen_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_screen_endpoint_api_v1_screens__screen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
