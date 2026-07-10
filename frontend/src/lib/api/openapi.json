@@ -1,1 +1,2317 @@
-{"openapi": "3.1.0", "info": {"title": "QuantVista API", "version": "0.1.0"}, "paths": {"/api/v1/health": {"get": {"tags": ["health"], "summary": "Health", "description": "Liveness probe \u2014 dependency-free so it stays green during boot.", "operationId": "health_api_v1_health_get", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_dict_str__str__"}}}}}}}, "/api/v1/auth/register": {"post": {"tags": ["auth"], "summary": "Register", "operationId": "register_api_v1_auth_register_post", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/RegisterRequest"}}}, "required": true}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_TokenResponse_"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/login": {"post": {"tags": ["auth"], "summary": "Login", "operationId": "login_api_v1_auth_login_post", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/LoginRequest"}}}, "required": true}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_TokenResponse_"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/auth/refresh": {"post": {"tags": ["auth"], "summary": "Refresh", "operationId": "refresh_api_v1_auth_refresh_post", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_TokenResponse_"}}}}}}}, "/api/v1/auth/logout": {"post": {"tags": ["auth"], "summary": "Logout", "operationId": "logout_api_v1_auth_logout_post", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_dict_str__str__"}}}}}}}, "/api/v1/me": {"get": {"tags": ["auth"], "summary": "Me", "operationId": "me_api_v1_me_get", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_MeResponse_"}}}}}}}, "/api/v1/stocks": {"get": {"tags": ["stocks"], "summary": "List Stocks Endpoint", "description": "Browse the universe: filter by market/sector/cap, keyset-paginated by symbol.", "operationId": "list_stocks_endpoint_api_v1_stocks_get", "parameters": [{"name": "market", "in": "query", "required": false, "schema": {"type": "string", "default": "NSE", "title": "Market"}}, {"name": "sector", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Sector"}}, {"name": "market_cap_bucket", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Market Cap Bucket"}}, {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "maximum": 100, "minimum": 1, "default": 50, "title": "Limit"}}, {"name": "cursor", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Cursor"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_list_StockListItem__"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/stocks/{symbol}": {"get": {"tags": ["stocks"], "summary": "Get Stock Endpoint", "description": "Master + latest snapshot for ``symbol`` (cached, TTL-backstopped).", "operationId": "get_stock_endpoint_api_v1_stocks__symbol__get", "parameters": [{"name": "symbol", "in": "path", "required": true, "schema": {"type": "string", "title": "Symbol"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_StockDetail_"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/scores/{symbol}": {"get": {"tags": ["scores"], "summary": "Get Score Endpoint", "description": "A stock's composite + sub-scores as of ``as_of`` (default latest).", "operationId": "get_score_endpoint_api_v1_scores__symbol__get", "parameters": [{"name": "symbol", "in": "path", "required": true, "schema": {"type": "string", "title": "Symbol"}}, {"name": "as_of", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}], "title": "As Of"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_ScoreResponse_"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/scores/{symbol}/decomposition": {"get": {"tags": ["scores"], "summary": "Get Decomposition Endpoint", "description": "Per-factor contributions that sum to the composite (US-02).", "operationId": "get_decomposition_endpoint_api_v1_scores__symbol__decomposition_get", "parameters": [{"name": "symbol", "in": "path", "required": true, "schema": {"type": "string", "title": "Symbol"}}, {"name": "as_of", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}], "title": "As Of"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_DecompositionResponse_"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/v1/rankings": {"get": {"tags": ["scores"], "summary": "Get Rankings Endpoint", "description": "Composite-desc leaderboard, truncated to the tenant's ``universe_scores_top`` quota.", "operationId": "get_rankings_endpoint_api_v1_rankings_get", "parameters": [{"name": "universe", "in": "query", "required": false, "schema": {"type": "string", "default": "NIFTY200", "title": "Universe"}}, {"name": "market", "in": "query", "required": false, "schema": {"type": "string", "default": "NSE", "title": "Market"}}, {"name": "as_of", "in": "query", "required": false, "schema": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}], "title": "As Of"}}, {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "maximum": 500, "minimum": 1, "default": 50, "title": "Limit"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Envelope_list_RankingItem__"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}}, "components": {"schemas": {"DecompositionResponse": {"properties": {"symbol": {"type": "string", "title": "Symbol"}, "as_of": {"type": "string", "title": "As Of"}, "composite": {"type": "number", "title": "Composite"}, "sum_of_contributions": {"type": "number", "title": "Sum Of Contributions"}, "factors": {"items": {"$ref": "#/components/schemas/FactorContribution"}, "type": "array", "title": "Factors"}}, "type": "object", "required": ["symbol", "as_of", "composite", "sum_of_contributions", "factors"], "title": "DecompositionResponse"}, "Envelope_DecompositionResponse_": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"$ref": "#/components/schemas/DecompositionResponse"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[DecompositionResponse]"}, "Envelope_MeResponse_": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"$ref": "#/components/schemas/MeResponse"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[MeResponse]"}, "Envelope_ScoreResponse_": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"$ref": "#/components/schemas/ScoreResponse"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[ScoreResponse]"}, "Envelope_StockDetail_": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"$ref": "#/components/schemas/StockDetail"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[StockDetail]"}, "Envelope_TokenResponse_": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"$ref": "#/components/schemas/TokenResponse"}, {"type": "null"}]}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[TokenResponse]"}, "Envelope_dict_str__str__": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"additionalProperties": {"type": "string"}, "type": "object"}, {"type": "null"}], "title": "Data"}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[dict[str, str]]"}, "Envelope_list_RankingItem__": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"items": {"$ref": "#/components/schemas/RankingItem"}, "type": "array"}, {"type": "null"}], "title": "Data"}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[list[RankingItem]]"}, "Envelope_list_StockListItem__": {"properties": {"success": {"type": "boolean", "title": "Success"}, "data": {"anyOf": [{"items": {"$ref": "#/components/schemas/StockListItem"}, "type": "array"}, {"type": "null"}], "title": "Data"}, "error": {"anyOf": [{"$ref": "#/components/schemas/Error"}, {"type": "null"}]}, "meta": {"anyOf": [{"additionalProperties": true, "type": "object"}, {"type": "null"}], "title": "Meta"}}, "type": "object", "required": ["success"], "title": "Envelope[list[StockListItem]]"}, "Error": {"properties": {"code": {"type": "string", "title": "Code"}, "message": {"type": "string", "title": "Message"}}, "type": "object", "required": ["code", "message"], "title": "Error"}, "FactorContribution": {"properties": {"factor_key": {"type": "string", "title": "Factor Key"}, "category": {"type": "string", "title": "Category"}, "raw_value": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Raw Value"}, "zscore": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Zscore"}, "percentile_sector": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Percentile Sector"}, "percentile_universe": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Percentile Universe"}, "contribution": {"type": "number", "title": "Contribution"}, "as_of": {"type": "string", "title": "As Of"}}, "type": "object", "required": ["factor_key", "category", "raw_value", "zscore", "percentile_sector", "percentile_universe", "contribution", "as_of"], "title": "FactorContribution"}, "HTTPValidationError": {"properties": {"detail": {"items": {"$ref": "#/components/schemas/ValidationError"}, "type": "array", "title": "Detail"}}, "type": "object", "title": "HTTPValidationError"}, "LatestSnapshot": {"properties": {"price_date": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Price Date"}, "close": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Close"}, "composite_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Composite Score"}, "fundamental_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Fundamental Score"}, "momentum_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Momentum Score"}, "quality_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Quality Score"}, "sentiment_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Sentiment Score"}, "risk_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Risk Score"}, "coverage": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Coverage"}, "model_version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Model Version"}, "weights_version": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Weights Version"}, "pe": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Pe"}, "pb": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Pb"}, "roe": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Roe"}, "roce": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Roce"}, "debt_equity": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Debt Equity"}}, "type": "object", "required": ["price_date", "close", "composite_score", "fundamental_score", "momentum_score", "quality_score", "sentiment_score", "risk_score", "coverage", "model_version", "weights_version", "pe", "pb", "roe", "roce", "debt_equity"], "title": "LatestSnapshot"}, "LoginRequest": {"properties": {"email": {"type": "string", "maxLength": 320, "minLength": 3, "title": "Email"}, "password": {"type": "string", "maxLength": 200, "minLength": 1, "title": "Password"}}, "type": "object", "required": ["email", "password"], "title": "LoginRequest"}, "MeResponse": {"properties": {"user_id": {"type": "string", "title": "User Id"}, "email": {"type": "string", "title": "Email"}, "name": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Name"}, "tenant_id": {"type": "string", "title": "Tenant Id"}, "tenant_name": {"type": "string", "title": "Tenant Name"}, "role": {"type": "string", "title": "Role"}, "entitlements": {"additionalProperties": true, "type": "object", "title": "Entitlements"}}, "type": "object", "required": ["user_id", "email", "name", "tenant_id", "tenant_name", "role", "entitlements"], "title": "MeResponse"}, "RankingItem": {"properties": {"rank": {"type": "integer", "title": "Rank"}, "symbol": {"type": "string", "title": "Symbol"}, "composite_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Composite Score"}, "coverage": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Coverage"}}, "type": "object", "required": ["rank", "symbol", "composite_score", "coverage"], "title": "RankingItem"}, "RegisterRequest": {"properties": {"email": {"type": "string", "maxLength": 320, "minLength": 3, "title": "Email"}, "password": {"type": "string", "maxLength": 200, "minLength": 8, "title": "Password"}, "name": {"anyOf": [{"type": "string", "maxLength": 200}, {"type": "null"}], "title": "Name"}}, "type": "object", "required": ["email", "password"], "title": "RegisterRequest"}, "ScoreResponse": {"properties": {"symbol": {"type": "string", "title": "Symbol"}, "as_of": {"type": "string", "title": "As Of"}, "fundamental": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Fundamental"}, "momentum": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Momentum"}, "quality": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Quality"}, "sentiment": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Sentiment"}, "risk": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Risk"}, "composite": {"type": "number", "title": "Composite"}, "coverage": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Coverage"}, "weights_version": {"type": "string", "title": "Weights Version"}, "model_version": {"type": "string", "title": "Model Version"}}, "type": "object", "required": ["symbol", "as_of", "fundamental", "momentum", "quality", "sentiment", "risk", "composite", "coverage", "weights_version", "model_version"], "title": "ScoreResponse"}, "StockDetail": {"properties": {"symbol": {"type": "string", "title": "Symbol"}, "company_name": {"type": "string", "title": "Company Name"}, "sector": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Sector"}, "industry": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Industry"}, "market_cap_bucket": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Market Cap Bucket"}, "market": {"type": "string", "title": "Market"}, "is_active": {"type": "boolean", "title": "Is Active"}, "snapshot": {"$ref": "#/components/schemas/LatestSnapshot"}}, "type": "object", "required": ["symbol", "company_name", "sector", "industry", "market_cap_bucket", "market", "is_active", "snapshot"], "title": "StockDetail"}, "StockListItem": {"properties": {"symbol": {"type": "string", "title": "Symbol"}, "company_name": {"type": "string", "title": "Company Name"}, "sector": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Sector"}, "market_cap_bucket": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Market Cap Bucket"}, "market": {"type": "string", "title": "Market"}, "composite_score": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Composite Score"}}, "type": "object", "required": ["symbol", "company_name", "sector", "market_cap_bucket", "market", "composite_score"], "title": "StockListItem"}, "TokenResponse": {"properties": {"access_token": {"type": "string", "title": "Access Token"}, "token_type": {"type": "string", "title": "Token Type", "default": "bearer"}}, "type": "object", "required": ["access_token"], "title": "TokenResponse"}, "ValidationError": {"properties": {"loc": {"items": {"anyOf": [{"type": "string"}, {"type": "integer"}]}, "type": "array", "title": "Location"}, "msg": {"type": "string", "title": "Message"}, "type": {"type": "string", "title": "Error Type"}, "input": {"title": "Input"}, "ctx": {"type": "object", "title": "Context"}}, "type": "object", "required": ["loc", "msg", "type"], "title": "ValidationError"}}}}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "QuantVista API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "description": "Liveness probe \u2014 dependency-free so it stays green during boot.",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__str__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register",
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_TokenResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_TokenResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh",
+        "operationId": "refresh_api_v1_auth_refresh_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_TokenResponse_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__str__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me",
+        "operationId": "me_api_v1_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_MeResponse_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stocks": {
+      "get": {
+        "tags": [
+          "stocks"
+        ],
+        "summary": "List Stocks Endpoint",
+        "description": "Browse the universe: filter by market/sector/cap, keyset-paginated by symbol.",
+        "operationId": "list_stocks_endpoint_api_v1_stocks_get",
+        "parameters": [
+          {
+            "name": "market",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "NSE",
+              "title": "Market"
+            }
+          },
+          {
+            "name": "sector",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sector"
+            }
+          },
+          {
+            "name": "market_cap_bucket",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Market Cap Bucket"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_StockListItem__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stocks/{symbol}": {
+      "get": {
+        "tags": [
+          "stocks"
+        ],
+        "summary": "Get Stock Endpoint",
+        "description": "Master + latest snapshot for ``symbol`` (cached, TTL-backstopped).",
+        "operationId": "get_stock_endpoint_api_v1_stocks__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_StockDetail_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scores/{symbol}": {
+      "get": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "Get Score Endpoint",
+        "description": "A stock's composite + sub-scores as of ``as_of`` (default latest).",
+        "operationId": "get_score_endpoint_api_v1_scores__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ScoreResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scores/{symbol}/decomposition": {
+      "get": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "Get Decomposition Endpoint",
+        "description": "Per-factor contributions that sum to the composite (US-02).",
+        "operationId": "get_decomposition_endpoint_api_v1_scores__symbol__decomposition_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_DecompositionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rankings": {
+      "get": {
+        "tags": [
+          "scores"
+        ],
+        "summary": "Get Rankings Endpoint",
+        "description": "Composite-desc leaderboard, truncated to the tenant's ``universe_scores_top`` quota.",
+        "operationId": "get_rankings_endpoint_api_v1_rankings_get",
+        "parameters": [
+          {
+            "name": "universe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "NIFTY200",
+              "title": "Universe"
+            }
+          },
+          {
+            "name": "market",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "NSE",
+              "title": "Market"
+            }
+          },
+          {
+            "name": "as_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_RankingItem__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screener": {
+      "post": {
+        "tags": [
+          "screener"
+        ],
+        "summary": "Screen Endpoint",
+        "description": "Filter/sort the universe by any allow-listed factor/fundamental.",
+        "operationId": "screen_endpoint_api_v1_screener_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ScreenerRow__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screens": {
+      "get": {
+        "tags": [
+          "screens"
+        ],
+        "summary": "List Screens Endpoint",
+        "operationId": "list_screens_endpoint_api_v1_screens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_SavedScreen__"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "screens"
+        ],
+        "summary": "Create Screen Endpoint",
+        "description": "Save a screen, tier-limited by the ``saved_screens`` entitlement.",
+        "operationId": "create_screen_endpoint_api_v1_screens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_SavedScreen_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/screens/{screen_id}": {
+      "delete": {
+        "tags": [
+          "screens"
+        ],
+        "summary": "Delete Screen Endpoint",
+        "operationId": "delete_screen_endpoint_api_v1_screens__screen_id__delete",
+        "parameters": [
+          {
+            "name": "screen_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Screen Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DecompositionResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "composite": {
+            "type": "number",
+            "title": "Composite"
+          },
+          "sum_of_contributions": {
+            "type": "number",
+            "title": "Sum Of Contributions"
+          },
+          "factors": {
+            "items": {
+              "$ref": "#/components/schemas/FactorContribution"
+            },
+            "type": "array",
+            "title": "Factors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "as_of",
+          "composite",
+          "sum_of_contributions",
+          "factors"
+        ],
+        "title": "DecompositionResponse"
+      },
+      "Envelope_DecompositionResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecompositionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[DecompositionResponse]"
+      },
+      "Envelope_MeResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[MeResponse]"
+      },
+      "Envelope_SavedScreen_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SavedScreen"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[SavedScreen]"
+      },
+      "Envelope_ScoreResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[ScoreResponse]"
+      },
+      "Envelope_StockDetail_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StockDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[StockDetail]"
+      },
+      "Envelope_TokenResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[TokenResponse]"
+      },
+      "Envelope_dict_str__str__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[dict[str, str]]"
+      },
+      "Envelope_list_RankingItem__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RankingItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[list[RankingItem]]"
+      },
+      "Envelope_list_SavedScreen__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SavedScreen"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[list[SavedScreen]]"
+      },
+      "Envelope_list_ScreenerRow__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ScreenerRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[list[ScreenerRow]]"
+      },
+      "Envelope_list_StockListItem__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/StockListItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[list[StockListItem]]"
+      },
+      "Error": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error"
+      },
+      "FactorContribution": {
+        "properties": {
+          "factor_key": {
+            "type": "string",
+            "title": "Factor Key"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "raw_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Value"
+          },
+          "zscore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zscore"
+          },
+          "percentile_sector": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile Sector"
+          },
+          "percentile_universe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile Universe"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor_key",
+          "category",
+          "raw_value",
+          "zscore",
+          "percentile_sector",
+          "percentile_universe",
+          "contribution",
+          "as_of"
+        ],
+        "title": "FactorContribution"
+      },
+      "FilterClause": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "op": {
+            "type": "string",
+            "title": "Op"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "op",
+          "value"
+        ],
+        "title": "FilterClause"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LatestSnapshot": {
+        "properties": {
+          "price_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Date"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
+          },
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
+          },
+          "fundamental_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fundamental Score"
+          },
+          "momentum_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Momentum Score"
+          },
+          "quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Score"
+          },
+          "sentiment_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment Score"
+          },
+          "risk_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Score"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "weights_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Version"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "roce": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roce"
+          },
+          "debt_equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt Equity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "price_date",
+          "close",
+          "composite_score",
+          "fundamental_score",
+          "momentum_score",
+          "quality_score",
+          "sentiment_score",
+          "risk_score",
+          "coverage",
+          "model_version",
+          "weights_version",
+          "pe",
+          "pb",
+          "roe",
+          "roce",
+          "debt_equity"
+        ],
+        "title": "LatestSnapshot"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "MeResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tenant_id": {
+            "type": "string",
+            "title": "Tenant Id"
+          },
+          "tenant_name": {
+            "type": "string",
+            "title": "Tenant Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "entitlements": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Entitlements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "tenant_id",
+          "tenant_name",
+          "role",
+          "entitlements"
+        ],
+        "title": "MeResponse"
+      },
+      "RankingItem": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "symbol",
+          "composite_score",
+          "coverage"
+        ],
+        "title": "RankingItem"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "SaveScreenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "criteria": {
+            "$ref": "#/components/schemas/ScreenCriteria"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "criteria"
+        ],
+        "title": "SaveScreenRequest"
+      },
+      "SavedScreen": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "criteria": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Criteria"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "criteria",
+          "created_at"
+        ],
+        "title": "SavedScreen"
+      },
+      "ScoreResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "fundamental": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fundamental"
+          },
+          "momentum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Momentum"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "sentiment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "composite": {
+            "type": "number",
+            "title": "Composite"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "weights_version": {
+            "type": "string",
+            "title": "Weights Version"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "as_of",
+          "fundamental",
+          "momentum",
+          "quality",
+          "sentiment",
+          "risk",
+          "composite",
+          "coverage",
+          "weights_version",
+          "model_version"
+        ],
+        "title": "ScoreResponse"
+      },
+      "ScreenCriteria": {
+        "properties": {
+          "market": {
+            "type": "string",
+            "title": "Market",
+            "default": "NSE"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterClause"
+            },
+            "type": "array",
+            "title": "Filters"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort"
+          }
+        },
+        "type": "object",
+        "title": "ScreenCriteria",
+        "description": "A runnable screener spec (a ``/screener`` body sans ``limit``/``cursor``)."
+      },
+      "ScreenRequest": {
+        "properties": {
+          "universe": {
+            "type": "string",
+            "title": "Universe",
+            "default": "NIFTY200"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market",
+            "default": "NSE"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterClause"
+            },
+            "type": "array",
+            "title": "Filters"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "type": "object",
+        "title": "ScreenRequest"
+      },
+      "ScreenerRow": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "market_cap_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap Bucket"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
+          },
+          "fundamental_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fundamental Score"
+          },
+          "momentum_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Momentum Score"
+          },
+          "quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Score"
+          },
+          "sentiment_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment Score"
+          },
+          "risk_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Score"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "roce": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roce"
+          },
+          "debt_equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt Equity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "company_name",
+          "sector",
+          "market_cap_bucket",
+          "market",
+          "composite_score",
+          "fundamental_score",
+          "momentum_score",
+          "quality_score",
+          "sentiment_score",
+          "risk_score",
+          "coverage",
+          "pe",
+          "pb",
+          "roe",
+          "roce",
+          "debt_equity"
+        ],
+        "title": "ScreenerRow"
+      },
+      "StockDetail": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "market_cap_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap Bucket"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/LatestSnapshot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "company_name",
+          "sector",
+          "industry",
+          "market_cap_bucket",
+          "market",
+          "is_active",
+          "snapshot"
+        ],
+        "title": "StockDetail"
+      },
+      "StockListItem": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "market_cap_bucket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap Bucket"
+          },
+          "market": {
+            "type": "string",
+            "title": "Market"
+          },
+          "composite_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composite Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "company_name",
+          "sector",
+          "market_cap_bucket",
+          "market",
+          "composite_score"
+        ],
+        "title": "StockListItem"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "TokenResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
