@@ -17,7 +17,11 @@ from uuid import UUID
 _SUFFIXES = frozenset(
     {"ltd", "limited", "inc", "incorporated", "corporation", "corp", "co", "company", "plc"}
 )
+# Trailing descriptor/stop words dropped to derive a SHORT alias (news often omits them, e.g.
+# "Kalyan Jewellers India Ltd" → "kalyan jewellers"). Only stripped from the tail.
+_SHORT_TAIL = _SUFFIXES | {"india", "of", "the", "and"}
 _MIN_SYMBOL_LEN = 3  # drop noisy 2-char tickers (e.g. "LT") that false-match common words
+_MIN_SHORT_TOKENS = 2  # a short alias must stay ≥2 tokens ("kalyan jewellers" ok; "bank" not)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +42,22 @@ def _core_name(name: str) -> str:
     return " ".join(tokens)
 
 
+def _name_aliases(name: str) -> set[str]:
+    """The name phrases to match a stock by: the full core + a short alias (trailing India/stop
+    words stripped) when it stays ≥2 tokens — so "Kalyan Jewellers India Ltd" also matches the
+    bare "Kalyan Jewellers", while "Bank of India" never degrades to the unsafe "bank"."""
+    core = _core_name(name)
+    if not core:
+        return set()
+    aliases = {core}
+    tokens = core.split()
+    while tokens and tokens[-1] in _SHORT_TAIL:
+        tokens.pop()
+    if len(tokens) >= _MIN_SHORT_TOKENS:
+        aliases.add(" ".join(tokens))
+    return aliases
+
+
 @dataclass(frozen=True, slots=True)
 class MatchIndex:
     """Precomputed aliases → stock_id, plus the raw refs (built once per catalog)."""
@@ -48,18 +68,17 @@ class MatchIndex:
 
 
 def build_match_index(catalog: Sequence[StockRef]) -> MatchIndex:
-    """Precompute the alias lookups. A core name shared by ≥2 stocks is dropped (ambiguous)."""
-    core_counts: dict[str, int] = {}
+    """Precompute the alias lookups. A name alias shared by ≥2 stocks is dropped (ambiguous)."""
+    alias_counts: dict[str, int] = {}
     for ref in catalog:
-        core = _core_name(ref.company_name)
-        if core:
-            core_counts[core] = core_counts.get(core, 0) + 1
+        for alias in _name_aliases(ref.company_name):
+            alias_counts[alias] = alias_counts.get(alias, 0) + 1
 
     index = MatchIndex()
     for ref in catalog:
-        core = _core_name(ref.company_name)
-        if core and core_counts[core] == 1:  # a non-unique core can never be a confident match
-            index.by_core[core] = ref.stock_id
+        for alias in _name_aliases(ref.company_name):
+            if alias_counts[alias] == 1:  # a non-unique alias can never be a confident match
+                index.by_core[alias] = ref.stock_id
         symbol = ref.symbol.strip().upper()
         if len(symbol) >= _MIN_SYMBOL_LEN:
             index.by_symbol[symbol] = ref.stock_id
@@ -73,8 +92,12 @@ def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9 ]", " ", text.lower()).split())
 
 
-def match_text(text: str, index: MatchIndex) -> UUID | None:
-    """Return the single stock the text is about, or ``None`` (no confident single match)."""
+def match_all(text: str, index: MatchIndex) -> set[UUID]:
+    """Every distinct stock the text confidently names (QV-094 — a multi-stock article tags all).
+
+    Per-match precision is unchanged from the single-match matcher (whole normalized company-name
+    phrase, symbol ≥3 chars, ISIN; catalog cores shared by ≥2 stocks are excluded at index build).
+    """
     normalized = _normalize(text)  # punctuation → space (so "Larsen & Toubro" → "larsen toubro")
     matched: set[UUID] = set()
 
@@ -89,4 +112,4 @@ def match_text(text: str, index: MatchIndex) -> UUID | None:
         if isin in upper:
             matched.add(stock_id)
 
-    return next(iter(matched)) if len(matched) == 1 else None  # exactly one → tag; else None
+    return matched

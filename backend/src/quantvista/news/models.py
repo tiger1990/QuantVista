@@ -47,8 +47,8 @@ class UntaggedArticle:
 
 @dataclass(frozen=True, slots=True)
 class TagReport:
-    """Outcome of one ``tag_news`` run (precision over recall — ambiguous stays NULL)."""
+    """Outcome of one ``tag_news`` run (QV-094 many-to-many)."""
 
-    scanned: int
-    tagged: int
-    ambiguous_or_unmatched: int
+    scanned: int  # articles processed this run
+    tagged: int  # articles that matched ≥1 stock
+    links: int  # total news↔stock links written

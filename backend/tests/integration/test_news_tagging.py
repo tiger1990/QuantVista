@@ -64,43 +64,44 @@ def seeded(admin_engine: Engine) -> Iterator[dict[str, UUID]]:
         conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE 'tag_news:%'"))
 
 
-def _stock_of(admin_engine: Engine, url: str) -> UUID | None:
+def _stocks_of(admin_engine: Engine, url: str) -> set[UUID]:
+    """The stock_ids linked to a news article via news_stocks (QV-094)."""
     with admin_engine.connect() as conn:
-        result = conn.execute(
-            text("SELECT stock_id FROM news WHERE source_url = :u"), {"u": url}
-        ).scalar_one()
-    return cast("UUID | None", result)
+        rows = conn.execute(
+            text(
+                "SELECT ns.stock_id FROM news_stocks ns "
+                "JOIN news n ON n.id = ns.news_id WHERE n.source_url = :u"
+            ),
+            {"u": url},
+        ).all()
+    return {cast("UUID", r[0]) for r in rows}
 
 
-def test_tags_distinct_name_and_leaves_ambiguous_null(
-    admin_engine: Engine, seeded: dict[str, UUID]
-) -> None:
-    with privileged_session_scope() as session:
-        catalog = [
-            StockRef(c.stock_id, c.symbol, c.isin, c.company_name) for c in stock_catalog(session)
-        ]
-        report = NewsTaggingService(catalog).tag_untagged(session)
-
-    assert report.tagged >= 1
-    assert _stock_of(admin_engine, f"{_URL}a") == seeded[_SYM_A]  # distinct name → tagged
-    assert _stock_of(admin_engine, f"{_URL}b") is None  # names both stocks → ambiguous, NULL
-    assert _stock_of(admin_engine, f"{_URL}c") is None  # no match → NULL
-
-
-def test_tagging_is_idempotent(admin_engine: Engine, seeded: dict[str, UUID]) -> None:
+def _tag() -> None:
     with privileged_session_scope() as session:
         catalog = [
             StockRef(c.stock_id, c.symbol, c.isin, c.company_name) for c in stock_catalog(session)
         ]
         NewsTaggingService(catalog).tag_untagged(session)
-    # Second pass sees the tagged row as no longer untagged → scans/ tags fewer, no change to A.
+
+
+def test_tags_every_named_stock(admin_engine: Engine, seeded: dict[str, UUID]) -> None:
+    _tag()
+    # Distinct name → its stock; a two-stock article → BOTH (QV-094); no match → no links.
+    assert _stocks_of(admin_engine, f"{_URL}a") == {seeded[_SYM_A]}
+    assert _stocks_of(admin_engine, f"{_URL}b") == {seeded[_SYM_A], seeded[_SYM_B]}
+    assert _stocks_of(admin_engine, f"{_URL}c") == set()
+
+
+def test_tagging_is_idempotent(admin_engine: Engine, seeded: dict[str, UUID]) -> None:
+    _tag()
     with privileged_session_scope() as session:
         catalog = [
             StockRef(c.stock_id, c.symbol, c.isin, c.company_name) for c in stock_catalog(session)
         ]
-        report2 = NewsTaggingService(catalog).tag_untagged(session)
-    assert report2.tagged == 0  # nothing new to tag among the seeded set
-    assert _stock_of(admin_engine, f"{_URL}a") == seeded[_SYM_A]
+        report2 = NewsTaggingService(catalog).tag_untagged(session)  # all now tagged_at set
+    assert report2.tagged == 0 and report2.links == 0  # nothing left to process
+    assert _stocks_of(admin_engine, f"{_URL}b") == {seeded[_SYM_A], seeded[_SYM_B]}  # unchanged
 
 
 def test_task_runs_under_run_job(admin_engine: Engine, seeded: dict[str, UUID]) -> None:
@@ -112,4 +113,4 @@ def test_task_runs_under_run_job(admin_engine: Engine, seeded: dict[str, UUID]) 
             text("SELECT status FROM jobs_runs WHERE run_key = :k"), {"k": key}
         ).scalar_one()
     assert status == "succeeded"
-    assert _stock_of(admin_engine, f"{_URL}a") == seeded[_SYM_A]
+    assert _stocks_of(admin_engine, f"{_URL}a") == {seeded[_SYM_A]}

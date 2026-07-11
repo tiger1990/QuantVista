@@ -18,8 +18,13 @@ from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
 from quantvista.news.interfaces import INewsProvider
 from quantvista.news.models import NewsIngestReport, TagReport
-from quantvista.news.repositories import iter_untagged_news, set_news_stock, upsert_news
-from quantvista.news.tagging import StockRef, build_match_index, match_text
+from quantvista.news.repositories import (
+    iter_untagged_news,
+    link_news_stocks,
+    mark_news_tagged,
+    upsert_news,
+)
+from quantvista.news.tagging import StockRef, build_match_index, match_all
 
 # Broad market queries (not per-stock — that would blow the free-tier cap; tagging is QV-042).
 MARKET_QUERIES: tuple[str, ...] = (
@@ -70,8 +75,9 @@ class NewsIngestionService:
 
 
 class NewsTaggingService:
-    """Tag untagged news to a single stock via the pure matcher (QV-042). Precision over recall:
-    only confident single matches are linked; ambiguous/unmatched stay ``stock_id = NULL``."""
+    """Tag unprocessed news to **every** stock it confidently names (QV-094) via the pure matcher.
+    Each article is marked ``tagged_at`` once processed (so no-match rows aren't re-scanned); a
+    multi-stock article links to all its stocks in ``news_stocks`` → shows on each stock's feed."""
 
     def __init__(self, catalog: Sequence[StockRef]) -> None:
         self._index = build_match_index(catalog)
@@ -79,14 +85,13 @@ class NewsTaggingService:
 
     def tag_untagged(self, session: Session, *, limit: int = 5000) -> TagReport:
         articles = iter_untagged_news(session, limit)
-        tagged = 0
+        tagged = links = 0
         for article in articles:
             text = article.headline + (f" {article.summary}" if article.summary else "")
-            stock_id = match_text(text, self._index)
-            if stock_id is not None:
-                set_news_stock(session, article.id, stock_id)
+            stock_ids = match_all(text, self._index)
+            if stock_ids:
+                links += link_news_stocks(session, article.id, stock_ids)
                 tagged += 1
-        self._log.info("news_tagged", scanned=len(articles), tagged=tagged)
-        return TagReport(
-            scanned=len(articles), tagged=tagged, ambiguous_or_unmatched=len(articles) - tagged
-        )
+            mark_news_tagged(session, article.id)  # processed either way
+        self._log.info("news_tagged", scanned=len(articles), tagged=tagged, links=links)
+        return TagReport(scanned=len(articles), tagged=tagged, links=links)

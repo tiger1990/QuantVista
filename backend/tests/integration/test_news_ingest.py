@@ -89,14 +89,14 @@ def test_ingest_dedups_within_and_across_providers_and_runs(
     assert _news_count(admin_engine) == 2
 
 
-def test_ingest_stores_stock_id_null(admin_engine: Engine, clean: None) -> None:
+def test_ingest_leaves_news_untagged(admin_engine: Engine, clean: None) -> None:
     NewsIngestionService([_FakeNews()], _FakeBus()).ingest(_SINCE, _UNTIL)
     with admin_engine.connect() as conn:
-        null_count = conn.execute(
-            text("SELECT count(*) FROM news WHERE source_url LIKE :p AND stock_id IS NULL"),
+        untagged = conn.execute(
+            text("SELECT count(*) FROM news WHERE source_url LIKE :p AND tagged_at IS NULL"),
             {"p": f"{_PREFIX}%"},
         ).scalar_one()
-    assert null_count == 2  # tagging is QV-042
+    assert untagged == 2  # tagging (QV-042/094) is a separate step
 
 
 def test_task_runs_under_run_job(
