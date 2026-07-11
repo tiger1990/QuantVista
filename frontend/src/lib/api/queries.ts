@@ -19,6 +19,7 @@ export type DecompositionResponse = components["schemas"]["DecompositionResponse
 export type FactorContribution = components["schemas"]["FactorContribution"];
 export type ScreenerRow = components["schemas"]["ScreenerRow"];
 export type SavedScreen = components["schemas"]["SavedScreen"];
+export type NewsItem = components["schemas"]["NewsItem"];
 
 const PAGE_SIZE = 50;
 const SCREENER_PAGE_SIZE = 100;
@@ -174,6 +175,32 @@ export function useSaveScreen() {
       return data.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-screens"] }),
+  });
+}
+
+/** Recent news tagged to a stock (QV-043), history-windowed by the plan. */
+export function useStockNews(symbol: string) {
+  return useQuery({
+    queryKey: ["stock-news", symbol],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/stocks/{symbol}/news", {
+        params: { path: { symbol }, query: { limit: 20 } },
+      });
+      if (error || !data) throw new Error("Failed to load news.");
+      return data.data ?? [];
+    },
+  });
+}
+
+/** Market-wide latest news (India-source-first), for the News page + Overview ticker. */
+export function useLatestNews(limit = 30) {
+  return useQuery({
+    queryKey: ["latest-news", limit],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/news", { params: { query: { limit } } });
+      if (error || !data) throw new Error("Failed to load news.");
+      return data.data ?? [];
+    },
   });
 }
 

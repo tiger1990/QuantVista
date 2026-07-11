@@ -3,12 +3,14 @@
 import { useAuth } from "@/components/auth-provider";
 import { MarketOverview, SectorHeatmap, TopRanked } from "@/components/dashboard";
 import { Disclaimer } from "@/components/disclaimer";
-import { useRankings, useStocks } from "@/lib/api/queries";
+import { NewsTicker } from "@/features/news/NewsTicker";
+import { useLatestNews, useRankings, useStocks } from "@/lib/api/queries";
 
 export default function OverviewPage() {
   const { user } = useAuth();
   const rankings = useRankings();
   const stocks = useStocks({});
+  const news = useLatestNews(20);
 
   const items = rankings.data?.data ?? [];
   const asOf = (rankings.data?.meta as { as_of?: string | null } | undefined)?.as_of;
@@ -30,6 +32,8 @@ export default function OverviewPage() {
         <TopRanked items={items} />
         <SectorHeatmap stocks={allStocks} />
       </div>
+
+      <NewsTicker items={news.data ?? []} />
 
       <Disclaimer />
     </div>
