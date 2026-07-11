@@ -218,6 +218,10 @@ News ingestion, tagging, FinBERT sentiment, event-impact scoring.
 ### Story 5.5: QV-045 — Event-impact scorer
 `[QUANT]` · 3pts · depends: QV-044 · Sprint 05 · detail: `plans/sprints/sprint-05-sentiment-alerts.md`
 
+### Story 5.6: QV-094 — News multi-tagging (many-to-many news↔stocks)
+`[DATA]` `[BE]` · 3pts · depends: QV-042, QV-043 · added post-hoc · detail: `_bmad-output/implementation-artifacts/5-6-qv-094-news-multi-tagging-many-to-many.md`
+> `news_stocks` join (migration 0015) replaces the single `news.stock_id`; a multi-stock article now tags every stock it names, so it shows on each name's feed. Matcher `match_text → match_all`.
+
 ---
 
 ## Epic 6: Alerts & Notifications (EPIC-ALERT)

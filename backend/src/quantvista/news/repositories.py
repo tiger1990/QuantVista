@@ -52,23 +52,34 @@ def upsert_news(session: Session, articles: Sequence[NewsArticle]) -> int:
 _UNTAGGED_SQL = text(
     """
     SELECT id, headline, summary FROM news
-    WHERE stock_id IS NULL
+    WHERE tagged_at IS NULL
     ORDER BY published_at DESC
     LIMIT :limit
     """
 )
-_SET_STOCK_SQL = text("UPDATE news SET stock_id = :stock_id WHERE id = :id")
+_LINK_STOCK_SQL = text(
+    "INSERT INTO news_stocks (news_id, stock_id) VALUES (:news_id, :stock_id) "
+    "ON CONFLICT DO NOTHING"
+)
+_MARK_TAGGED_SQL = text("UPDATE news SET tagged_at = now() WHERE id = :id")
 
 
 def iter_untagged_news(session: Session, limit: int = 5000) -> list[UntaggedArticle]:
-    """The most-recent untagged articles (``stock_id IS NULL``) — the tagging work list."""
+    """The most-recent unprocessed articles (``tagged_at IS NULL``) — the tagging work list."""
     rows = session.execute(_UNTAGGED_SQL, {"limit": limit}).all()
     return [UntaggedArticle(id=r[0], headline=r[1], summary=r[2]) for r in rows]
 
 
-def set_news_stock(session: Session, news_id: UUID, stock_id: UUID) -> None:
-    """Link one article to its matched stock (QV-042)."""
-    session.execute(_SET_STOCK_SQL, {"stock_id": stock_id, "id": news_id})
+def link_news_stocks(session: Session, news_id: UUID, stock_ids: set[UUID]) -> int:
+    """Link an article to every matched stock (QV-094, idempotent). Returns links inserted."""
+    for stock_id in stock_ids:
+        session.execute(_LINK_STOCK_SQL, {"news_id": news_id, "stock_id": stock_id})
+    return len(stock_ids)
+
+
+def mark_news_tagged(session: Session, news_id: UUID) -> None:
+    """Mark an article processed by the tagger (matched or not) so it isn't re-scanned."""
+    session.execute(_MARK_TAGGED_SQL, {"id": news_id})
 
 
 # --- read models (QV-043 API) ------------------------------------------------
@@ -93,7 +104,8 @@ _NEWS_FOR_STOCK_SQL = text(
     """
     SELECT n.id, n.headline, n.summary, n.source, n.source_url, n.published_at
     FROM news n
-    JOIN stocks s ON s.id = n.stock_id
+    JOIN news_stocks ns ON ns.news_id = n.id
+    JOIN stocks s ON s.id = ns.stock_id
     WHERE s.symbol = :symbol
       AND (CAST(:since AS date) IS NULL OR n.published_at >= :since)
     ORDER BY n.published_at DESC

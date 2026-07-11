@@ -42,19 +42,24 @@ def api(admin_engine: Engine) -> Iterator[tuple[TestClient, str]]:
             {"m": market_id, "s": SYMBOL},
         ).scalar_one()
         rows = [
-            # (headline, source, url-suffix, age_days, stock_id) — Free window = 7 days
-            ("ZQ recent tagged", "Moneycontrol", "a", 2, stock_id),
-            ("ZQ old tagged", "Livemint", "b", 30, stock_id),  # beyond 7d → dropped for Free
-            ("Other-stock recent", "Reuters", "c", 1, None),  # not tagged to ZQNEWS
+            # (headline, source, url-suffix, age_days, linked_to_ZQNEWS) — Free window = 7 days
+            ("ZQ recent tagged", "Moneycontrol", "a", 2, True),
+            ("ZQ old tagged", "Livemint", "b", 30, True),  # beyond 7d → dropped for Free
+            ("Other-stock recent", "Reuters", "c", 1, False),  # not linked to ZQNEWS
         ]
-        for headline, source, sfx, age, sid in rows:
-            conn.execute(
+        for headline, source, sfx, age, linked in rows:
+            news_id = conn.execute(
                 text(
-                    "INSERT INTO news (headline, source, source_url, published_at, stock_id) "
-                    "VALUES (:h, :src, :u, now() - make_interval(days => :age), :sid)"
+                    "INSERT INTO news (headline, source, source_url, published_at) "
+                    "VALUES (:h, :src, :u, now() - make_interval(days => :age)) RETURNING id"
                 ),
-                {"h": headline, "src": source, "u": f"{URL}{sfx}", "age": age, "sid": sid},
-            )
+                {"h": headline, "src": source, "u": f"{URL}{sfx}", "age": age},
+            ).scalar_one()
+            if linked:
+                conn.execute(
+                    text("INSERT INTO news_stocks (news_id, stock_id) VALUES (:n, :s)"),
+                    {"n": news_id, "s": stock_id},
+                )
     yield client, token
     with admin_engine.begin() as conn:
         conn.execute(text("DELETE FROM news WHERE source_url LIKE :p"), {"p": f"{URL}%"})
