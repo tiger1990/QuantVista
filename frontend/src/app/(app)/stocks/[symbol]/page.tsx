@@ -7,7 +7,8 @@ import { useParams } from "next/navigation";
 import { Decomposition } from "@/components/decomposition";
 import { Disclaimer } from "@/components/disclaimer";
 import { Card, CardContent } from "@/components/ui/card";
-import { useDecomposition, useStockDetail } from "@/lib/api/queries";
+import { NewsList } from "@/features/news/NewsList";
+import { useDecomposition, useStockDetail, useStockNews } from "@/lib/api/queries";
 import { formatScore, scoreTone, toneTextClass } from "@/lib/score";
 
 function SubScore({ label, value }: { label: string; value: number | null | undefined }) {
@@ -49,6 +50,7 @@ export default function StockDetailPage() {
   const symbol = params.symbol;
   const detail = useStockDetail(symbol);
   const decomp = useDecomposition(symbol);
+  const news = useStockNews(symbol);
 
   if (detail.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading…</p>;
@@ -127,6 +129,17 @@ export default function StockDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardContent className="space-y-3">
+          <h2 className="text-sm font-semibold">Recent news</h2>
+          <NewsList
+            items={news.data ?? []}
+            isLoading={news.isLoading}
+            emptyMessage={`No recent news for ${symbol}.`}
+          />
+        </CardContent>
+      </Card>
 
       <Disclaimer />
     </div>

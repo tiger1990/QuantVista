@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.pagination import InvalidCursor
 from quantvista.api.routes import router as auth_router
+from quantvista.api.routes_news import router as news_router
 from quantvista.api.routes_scores import router as scores_router
 from quantvista.api.routes_screener import ScreenerError
 from quantvista.api.routes_screener import router as screener_router
@@ -119,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(scores_router)
     app.include_router(screener_router)
     app.include_router(screens_router)
+    app.include_router(news_router)
     _register_error_handlers(app)
     return app
 

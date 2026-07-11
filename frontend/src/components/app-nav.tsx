@@ -22,6 +22,7 @@ const LINKS = [
   { href: "/stocks", label: "Stocks" },
   { href: "/rankings", label: "Rankings" },
   { href: "/screener", label: "Screener" },
+  { href: "/news", label: "News" },
 ];
 
 export function AppNav() {
