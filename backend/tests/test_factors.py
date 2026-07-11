@@ -61,7 +61,7 @@ class _FakeCtx(ScoringContext):
         self._i = indicators
 
     def fundamentals_as_of(
-        self, stock_id: object, as_of: object, *, statement_type: str = "quarterly"
+        self, stock_id: object, as_of: object, *, statement_type: str | None = None
     ) -> FundamentalVersion | None:
         return self._f
 
