@@ -49,9 +49,16 @@ def create_celery() -> Celery:
         broker=settings.redis_url,
         backend=settings.redis_url,
         # register Beat-scheduled + manually-triggerable tasks (news ingestion is off-beat, PV-007)
-        include=["quantvista.jobs.ops_metrics", "quantvista.jobs.news"],
+        include=[
+            "quantvista.jobs.ops_metrics",
+            "quantvista.jobs.news",
+            "quantvista.jobs.sentiment",
+        ],
     )
     celery.conf.task_default_queue = "default"
+    # Sentiment inference is heavy and pluggable (QV-044): its own `nlp` queue lets a capable
+    # host run `celery worker -Q nlp` with the [finbert] extra, off the default worker pool.
+    celery.conf.task_routes = {"quantvista.score_news": {"queue": "nlp"}}
     celery.conf.timezone = "UTC"
     celery.conf.beat_schedule = BEAT_SCHEDULE
     # Fail-loud / retry-smart defaults (06 §1.4): re-deliver on worker loss; per-task

@@ -10,19 +10,22 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from uuid import uuid4
 
 import structlog
 from sqlalchemy.orm import Session
 
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
-from quantvista.news.interfaces import INewsProvider
-from quantvista.news.models import NewsIngestReport, TagReport
+from quantvista.news.interfaces import INewsProvider, ISentimentService
+from quantvista.news.models import NewsIngestReport, SentimentReport, TagReport, UnscoredArticle
 from quantvista.news.repositories import (
+    iter_unscored_news,
     iter_untagged_news,
     link_news_stocks,
     mark_news_tagged,
     upsert_news,
+    upsert_sentiment,
 )
 from quantvista.news.tagging import StockRef, build_match_index, match_all
 
@@ -95,3 +98,49 @@ class NewsTaggingService:
             mark_news_tagged(session, article.id)  # processed either way
         self._log.info("news_tagged", scanned=len(articles), tagged=tagged, links=links)
         return TagReport(scanned=len(articles), tagged=tagged, links=links)
+
+
+_DEFAULT_BATCH = 32
+
+
+class SentimentScoringService:
+    """Score unscored news with the active ``ISentimentService``; persist + emit ``NewsScored``.
+
+    Model-agnostic (QV-044): the injected runtime is DevSentiment on the ``default`` queue or
+    FinBERTSentiment on the ``nlp`` queue — this service only sees the seam. Work is batched (one
+    ``classify`` call per ``batch_size`` texts) so a real model amortises tokenisation. Each batch
+    commits in its own session scope; ``NewsScored`` fires once **after** the writes are durable.
+    """
+
+    def __init__(self, model: ISentimentService, event_bus: IEventBus) -> None:
+        self._model = model
+        self._events = event_bus
+        self._log = structlog.get_logger()
+
+    def score_unscored(
+        self,
+        *,
+        limit: int = 5000,
+        batch_size: int = _DEFAULT_BATCH,
+        batch_id: str | None = None,
+    ) -> SentimentReport:
+        model_version = self._model.model_version
+        batch = batch_id or uuid4().hex
+        with privileged_session_scope() as session:
+            work = iter_unscored_news(session, model_version, limit)
+
+        scored = 0
+        for start in range(0, len(work), batch_size):
+            chunk = work[start : start + batch_size]
+            results = self._model.classify([self._text(a) for a in chunk])
+            pairs = list(zip((a.id for a in chunk), results, strict=True))
+            with privileged_session_scope() as session:
+                scored += upsert_sentiment(session, model_version, pairs)
+
+        self._events.publish("NewsScored", {"news_batch": batch, "count": scored})
+        self._log.info("news_scored", model_version=model_version, scanned=len(work), scored=scored)
+        return SentimentReport(model_version=model_version, scanned=len(work), scored=scored)
+
+    @staticmethod
+    def _text(article: UnscoredArticle) -> str:
+        return f"{article.headline} {article.summary or ''}".strip()

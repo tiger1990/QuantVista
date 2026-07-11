@@ -160,6 +160,34 @@ jobs:
       - name: Integration tests — RLS denial + seed idempotency (as app/admin roles)
         run: pytest -m integration
 
+  # Real FinBERT verification (QV-044). Linux HAS torch/py3.13 wheels (the x86 macOS dev box does
+  # not), so this exercises the ACTUAL ProsusAI/finbert model behind `-m finbert`. Intentionally
+  # NOT in `ci-success` needs → informational, never blocks a merge if the heavy ML install is slow.
+  backend-finbert:
+    name: Backend FinBERT (real model, non-blocking)
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: backend/pyproject.toml
+      - name: Cache HuggingFace model weights
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-finbert-${{ runner.os }}
+      - name: Install backend with the [finbert] extra (torch + transformers)
+        run: python -m pip install -e ".[dev,finbert]"
+      - name: Pytest — real FinBERT only
+        run: pytest -m finbert
+
   frontend-quality:
     name: Frontend lint, typecheck & tests
     needs: detect-changes
