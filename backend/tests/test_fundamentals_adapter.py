@@ -114,3 +114,25 @@ def test_empty_statements_return_nothing() -> None:
         info: dict[str, Any] = {}
 
     assert _provider(_Empty()).get_fundamentals("X") == []
+
+
+def test_empty_latest_period_is_skipped_and_valuation_shifts_to_real_period() -> None:
+    # yfinance can carry an empty trailing column (fiscal-year change / not-yet-reported year,
+    # e.g. NESTLEIND). It must be skipped, and valuation (PE) applied to the latest REAL period.
+    empty, real = pd.Timestamp("2026-03-31"), pd.Timestamp("2025-03-31")
+    income = pd.DataFrame({empty: {}, real: {"Total Revenue": 800, "Net Income": 90}})
+    balance = pd.DataFrame(
+        {empty: {}, real: {"Stockholders Equity": 700, "Ordinary Shares Number": 100}}
+    )
+    cash = pd.DataFrame({empty: {}, real: {"Operating Cash Flow": 128, "Capital Expenditure": -48}})
+
+    class _Ticker:
+        income_stmt = income
+        balance_sheet = balance
+        cashflow = cash
+        info = {"regularMarketPrice": 210, "sharesOutstanding": 100}
+
+    snaps = _provider(_Ticker()).get_fundamentals("NESTLEIND")
+    assert [s.period_end for s in snaps] == [date(2025, 3, 31)]  # empty 2026 period dropped
+    assert snaps[0].roe == D(90) / D(700)
+    assert snaps[0].pe == D(210) / (D(90) / D(100))  # valuation moved to the real latest period

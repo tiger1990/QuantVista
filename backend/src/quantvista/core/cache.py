@@ -22,6 +22,8 @@ class ICache(Protocol):
 
     def delete(self, *keys: str) -> None: ...
 
+    def delete_pattern(self, pattern: str) -> None: ...
+
 
 class NullCache:
     """No-op cache — every read misses. Used when caching is disabled / Redis is absent."""
@@ -33,6 +35,9 @@ class NullCache:
         return None
 
     def delete(self, *keys: str) -> None:
+        return None
+
+    def delete_pattern(self, pattern: str) -> None:
         return None
 
 
@@ -61,6 +66,13 @@ class RedisCache:
     def delete(self, *keys: str) -> None:
         if keys:
             self._redis().delete(*keys)
+
+    def delete_pattern(self, pattern: str) -> None:
+        """Delete every key matching a glob ``pattern`` (SCAN, non-blocking)."""
+        client = self._redis()
+        keys = list(client.scan_iter(match=pattern, count=500))
+        if keys:
+            client.delete(*keys)
 
 
 _cache: ICache | None = None

@@ -136,6 +136,18 @@ class Vol30DFactor(_IndicatorFactor):
     column = "vol_30d"
 
 
+# --- Sentiment (QV-046) -------------------------------------------------------
+class SentimentFactor(Factor):
+    """Decayed per-stock news signal (QV-045 impact = tone + event impact), PIT via the context."""
+
+    key = "sentiment"
+    category = FactorCategory.SENTIMENT
+    direction = 1  # more-positive news → higher score
+
+    def compute(self, ctx: ScoringContext, stock_id: UUID, as_of: date) -> float | None:
+        return ctx.sentiment_as_of(stock_id, as_of)
+
+
 ALL_FACTORS: tuple[Factor, ...] = (
     PEFactor(),
     PBFactor(),
@@ -147,4 +159,5 @@ ALL_FACTORS: tuple[Factor, ...] = (
     Return12MFactor(),
     BetaFactor(),
     Vol30DFactor(),
+    SentimentFactor(),
 )

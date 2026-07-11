@@ -46,18 +46,20 @@ def list_stocks_endpoint(
     market: str = Query("NSE"),
     sector: str | None = Query(None),
     market_cap_bucket: str | None = Query(None),
+    q: str | None = Query(None, max_length=100, description="Search by symbol or company name"),
     limit: int = Query(50, ge=1, le=_MAX_LIMIT),
     cursor: str | None = Query(None),
     _principal: Principal = Depends(get_current_principal),
     session: Session = Depends(get_global_session),
 ) -> Envelope[list[dict[str, Any]]]:
-    """Browse the universe: filter by market/sector/cap, keyset-paginated by symbol."""
+    """Browse the universe: filter by market/sector/cap + free-text ``q``, keyset-paginated."""
     after = decode_cursor(cursor)  # raises ValueError → validation_error (422)
     rows = list_stocks(
         session,
         market=market,
         sector=sector,
         market_cap_bucket=market_cap_bucket,
+        q=q,
         limit=limit + 1,  # fetch one extra to know if there's a next page
         after_symbol=after,
     )

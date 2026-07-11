@@ -16,13 +16,16 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
-from quantvista.analytics.factors import ALL_FACTORS
+from quantvista.analytics.factors import ALL_FACTORS, FactorCategory
 from quantvista.core.events import get_event_bus, reset_event_bus
 from quantvista.jobs.framework import run_key
 from quantvista.jobs.scoring import _run_factors, _run_scores
 from quantvista.market_data.fundamentals import record_fundamental_version
 
 pytestmark = pytest.mark.integration
+
+# Factors available from seeded fundamentals+indicators (no news → sentiment factor excluded).
+_DATA_FACTORS = sum(1 for f in ALL_FACTORS if f.category is not FactorCategory.SENTIMENT)
 
 _PERIOD = date(2025, 12, 31)
 _KNOWN = datetime(2026, 1, 15, tzinfo=UTC)
@@ -132,7 +135,8 @@ def test_factors_then_scores_pipeline(
     # Stage 1: compute_factors → factor_values snapshot + FactorsComputed (post-commit).
     out_f = _run_factors(market, _AS_OF, run_key("fac", market, "t1"))
     assert out_f.status.value == "succeeded"
-    assert _count(admin_engine, "factor_values", ids) == len(ids) * len(ALL_FACTORS)  # 3×10
+    # No news seeded → the QV-046 sentiment factor is unavailable; expect the non-sentiment factors.
+    assert _count(admin_engine, "factor_values", ids) == len(ids) * _DATA_FACTORS  # 3×10
     assert _count(admin_engine, "scores", ids) == 0  # scores NOT written by compute_factors
     assert (
         "FactorsComputed",
@@ -168,5 +172,5 @@ def test_jobs_are_idempotent(admin_engine: Engine, universe: tuple[str, list[UUI
     for _ in range(2):
         _run_factors(market, _AS_OF, run_key("fac", market, "same"))
         _run_scores(market, _AS_OF, run_key("score", market, "same"))
-    assert _count(admin_engine, "factor_values", ids) == len(ids) * len(ALL_FACTORS)  # no dup
+    assert _count(admin_engine, "factor_values", ids) == len(ids) * _DATA_FACTORS  # no dup
     assert _count(admin_engine, "scores", ids) == len(ids)

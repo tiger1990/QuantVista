@@ -58,11 +58,18 @@ def on_factors_computed(envelope: dict[str, Any]) -> None:
 
 
 def on_scores_computed(envelope: dict[str, Any]) -> None:
-    """Fresh scores landed → invalidate the cached rankings for that market/date (03 §8)."""
+    """Fresh scores landed → invalidate cached rankings + every stock-detail snapshot (03 §8).
+
+    Stock-detail responses embed the latest score (incl. sentiment, QV-046), so a rescore makes them
+    all stale — clear ``stock:*:detail`` too, not just the ranking keys, or the UI shows old scores
+    until the TTL backstop expires.
+    """
     payload = envelope["payload"]
     market, day = payload["universe"], payload["date"]
     _log.info("consume_scores_computed", market=market, date=day)
-    get_cache().delete(f"rank:{market}:{day}", f"score:{market}:{day}")
+    cache = get_cache()
+    cache.delete(f"rank:{market}:{day}", f"score:{market}:{day}")
+    cache.delete_pattern("stock:*:detail")
 
 
 def on_news_ingested(envelope: dict[str, Any]) -> None:

@@ -2,7 +2,7 @@
 baseline_commit: b320543
 ---
 
-Status: review
+Status: done
 
 # QV-045 — Event-impact scorer
 

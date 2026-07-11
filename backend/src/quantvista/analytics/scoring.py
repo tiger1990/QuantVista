@@ -6,7 +6,8 @@ Two responsibilities that evolve independently (``05`` §1.2):
   once, project many.
 - **ScoreEngine** (methodology): read a factor snapshot → equal-weight **category** sub-scores over
   available factors → composite = category weights (``05`` §2) **re-normalized over scored
-  categories** (sentiment has no factor yet → drops). **Decomposition == composite.**
+  categories** (a category with no available factor drops; QV-046 added the sentiment factor).
+  **Decomposition == composite.**
 
 ``compute_universe`` composes both. ``MODEL_VERSION`` fingerprints the methodology (both engines
 share it → factors and scores are always the same methodology).

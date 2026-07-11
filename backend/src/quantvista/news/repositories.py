@@ -8,7 +8,7 @@ Stores derived fields + the link only — never full article text (``03`` §1 ru
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -141,6 +141,36 @@ def upsert_sentiment(
             },
         )
     return len(rows)
+
+
+# PIT sentiment signal for scoring (QV-046). Per the stock's tagged news (news_stocks) published by
+# `known_by`, the LATEST sentiment row known by then (created_at guard = knowledge time; dedupes
+# coexisting model_versions to one per news) with a non-null impact_score. The caller (analytics)
+# applies recency decay; both filters bound everything by as_of → no look-ahead.
+_SENTIMENT_SIGNAL_SQL = text(
+    """
+    SELECT n.published_at, ls.impact_score
+    FROM news n
+    JOIN news_stocks ns ON ns.news_id = n.id
+    JOIN LATERAL (
+        SELECT s.impact_score FROM sentiment s
+        WHERE s.news_id = n.id AND s.created_at <= :known_by AND s.impact_score IS NOT NULL
+        ORDER BY s.created_at DESC
+        LIMIT 1
+    ) ls ON true
+    WHERE ns.stock_id = :stock_id AND n.published_at <= :known_by
+    """
+)
+
+
+def sentiment_signal_for_stock(
+    session: Session, stock_id: UUID, known_by: datetime
+) -> list[tuple[datetime, Decimal]]:
+    """PIT ``(published_at, impact_score)`` rows for a stock's tagged news known by ``known_by``."""
+    rows = session.execute(
+        _SENTIMENT_SIGNAL_SQL, {"stock_id": stock_id, "known_by": known_by}
+    ).all()
+    return [(r[0], r[1]) for r in rows]
 
 
 # --- read models (QV-043 API) ------------------------------------------------

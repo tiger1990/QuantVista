@@ -75,17 +75,19 @@ export default function StockDetailPage() {
       </Link>
 
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-0.5">
-          <h1 className="text-3xl font-semibold tracking-tight">{d.symbol}</h1>
-          <p className="text-muted-foreground">{d.company_name}</p>
+
+        <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">{d.symbol}</h1>
           <p className="text-xs text-muted-foreground">
-            {[d.sector, d.industry, d.market].filter(Boolean).join(" · ")}
-          </p>
+            {[d.sector, d.industry, d.market].filter(Boolean).join(" · ")}</p>
+        </div>
+          <p className="truncate text-sm text-muted-foreground">{d.company_name}</p>
         </div>
         <div className="text-right">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Composite</p>
           <p
-            className={`text-4xl font-semibold tabular-nums ${toneTextClass(scoreTone(s.composite_score))}`}
+            className={`text-2xl font-semibold tabular-nums ${toneTextClass(scoreTone(s.composite_score))}`}
           >
             {formatScore(s.composite_score)}
           </p>

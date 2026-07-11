@@ -25,6 +25,7 @@ class _FakeCache:
     def __init__(self) -> None:
         self.store: dict[str, Any] = {}
         self.deleted: list[str] = []
+        self.patterns: list[str] = []
 
     def get(self, key: str) -> Any | None:
         return self.store.get(key)
@@ -35,6 +36,12 @@ class _FakeCache:
     def delete(self, *keys: str) -> None:
         self.deleted.extend(keys)
         for k in keys:
+            self.store.pop(k, None)
+
+    def delete_pattern(self, pattern: str) -> None:
+        self.patterns.append(pattern)
+        prefix = pattern.split("*", 1)[0]
+        for k in [k for k in self.store if k.startswith(prefix)]:
             self.store.pop(k, None)
 
 
@@ -61,10 +68,13 @@ def test_cached_rankings_miss_populates_then_hit_skips_db(monkeypatch: pytest.Mo
     assert cache.store["rank:NSE:2026-01-20"] == first  # populated under the ranking key
 
 
-def test_scores_computed_invalidates_the_ranking_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scores_computed_invalidates_ranking_and_stock_detail_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cache = _FakeCache()
     cache.store["rank:NSE:2026-01-20"] = [1]
     cache.store["score:NSE:2026-01-20"] = [2]
+    cache.store["stock:INFY:detail"] = [3]  # embeds the latest score → stale after a rescore
     monkeypatch.setattr(consumers, "get_cache", lambda: cache)
     bus = InProcessEventBus()
     register_pipeline_consumers(bus)
@@ -73,4 +83,6 @@ def test_scores_computed_invalidates_the_ranking_keys(monkeypatch: pytest.Monkey
         {"universe": "NSE", "date": "2026-01-20", "model_version": "score-v1", "count": 5},
     )
     assert set(cache.deleted) == {"rank:NSE:2026-01-20", "score:NSE:2026-01-20"}
+    assert "stock:*:detail" in cache.patterns
     assert cache.get("rank:NSE:2026-01-20") is None
+    assert cache.get("stock:INFY:detail") is None  # stock-detail snapshot cleared too

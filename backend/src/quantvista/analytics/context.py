@@ -15,8 +15,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from quantvista.analytics.sentiment import decayed_sentiment
 from quantvista.market_data.fundamentals import FundamentalVersion, fundamentals_as_of
 from quantvista.market_data.repositories import technical_indicators_as_of
+from quantvista.news.repositories import sentiment_signal_for_stock
 
 
 class ScoringContext:
@@ -47,3 +49,13 @@ class ScoringContext:
     def indicator_as_of(self, stock_id: UUID, as_of: date) -> dict[str, Decimal | None] | None:
         """The latest technical-indicator row with ``date <= as_of`` (no future-dated row)."""
         return technical_indicators_as_of(self._session, stock_id, as_of)
+
+    def sentiment_as_of(self, stock_id: UUID, as_of: date) -> float | None:
+        """Decayed news-sentiment signal (QV-046), PIT-bounded by end of the ``as_of`` day.
+
+        Sees only news ``published_at <= as_of`` whose sentiment was ``created_at``-known by then;
+        older articles decay (QV-046 half-life). ``None`` when the stock has no visible news.
+        """
+        known_by = datetime.combine(as_of, time.max, tzinfo=UTC)
+        rows = sentiment_signal_for_stock(self._session, stock_id, known_by)
+        return decayed_sentiment([(dt.date(), float(impact)) for dt, impact in rows], as_of)
