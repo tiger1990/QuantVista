@@ -2,7 +2,7 @@
 baseline_commit: 6e59ce7a706947bed9167779d5c7490815c345a4
 ---
 
-Status: review
+Status: done
 
 # QV-044 — FinBERT sentiment service + model runtime
 

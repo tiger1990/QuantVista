@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
+from quantvista.news.events import EventImpactScorer
 from quantvista.news.interfaces import INewsProvider, ISentimentService
 from quantvista.news.models import NewsIngestReport, SentimentReport, TagReport, UnscoredArticle
 from quantvista.news.repositories import (
@@ -108,13 +109,21 @@ class SentimentScoringService:
 
     Model-agnostic (QV-044): the injected runtime is DevSentiment on the ``default`` queue or
     FinBERTSentiment on the ``nlp`` queue — this service only sees the seam. Work is batched (one
-    ``classify`` call per ``batch_size`` texts) so a real model amortises tokenisation. Each batch
-    commits in its own session scope; ``NewsScored`` fires once **after** the writes are durable.
+    ``classify`` call per ``batch_size`` texts) so a real model amortises tokenisation. In the same
+    pass it derives each article's ``impact_score`` (QV-045: event type × sentiment) and persists
+    both. Each batch commits in its own session scope; ``NewsScored`` fires once **after** the
+    writes are durable.
     """
 
-    def __init__(self, model: ISentimentService, event_bus: IEventBus) -> None:
+    def __init__(
+        self,
+        model: ISentimentService,
+        event_bus: IEventBus,
+        impact_scorer: EventImpactScorer | None = None,
+    ) -> None:
         self._model = model
         self._events = event_bus
+        self._impact = impact_scorer or EventImpactScorer()
         self._log = structlog.get_logger()
 
     def score_unscored(
@@ -132,13 +141,26 @@ class SentimentScoringService:
         scored = 0
         for start in range(0, len(work), batch_size):
             chunk = work[start : start + batch_size]
-            results = self._model.classify([self._text(a) for a in chunk])
-            pairs = list(zip((a.id for a in chunk), results, strict=True))
+            texts = [self._text(a) for a in chunk]
+            results = self._model.classify(texts)
+            rows = [
+                (article.id, result, self._impact.score(text, result))
+                for article, result, text in zip(chunk, results, texts, strict=True)
+            ]
             with privileged_session_scope() as session:
-                scored += upsert_sentiment(session, model_version, pairs)
+                scored += upsert_sentiment(session, model_version, rows)
 
-        self._events.publish("NewsScored", {"news_batch": batch, "count": scored})
-        self._log.info("news_scored", model_version=model_version, scanned=len(work), scored=scored)
+        self._events.publish(
+            "NewsScored",
+            {"news_batch": batch, "count": scored, "impact_version": self._impact.ruleset_version},
+        )
+        self._log.info(
+            "news_scored",
+            model_version=model_version,
+            impact_version=self._impact.ruleset_version,
+            scanned=len(work),
+            scored=scored,
+        )
         return SentimentReport(model_version=model_version, scanned=len(work), scored=scored)
 
     @staticmethod

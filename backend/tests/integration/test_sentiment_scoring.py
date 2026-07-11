@@ -93,7 +93,12 @@ def test_scores_persist_and_emit_event(admin_engine: Engine, world: _World) -> N
     )
     assert report.scored == report.scanned >= 2  # every scanned article got a row
     assert _rows(admin_engine, world.a, [world.mv]) == {world.mv: "positive"}
-    assert bus.published == [("NewsScored", {"news_batch": "batch-1", "count": report.scored})]
+    assert bus.published == [
+        (
+            "NewsScored",
+            {"news_batch": "batch-1", "count": report.scored, "impact_version": "impact-v1"},
+        )
+    ]
 
 
 def test_rescore_same_model_is_idempotent(admin_engine: Engine, world: _World) -> None:
@@ -116,3 +121,25 @@ def test_two_model_versions_coexist(admin_engine: Engine, world: _World) -> None
         world.mv: "positive",
         world.mv2: "negative",
     }
+
+
+def test_impact_score_persists_and_reflects_event(admin_engine: Engine, world: _World) -> None:
+    # QV-045: same (positive) tone on both, so the impact difference comes purely from event type.
+    # world.a "Company profit surges" → EARNINGS_BEAT (+30); world.b "Regulator opens probe" → -40.
+    SentimentScoringService(_FixedModel(world.mv, _POS), _FakeBus()).score_unscored()
+
+    def _impact(news_id: UUID) -> Decimal:
+        with admin_engine.connect() as conn:
+            value = conn.execute(
+                text(
+                    "SELECT impact_score FROM sentiment WHERE news_id = :n AND model_version = :m"
+                ),
+                {"n": news_id, "m": world.mv},
+            ).scalar_one()
+        return Decimal(str(value))
+
+    beat = _impact(world.a)  # +30 base + 0.5 tone * 25 = +42.5
+    regulatory = _impact(world.b)  # -40 base + 0.5 tone * 25 = -27.5
+    assert beat == Decimal("42.5")
+    assert regulatory == Decimal("-27.5")
+    assert beat > regulatory  # the positive event outranks the regulatory one

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -104,11 +105,11 @@ _UNSCORED_SQL = text(
 # same-version re-score refreshes the row; a different model_version inserts a coexisting row.
 _UPSERT_SENTIMENT_SQL = text(
     """
-    INSERT INTO sentiment (news_id, label, score, confidence, model_version)
-    VALUES (:news_id, :label, :score, :confidence, :model_version)
+    INSERT INTO sentiment (news_id, label, score, confidence, impact_score, model_version)
+    VALUES (:news_id, :label, :score, :confidence, :impact_score, :model_version)
     ON CONFLICT (news_id, model_version) DO UPDATE
-        SET label = EXCLUDED.label, score = EXCLUDED.score,
-            confidence = EXCLUDED.confidence, created_at = now()
+        SET label = EXCLUDED.label, score = EXCLUDED.score, confidence = EXCLUDED.confidence,
+            impact_score = EXCLUDED.impact_score, created_at = now()
     """
 )
 
@@ -124,10 +125,10 @@ def iter_unscored_news(
 def upsert_sentiment(
     session: Session,
     model_version: str,
-    rows: Sequence[tuple[UUID, SentimentResult]],
+    rows: Sequence[tuple[UUID, SentimentResult, Decimal]],
 ) -> int:
-    """Persist (news_id → result) for ``model_version``; idempotent per (news_id, model_version)."""
-    for news_id, result in rows:
+    """Persist (news_id → result + impact) for ``model_version``; idempotent per (news, model)."""
+    for news_id, result, impact in rows:
         session.execute(
             _UPSERT_SENTIMENT_SQL,
             {
@@ -135,6 +136,7 @@ def upsert_sentiment(
                 "label": result.label,
                 "score": result.score,
                 "confidence": result.confidence,
+                "impact_score": impact,
                 "model_version": model_version,
             },
         )
