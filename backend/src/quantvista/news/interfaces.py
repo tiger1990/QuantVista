@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from quantvista.news.models import NewsArticle
+from quantvista.news.models import NewsArticle, SentimentResult
 
 
 @runtime_checkable
@@ -31,6 +31,15 @@ class INewsService(Protocol):
 
 @runtime_checkable
 class ISentimentService(Protocol):
-    """FinBERT-backed sentiment scoring for a piece of text."""
+    """The swappable sentiment model runtime (QV-044) — the seam behind which DevSentiment
+    (lexicon, always-on) and FinBERTSentiment (torch+transformers, optional) are interchangeable.
 
-    def score(self, text: str) -> float: ...
+    ``classify`` is **batched** (one call, many texts) so a real model amortises tokenisation and
+    runs on the dedicated ``nlp`` queue. ``model_version`` stamps every row it produces, so a dev
+    score and a finbert score coexist per article (``sentiment.UNIQUE(news_id, model_version)``).
+    """
+
+    @property
+    def model_version(self) -> str: ...
+
+    def classify(self, texts: Sequence[str]) -> Sequence[SentimentResult]: ...

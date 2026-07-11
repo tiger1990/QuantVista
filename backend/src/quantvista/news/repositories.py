@@ -15,7 +15,12 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from quantvista.news.models import NewsArticle, UntaggedArticle
+from quantvista.news.models import (
+    NewsArticle,
+    SentimentResult,
+    UnscoredArticle,
+    UntaggedArticle,
+)
 
 # ON CONFLICT targets the partial index by repeating its predicate; DO NOTHING + RETURNING id lets
 # us count only the rows that actually inserted (a duplicate URL returns no row).
@@ -80,6 +85,60 @@ def link_news_stocks(session: Session, news_id: UUID, stock_ids: set[UUID]) -> i
 def mark_news_tagged(session: Session, news_id: UUID) -> None:
     """Mark an article processed by the tagger (matched or not) so it isn't re-scanned."""
     session.execute(_MARK_TAGGED_SQL, {"id": news_id})
+
+
+# --- sentiment (QV-044): score → persist per (news, model_version) -----------
+# Work list = news with no sentiment row for the ACTIVE model_version, so dev and finbert each score
+# independently and a re-score (new model_version) picks everything up. Idempotent by construction.
+_UNSCORED_SQL = text(
+    """
+    SELECT n.id, n.headline, n.summary FROM news n
+    WHERE NOT EXISTS (
+        SELECT 1 FROM sentiment s WHERE s.news_id = n.id AND s.model_version = :model_version
+    )
+    ORDER BY n.published_at DESC
+    LIMIT :limit
+    """
+)
+# UNIQUE(news_id, model_version) → re-running upserts in place (DO UPDATE), never duplicates. A
+# same-version re-score refreshes the row; a different model_version inserts a coexisting row.
+_UPSERT_SENTIMENT_SQL = text(
+    """
+    INSERT INTO sentiment (news_id, label, score, confidence, model_version)
+    VALUES (:news_id, :label, :score, :confidence, :model_version)
+    ON CONFLICT (news_id, model_version) DO UPDATE
+        SET label = EXCLUDED.label, score = EXCLUDED.score,
+            confidence = EXCLUDED.confidence, created_at = now()
+    """
+)
+
+
+def iter_unscored_news(
+    session: Session, model_version: str, limit: int = 5000
+) -> list[UnscoredArticle]:
+    """Most-recent articles with no ``sentiment`` row for ``model_version`` (the work list)."""
+    rows = session.execute(_UNSCORED_SQL, {"model_version": model_version, "limit": limit}).all()
+    return [UnscoredArticle(id=r[0], headline=r[1], summary=r[2]) for r in rows]
+
+
+def upsert_sentiment(
+    session: Session,
+    model_version: str,
+    rows: Sequence[tuple[UUID, SentimentResult]],
+) -> int:
+    """Persist (news_id → result) for ``model_version``; idempotent per (news_id, model_version)."""
+    for news_id, result in rows:
+        session.execute(
+            _UPSERT_SENTIMENT_SQL,
+            {
+                "news_id": news_id,
+                "label": result.label,
+                "score": result.score,
+                "confidence": result.confidence,
+                "model_version": model_version,
+            },
+        )
+    return len(rows)
 
 
 # --- read models (QV-043 API) ------------------------------------------------

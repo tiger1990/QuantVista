@@ -9,7 +9,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
+from typing import Literal
 from uuid import UUID
+
+SentimentLabel = Literal["positive", "negative", "neutral"]
+
+
+@dataclass(frozen=True, slots=True)
+class SentimentResult:
+    """One model's read of a single text (QV-044).
+
+    ``score`` is signed in [-1, 1] (≈ P(pos) − P(neg)); ``confidence`` is [0, 1]. Money-rule
+    Decimals (never float). Maps 1:1 to a ``sentiment`` row's label/score/confidence per model.
+    """
+
+    label: SentimentLabel
+    score: Decimal
+    confidence: Decimal
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,3 +69,21 @@ class TagReport:
     scanned: int  # articles processed this run
     tagged: int  # articles that matched ≥1 stock
     links: int  # total news↔stock links written
+
+
+@dataclass(frozen=True, slots=True)
+class UnscoredArticle:
+    """An article with no ``sentiment`` row for the active model_version (QV-044 work item)."""
+
+    id: UUID
+    headline: str
+    summary: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SentimentReport:
+    """Outcome of one ``score_news`` run for a given model_version (QV-044)."""
+
+    model_version: str
+    scanned: int  # articles that needed scoring this run
+    scored: int  # sentiment rows written (inserted or re-scored)

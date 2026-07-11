@@ -4,7 +4,7 @@ baseline_commit: 71c77c0e7a7155d2bbe6f4c3e135e6e0ce07d734
 
 # Story 3.19: QV-095 — yfinance-financials fundamentals adapter (dev)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     marketaux_api_key: str | None = None  # env: MARKETAUX_API_KEY
     finnhub_api_key: str | None = Field(default=None, validation_alias="FINHUB_API_KEY")
 
+    # Sentiment model runtime (QV-044): dev | finbert. `dev` = DevSentiment (lexicon, always-on;
+    # runs on x86 macOS 12 + CI). `finbert` = FinBERTSentiment (ProsusAI/finbert via the [finbert]
+    # extra) — set only on a capable host running the `nlp` queue worker; writes coexist by
+    # model_version, so a dev worker and a finbert worker can score the same corpus independently.
+    sentiment_model: str = "dev"
+
     # Caching (QV-031): Redis cache-aside for scores/rankings, invalidated on ScoresComputed.
     cache_enabled: bool = True  # false → NullCache (dev/tests with no Redis)
     cache_ttl_seconds: int = 3600  # TTL backstop if an invalidation event is ever missed

@@ -60,6 +60,14 @@ dev-data = [
 kafka = [
     "kafka-python-ng>=2.2",
 ]
+# FinBERT sentiment runtime (QV-044). Heavy ML deps — NO torch/onnxruntime wheel exists for
+# x86_64 macOS 12 + py3.13, so this extra installs only on a capable host (teammate box / Docker /
+# EC2 / CI-Linux). FinBERTSentiment lazy-imports it; the default install and DevSentiment never
+# need it. On such a host: `SENTIMENT_MODEL=finbert celery -A quantvista.jobs.celery_app worker -Q nlp`.
+finbert = [
+    "torch>=2.2",
+    "transformers>=4.40",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -89,6 +97,12 @@ exclude = "src/quantvista/db/migrations/"
 # Celery ships no py.typed marker; treat as untyped third-party.
 [[tool.mypy.overrides]]
 module = ["celery", "celery.*"]
+ignore_missing_imports = true
+
+# FinBERT deps (QV-044) are an optional extra not installed on the dev box / default CI — the
+# adapter lazy-imports them, so let mypy resolve the module without stubs present.
+[[tool.mypy.overrides]]
+module = ["torch", "torch.*", "transformers", "transformers.*"]
 ignore_missing_imports = true
 
 # Celery's decorators are untyped (Any); allow them in the jobs composition root only.
@@ -123,6 +137,7 @@ module = [
     "quantvista.jobs.corrections",
     "quantvista.jobs.scoring",
     "quantvista.jobs.news",
+    "quantvista.jobs.sentiment",
 ]
 disallow_untyped_decorators = false
 
@@ -133,6 +148,7 @@ addopts = "-q"
 pythonpath = ["scripts"]
 markers = [
     "integration: requires a reachable PostgreSQL database (skipped when none is reachable)",
+    "finbert: exercises the real ProsusAI/finbert model (needs the [finbert] extra; auto-skips without torch)",
 ]
 
 [tool.coverage.run]
