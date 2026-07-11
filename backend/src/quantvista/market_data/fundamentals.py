@@ -19,6 +19,12 @@ from uuid import UUID
 from sqlalchemy import RowMapping, text
 from sqlalchemy.orm import Session
 
+# The canonical statement cadence for the dev fundamentals source (QV-095): yfinance
+# ``.income_stmt`` et al. are ANNUAL, and annual figures give correct per-year ratios (a single
+# quarter's EPS would make PE ~4× too high). Scoring reads cadence-agnostically, so this label is
+# mainly the value the ingest path stamps.
+PRIMARY_STATEMENT_TYPE = "annual"
+
 # Allowlist of NUMERIC ratio/measure columns (0005). The write builds its column list from THIS
 # set only (values always parametrised) — never from caller-supplied names — so a dict-driven
 # insert can't inject SQL.
@@ -78,6 +84,19 @@ _AS_OF_SQL = text(
     LIMIT 1
     """
 )
+# Same, but cadence-agnostic (``statement_type=None``): the latest fundamentals of ANY cadence known
+# by ``as_of``. Scoring reads this so it picks up whatever the dev source provides (QV-095: annual)
+# without the reader and the ingest adapter having to hard-agree on one label.
+_AS_OF_ANY_SQL = text(
+    f"""
+    SELECT {_SELECT_COLS} FROM fundamentals
+    WHERE stock_id = :stock_id
+      AND knowledge_from <= :as_of
+      AND (knowledge_to IS NULL OR :as_of < knowledge_to)
+    ORDER BY period_end DESC, knowledge_from DESC
+    LIMIT 1
+    """
+)
 _OPEN_VERSION_SQL = text(
     f"""
     SELECT {_SELECT_COLS} FROM fundamentals
@@ -112,17 +131,26 @@ def fundamentals_as_of(
     stock_id: UUID,
     as_of: datetime,
     *,
-    statement_type: str = "quarterly",
+    statement_type: str | None = None,
 ) -> FundamentalVersion | None:
-    """The version whose knowledge interval contains ``as_of`` (newest ``period_end`` first)."""
-    row = (
-        session.execute(
-            _AS_OF_SQL,
-            {"stock_id": stock_id, "statement_type": statement_type, "as_of": as_of},
+    """The version whose knowledge interval contains ``as_of`` (newest ``period_end`` first).
+
+    ``statement_type=None`` (default) reads the latest of ANY cadence; pass a specific cadence
+    (``"annual"``/``"quarterly"``/``"ttm"``) to isolate one — as corrections do, to close the
+    right chain.
+    """
+    if statement_type is None:
+        params = {"stock_id": stock_id, "as_of": as_of}
+        row = session.execute(_AS_OF_ANY_SQL, params).mappings().one_or_none()
+    else:
+        row = (
+            session.execute(
+                _AS_OF_SQL,
+                {"stock_id": stock_id, "statement_type": statement_type, "as_of": as_of},
+            )
+            .mappings()
+            .one_or_none()
         )
-        .mappings()
-        .one_or_none()
-    )
     return _to_version(row) if row is not None else None
 
 

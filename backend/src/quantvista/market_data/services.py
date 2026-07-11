@@ -20,7 +20,10 @@ import structlog
 
 from quantvista.core.db import privileged_session_scope
 from quantvista.core.interfaces import IEventBus
-from quantvista.market_data.fundamentals import record_fundamental_version
+from quantvista.market_data.fundamentals import (
+    PRIMARY_STATEMENT_TYPE,
+    record_fundamental_version,
+)
 from quantvista.market_data.interfaces import IMarketDataProvider
 from quantvista.market_data.macro import IMacroProvider, MacroSeries
 from quantvista.market_data.models import (
@@ -387,7 +390,29 @@ class FundamentalsReport:
 
 
 # The 6 measures the QV-012 DTO carries → QV-021 ratio-allowlist columns (rest stay NULL).
-_SNAPSHOT_RATIOS = ("pe", "forward_pe", "pb", "roe", "roce", "debt_equity")
+_SNAPSHOT_RATIOS = (
+    "pe",
+    "forward_pe",
+    "pb",
+    "roe",
+    "roce",
+    "roic",
+    "debt_equity",
+    "revenue",
+    "revenue_growth",
+    "eps",
+    "eps_growth",
+    "fcf",
+    "fcf_growth",
+    "operating_margin",
+    "net_margin",
+    "current_ratio",
+    "quick_ratio",
+    "ev_ebitda",
+    "peg",
+    "price_sales",
+    "enterprise_value",
+)
 
 
 class FundamentalsIngestionService:
@@ -440,7 +465,7 @@ class FundamentalsIngestionService:
                 with privileged_session_scope() as session:
                     for snap in filings:
                         assert snap.period_end is not None  # filtered above; narrows for mypy
-                        statement_type = snap.statement_type or "quarterly"
+                        statement_type = snap.statement_type or PRIMARY_STATEMENT_TYPE
                         action = record_fundamental_version(
                             session,
                             stock.stock_id,
