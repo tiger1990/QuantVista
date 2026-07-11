@@ -142,15 +142,11 @@ def test_get_corporate_actions_maps_and_filters_by_date() -> None:
     assert len(events) == 2  # out-of-range dividend excluded
 
 
-def test_get_fundamentals_maps_info_with_sparse_none() -> None:
-    # Arrange — trailingPE present, forwardPE absent
-    ticker = _FakeTicker(info={"trailingPE": 28.4, "priceToBook": 12.1, "returnOnEquity": 0.42})
-    # Act
-    (snap,) = _provider(ticker).get_fundamentals("TCS.NS")
-    # Assert
-    assert snap.pe == Decimal("28.4")
-    assert snap.forward_pe is None
-    assert snap.provenance.license_class is LicenseClass.NON_COMMERCIAL_DEV
+def test_get_fundamentals_empty_without_statements() -> None:
+    # QV-095: fundamentals come from the dated financial STATEMENTS, not the .info TTM snapshot.
+    # No statements → nothing. (Full statement→ratio mapping lives in test_fundamentals_adapter.)
+    ticker = _FakeTicker(info={"trailingPE": 28.4})  # no income_stmt/balance_sheet/cashflow
+    assert _provider(ticker).get_fundamentals("TCS.NS") == []
 
 
 def test_get_shareholding_best_effort_and_empty_when_absent() -> None:

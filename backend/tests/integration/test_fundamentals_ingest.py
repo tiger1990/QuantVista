@@ -55,6 +55,26 @@ def _snap(symbol: str, *, pe: str | None, period_end: date | None = _PERIOD) -> 
     )
 
 
+def _snap_full(symbol: str, period_end: date) -> FundamentalSnapshot:
+    """A QV-095-shaped dated snapshot carrying the widened ratio set (intrinsic + valuation)."""
+    return FundamentalSnapshot(
+        symbol=symbol,
+        period_end=period_end,
+        statement_type="annual",
+        pe=Decimal("20"),
+        forward_pe=None,
+        pb=Decimal("3"),
+        roe=Decimal("0.15"),
+        roce=Decimal("0.18"),
+        debt_equity=Decimal("0.5"),
+        provenance=_PROV,
+        roic=Decimal("0.12"),
+        revenue=Decimal("1000"),
+        net_margin=Decimal("0.12"),
+        eps=Decimal("1.2"),
+    )
+
+
 class _FakeProvider:
     def __init__(
         self, funds: dict[str, list[FundamentalSnapshot]], raise_for: set[str] | None = None
@@ -257,6 +277,27 @@ def test_task_strict_fail_marks_run_failed(
         ).scalar_one()
     assert status == "failed"
     _FakeYf._raise = False
+
+
+def test_dated_multi_period_versions_and_widened_ratios(
+    admin_engine: Engine, universe: _Universe
+) -> None:
+    # QV-095: the adapter now returns one dated snapshot PER fiscal period (not a single TTM stub).
+    # Each distinct period_end must become its own bitemporal row, and the widened ratio set
+    # (roic/net_margin/revenue/eps …) must persist and read back — not just the original 6.
+    p0, p1 = date(2026, 3, 31), date(2025, 3, 31)
+    provider = _FakeProvider({"AAA": [_snap_full("AAA", p0), _snap_full("AAA", p1)]})
+    report = FundamentalsIngestionService(provider, _FakeBus()).ingest(
+        universe.market, index_code=universe.index_code, knowledge_time=T0
+    )
+    assert report.filings_inserted == 2  # one row per fiscal period
+    assert _row_count(admin_engine, universe.aaa) == 2
+    with admin_engine.connect() as conn, Session(bind=conn) as session:
+        latest = fundamentals_as_of(session, universe.aaa, T1, statement_type="annual")
+    assert latest is not None
+    assert latest.ratios["roic"] == Decimal("0.120000")  # widened intrinsic ratio round-trips
+    assert latest.ratios["net_margin"] == Decimal("0.120000")
+    assert latest.ratios["pe"] == Decimal("20.000000")
 
 
 def test_daily_task_is_registered() -> None:

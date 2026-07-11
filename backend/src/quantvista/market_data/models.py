@@ -80,6 +80,22 @@ class FundamentalSnapshot:
     roce: Decimal | None
     debt_equity: Decimal | None
     provenance: Provenance
+    # QV-095: rest of the ratio set (default None → back-compatible with existing constructions).
+    roic: Decimal | None = None
+    revenue: Decimal | None = None
+    revenue_growth: Decimal | None = None
+    eps: Decimal | None = None
+    eps_growth: Decimal | None = None
+    fcf: Decimal | None = None
+    fcf_growth: Decimal | None = None
+    operating_margin: Decimal | None = None
+    net_margin: Decimal | None = None
+    current_ratio: Decimal | None = None
+    quick_ratio: Decimal | None = None
+    ev_ebitda: Decimal | None = None
+    peg: Decimal | None = None
+    price_sales: Decimal | None = None
+    enterprise_value: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -27,8 +27,42 @@ from quantvista.market_data.models import (
     ShareholdingSnapshot,
     UniverseEntry,
 )
+from quantvista.market_data.ratios import StatementBundle, compute
 
 _SOURCE = "yfinance"
+
+# yfinance line-item names vary — first match wins, else that input is None (→ ratio None).
+_LINE_ITEMS: dict[str, tuple[str, ...]] = {
+    "revenue": ("Total Revenue", "Operating Revenue"),
+    "ebit": ("EBIT", "Operating Income"),
+    "ebitda": ("EBITDA", "Normalized EBITDA"),
+    "operating_income": ("Operating Income", "Total Operating Income As Reported"),
+    "net_income": (
+        "Net Income",
+        "Net Income Common Stockholders",
+        "Net Income Continuous Operations",
+    ),
+    "pretax_income": ("Pretax Income", "Pre Tax Income"),
+    "tax_provision": ("Tax Provision", "Income Tax Expense"),
+    "total_assets": ("Total Assets",),
+    "current_assets": ("Current Assets", "Total Current Assets"),
+    "current_liabilities": ("Current Liabilities", "Total Current Liabilities"),
+    "inventory": ("Inventory",),
+    "total_debt": ("Total Debt",),
+    "cash": ("Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments"),
+    "equity": (
+        "Stockholders Equity",
+        "Common Stock Equity",
+        "Total Equity Gross Minority Interest",
+    ),
+    "shares": ("Ordinary Shares Number", "Share Issued"),
+    "operating_cash_flow": (
+        "Operating Cash Flow",
+        "Cash Flow From Continuing Operating Activities",
+    ),
+    "capex": ("Capital Expenditure", "Capital Expenditure Reported"),
+}
+_FILING_LAG_DAYS = 45  # Indian norm: results filed ~6 weeks after fiscal period-end
 
 # Representative dev universe (symbol → name). NOT the authoritative NIFTY200 — the real
 # point-in-time constituent sync is QV-019; this is enough to exercise the pipeline in dev.
@@ -89,6 +123,37 @@ def _dec(value: Any) -> Decimal | None:
 def _int(value: Any) -> int | None:
     d = _dec(value)
     return int(d) if d is not None else None
+
+
+def _safe_div(numer: Decimal | None, denom: Decimal | None) -> Decimal | None:
+    if numer is None or denom is None or denom == 0:
+        return None
+    try:
+        return numer / denom
+    except (InvalidOperation, ArithmeticError):
+        return None
+
+
+def _cell(df: Any, key: str, col: Any) -> Decimal | None:
+    """First matching line item for ``key`` at period ``col`` in a yfinance statement DataFrame."""
+    if df is None or col is None or getattr(df, "empty", True):
+        return None
+    for name in _LINE_ITEMS[key]:
+        if name in df.index:
+            try:
+                return _dec(df.loc[name, col])
+            except (KeyError, TypeError):
+                continue
+    return None
+
+
+def _eps(inc: Any, bs: Any, col: Any, info_shares: Decimal | None) -> Decimal | None:
+    return _safe_div(_cell(inc, "net_income", col), _cell(bs, "shares", col) or info_shares)
+
+
+def _fcf(cf: Any, col: Any) -> Decimal | None:
+    ocf, capex = _cell(cf, "operating_cash_flow", col), _cell(cf, "capex", col)
+    return None if ocf is None or capex is None else ocf - abs(capex)
 
 
 class YFinanceDevProvider:
@@ -180,21 +245,64 @@ class YFinanceDevProvider:
         return out
 
     def get_fundamentals(self, symbol: str) -> Sequence[FundamentalSnapshot]:
-        info = getattr(self._ticker(symbol), "info", None) or {}
-        return [
-            FundamentalSnapshot(
-                symbol=symbol,
-                period_end=None,
-                statement_type="ttm",
-                pe=_dec(info.get("trailingPE")),
-                forward_pe=_dec(info.get("forwardPE")),
-                pb=_dec(info.get("priceToBook")),
-                roe=_dec(info.get("returnOnEquity")),
-                roce=None,  # not exposed by yfinance
-                debt_equity=_dec(info.get("debtToEquity")),
-                provenance=self._provenance(symbol),
+        """Dated ratios per annual fiscal period from the financial statements (QV-095).
+
+        Computes statement-intrinsic ratios from ``income_stmt``/``balance_sheet``/``cashflow``
+        (real ``period_end`` → passes the bitemporal store, unlike the old ``.info`` TTM stub);
+        valuation ratios (PE/PB/EV…) are added to the latest period only, from the current price.
+        """
+        ticker = self._ticker(symbol)
+        inc = getattr(ticker, "income_stmt", None)
+        bs = getattr(ticker, "balance_sheet", None)
+        cf = getattr(ticker, "cashflow", None)
+        if inc is None or getattr(inc, "empty", True):
+            return []
+
+        info = getattr(ticker, "info", None) or {}
+        info_shares = _dec(info.get("sharesOutstanding"))
+        price = _dec(info.get("regularMarketPrice") or info.get("currentPrice"))
+        forward_eps = _dec(info.get("forwardEps"))
+        prov = self._provenance(symbol)
+
+        periods = list(inc.columns)  # period-end timestamps, newest first
+        snapshots: list[FundamentalSnapshot] = []
+        for i, col in enumerate(periods):
+            prior = periods[i + 1] if i + 1 < len(periods) else None
+            bundle = StatementBundle(
+                revenue=_cell(inc, "revenue", col),
+                ebit=_cell(inc, "ebit", col),
+                ebitda=_cell(inc, "ebitda", col),
+                operating_income=_cell(inc, "operating_income", col),
+                net_income=_cell(inc, "net_income", col),
+                tax_rate=_safe_div(
+                    _cell(inc, "tax_provision", col), _cell(inc, "pretax_income", col)
+                ),
+                total_assets=_cell(bs, "total_assets", col),
+                current_assets=_cell(bs, "current_assets", col),
+                current_liabilities=_cell(bs, "current_liabilities", col),
+                inventory=_cell(bs, "inventory", col),
+                total_debt=_cell(bs, "total_debt", col),
+                cash=_cell(bs, "cash", col),
+                equity=_cell(bs, "equity", col),
+                shares=_cell(bs, "shares", col) or info_shares,
+                operating_cash_flow=_cell(cf, "operating_cash_flow", col),
+                capex=_cell(cf, "capex", col),
+                prior_revenue=_cell(inc, "revenue", prior) if prior is not None else None,
+                prior_eps=_eps(inc, bs, prior, info_shares) if prior is not None else None,
+                prior_fcf=_fcf(cf, prior) if prior is not None else None,
+                price=price if i == 0 else None,  # valuation on the latest period only
+                forward_eps=forward_eps if i == 0 else None,
             )
-        ]
+            snapshots.append(
+                FundamentalSnapshot(
+                    symbol=symbol,
+                    period_end=col.date(),
+                    statement_type="annual",
+                    provenance=prov,
+                    **compute(bundle),  # keys match the DTO's ratio fields exactly
+                )
+            )
+        return snapshots
 
     def get_shareholding(self, symbol: str) -> Sequence[ShareholdingSnapshot]:
         info = getattr(self._ticker(symbol), "info", None) or {}

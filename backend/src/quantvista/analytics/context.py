@@ -32,9 +32,13 @@ class ScoringContext:
         return self._universe
 
     def fundamentals_as_of(
-        self, stock_id: UUID, as_of: date, *, statement_type: str = "quarterly"
+        self, stock_id: UUID, as_of: date, *, statement_type: str | None = None
     ) -> FundamentalVersion | None:
-        """The fundamentals version *known* by end of the ``as_of`` day (QV-021 bitemporal)."""
+        """The fundamentals version *known* by end of the ``as_of`` day (QV-021 bitemporal).
+
+        Cadence-agnostic by default (``None``) so scoring picks up whatever the dev source ingests
+        (QV-095 emits ``annual``); the bitemporal knowledge-time guard still applies.
+        """
         knowledge_time = datetime.combine(as_of, time.max, tzinfo=UTC)
         return fundamentals_as_of(
             self._session, stock_id, knowledge_time, statement_type=statement_type
