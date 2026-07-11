@@ -13,6 +13,18 @@ export function formatScore(score: number | null | undefined, digits = 1): strin
   return score == null ? "—" : score.toFixed(digits);
 }
 
+/** Coverage as a whole percent. The API already returns 0–100 (like the scores) — do NOT ×100. */
+export function formatCoverage(coverage: number | null | undefined): string {
+  return coverage == null ? "—" : `${Math.round(coverage)}%`;
+}
+
+/** Rupee price to 2dp with Indian digit grouping (₹1,10,000.00), or an em dash when no price. */
+export function formatPrice(close: number | null | undefined): string {
+  return close == null
+    ? "—"
+    : `₹${close.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /** Tailwind text-color class for a tone (semantic tokens, not decorative). */
 export function toneTextClass(tone: ScoreTone): string {
   return tone === "positive"

@@ -2,11 +2,12 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { DataTable } from "@/components/data-table";
 import { Disclaimer } from "@/components/disclaimer";
 import { type RankingItem, useRankings } from "@/lib/api/queries";
-import { formatScore, scoreTone, toneTextClass } from "@/lib/score";
+import { formatCoverage, formatPrice, formatScore, scoreTone, toneTextClass } from "@/lib/score";
 
 const columns: ColumnDef<RankingItem, unknown>[] = [
   {
@@ -28,6 +29,14 @@ const columns: ColumnDef<RankingItem, unknown>[] = [
     ),
   },
   {
+    accessorKey: "close",
+    header: "Price",
+    enableSorting: false,
+    cell: ({ row }) => (
+      <span className="tabular-nums text-muted-foreground">{formatPrice(row.original.close)}</span>
+    ),
+  },
+  {
     accessorKey: "composite_score",
     header: "Composite",
     cell: ({ row }) => {
@@ -43,10 +52,9 @@ const columns: ColumnDef<RankingItem, unknown>[] = [
     accessorKey: "coverage",
     header: "Coverage",
     cell: ({ row }) => {
-      const c = row.original.coverage;
       return (
         <span className="tabular-nums text-muted-foreground">
-          {c == null ? "—" : `${Math.round(c * 100)}%`}
+          {formatCoverage(row.original.coverage)}
         </span>
       );
     },
@@ -54,6 +62,7 @@ const columns: ColumnDef<RankingItem, unknown>[] = [
 ];
 
 export default function RankingsPage() {
+  const router = useRouter();
   const { data, isLoading, isError } = useRankings();
   const rows = data?.data ?? [];
   const meta = data?.meta as { tier_limit?: number | null; as_of?: string | null } | undefined;
@@ -80,6 +89,7 @@ export default function RankingsPage() {
         <DataTable
           columns={columns}
           data={rows}
+          onRowClick={(row) => router.push(`/stocks/${row.symbol}`)}
           emptyMessage={isLoading ? "Loading…" : "No ranked stocks yet — run the scoring pipeline."}
         />
       )}

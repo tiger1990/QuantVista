@@ -9,7 +9,7 @@ import { DataTable } from "@/components/data-table";
 import { Disclaimer } from "@/components/disclaimer";
 import { Button } from "@/components/ui/button";
 import { type StockListItem, useStocks } from "@/lib/api/queries";
-import { formatScore, scoreTone, toneTextClass } from "@/lib/score";
+import { formatPrice, formatScore, scoreTone, toneTextClass } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 const columns: ColumnDef<StockListItem, unknown>[] = [
@@ -34,6 +34,14 @@ const columns: ColumnDef<StockListItem, unknown>[] = [
     accessorKey: "sector",
     header: "Sector",
     cell: ({ row }) => row.original.sector ?? "—",
+  },
+  {
+    accessorKey: "close",
+    header: "Price",
+    enableSorting: false,
+    cell: ({ row }) => (
+      <span className="tabular-nums text-muted-foreground">{formatPrice(row.original.close)}</span>
+    ),
   },
   {
     accessorKey: "composite_score",
@@ -110,6 +118,7 @@ function StocksInner() {
           data={rows}
           sorting={sorting}
           onSortingChange={onSortingChange}
+          onRowClick={(row) => router.push(`/stocks/${row.symbol}`)}
           emptyMessage={isLoading ? "Loading…" : "No stocks match."}
         />
       )}

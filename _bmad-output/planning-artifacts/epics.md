@@ -193,6 +193,10 @@ Factor framework, scoring engine, stock/score APIs, frontend shell, screener.
 ### Story 4.14: QV-046 — Sentiment factor wired into scoring
 `[QUANT]` · 3pts · depends: QV-044, QV-029 · Sprint 05 · detail: `plans/sprints/sprint-05-sentiment-alerts.md`
 
+### Story 4.15: QV-093 — Current Price column (Stocks / Rankings / Overview)
+`[BE]` `[FE]` · 2pts · depends: QV-033, QV-035 · added post-hoc · detail: `_bmad-output/implementation-artifacts/4-15-qv-093-current-price-column-stocks-rankings-overview.md`
+> Show the latest close (T-1 dev) next to the score in the Stocks list, Rankings, and Overview top-movers — additive nullable `close` on `/stocks` + `/rankings`; no migration.
+
 ---
 
 ## Epic 5: News & Sentiment (EPIC-NEWS)

@@ -47,3 +47,4 @@ class RankingItem(BaseModel):
     symbol: str
     composite_score: float | None
     coverage: float | None
+    close: float | None  # latest daily_prices close (T-1 dev); nullable when no price yet

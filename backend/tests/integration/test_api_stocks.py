@@ -141,6 +141,7 @@ def test_list_filters_by_sector_and_shows_score(api: _Fixture) -> None:
     ).json()["data"]
     a_row = next(i for i in scored if i["symbol"] == api.scored)
     assert a_row["composite_score"] == 75.5  # latest score surfaced in the list
+    assert a_row["close"] == 101.0  # latest close price surfaced in the list (QV-093)
 
 
 def test_detail_returns_master_and_snapshot(api: _Fixture) -> None:

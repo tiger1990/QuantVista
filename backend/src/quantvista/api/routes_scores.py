@@ -115,6 +115,7 @@ def get_rankings_endpoint(
                 "symbol": r["symbol"],
                 "composite_score": r["composite_score"],
                 "coverage": r["coverage"],
+                "close": r.get("close"),  # .get: survive any pre-QV-093 cached ranking rows
             }
         ).model_dump()
         for i, r in enumerate(full[:effective])
