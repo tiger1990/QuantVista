@@ -19,11 +19,14 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
-      <section className="space-y-1">
-        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          Equity research · India
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight">Welcome back, {firstName}.</h1>
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            Equity research · India
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight">Welcome back, {firstName}.</h1>
+        </div>
+        <NewsTicker items={news.data ?? []} />
       </section>
 
       <MarketOverview items={items} asOf={asOf} />
@@ -32,8 +35,6 @@ export default function OverviewPage() {
         <TopRanked items={items} />
         <SectorHeatmap stocks={allStocks} />
       </div>
-
-      <NewsTicker items={news.data ?? []} />
 
       <Disclaimer />
     </div>

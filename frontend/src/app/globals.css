@@ -108,7 +108,9 @@
   }
 }
 
-/* Overview news ticker (QV-043): scroll one full set; content is duplicated in the DOM. */
+/* Overview news ticker (QV-043): continuous right-to-left marquee; content is duplicated in the DOM
+   so -50% is a seamless loop. Slow (120s) so headlines are readable as they pass; pauses on hover.
+   Decorative → gated on reduced-motion. Tune readability via the duration below. */
 @keyframes ticker {
   from {
     transform: translateX(0);
@@ -116,4 +118,14 @@
   to {
     transform: translateX(-50%);
   }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ticker-track {
+    animation: ticker 290s linear infinite;
+  }
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
 }
