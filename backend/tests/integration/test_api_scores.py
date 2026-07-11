@@ -139,6 +139,7 @@ def test_rankings_desc_order_and_free_tier(api: _Fixture) -> None:
     assert syms[0] == api.top  # highest composite first
     assert [i["rank"] for i in body["data"]] == [1, 2, 3]
     assert body["data"][0]["composite_score"] >= body["data"][1]["composite_score"]
+    assert "close" in body["data"][0]  # latest price field present (QV-093; null with no prices)
     assert body["meta"]["tier_limit"] == 50  # Free entitlement surfaced
     assert body["meta"]["truncated"] is False  # only 3 stocks
 

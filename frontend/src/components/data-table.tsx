@@ -28,6 +28,9 @@ interface DataTableProps<T> {
   // Optional controlled sorting (e.g. URL-persisted); falls back to internal state.
   sorting?: SortingState;
   onSortingChange?: OnChangeFn<SortingState>;
+  // Optional: makes the whole row a click target (cursor + stronger hover). Cells with their own
+  // links still work (a11y / new-tab); the row navigates to the same place on a plain click.
+  onRowClick?: (row: T) => void;
 }
 
 export function DataTable<T>({
@@ -36,6 +39,7 @@ export function DataTable<T>({
   emptyMessage = "No rows.",
   sorting: controlledSorting,
   onSortingChange,
+  onRowClick,
 }: DataTableProps<T>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>([]);
   const sorting = controlledSorting ?? internalSorting;
@@ -77,7 +81,11 @@ export function DataTable<T>({
       <TableBody>
         {table.getRowModel().rows.length ? (
           table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
+            <TableRow
+              key={row.id}
+              onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+              className={onRowClick ? "cursor-pointer hover:bg-muted" : undefined}
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}

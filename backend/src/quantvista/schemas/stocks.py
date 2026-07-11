@@ -16,6 +16,7 @@ class StockListItem(BaseModel):
     market_cap_bucket: str | None
     market: str
     composite_score: float | None  # latest, nullable when unscored
+    close: float | None  # latest daily_prices close (T-1 dev); nullable when no price yet
 
 
 class LatestSnapshot(BaseModel):

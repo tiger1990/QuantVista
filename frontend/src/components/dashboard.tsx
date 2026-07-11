@@ -2,7 +2,14 @@ import Link from "next/link";
 
 import { Card, CardContent } from "@/components/ui/card";
 import type { RankingItem, StockListItem } from "@/lib/api/queries";
-import { type ScoreTone, formatScore, scoreTone, toneTextClass } from "@/lib/score";
+import {
+  type ScoreTone,
+  formatCoverage,
+  formatPrice,
+  formatScore,
+  scoreTone,
+  toneTextClass,
+} from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: ScoreTone }) {
@@ -28,7 +35,7 @@ export function MarketOverview({ items, asOf }: { items: RankingItem[]; asOf?: s
     <Card>
       <CardContent className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         <Stat label="Avg composite" value={formatScore(avg)} tone={scoreTone(avg)} />
-        <Stat label="Coverage" value={cov == null ? "—" : `${Math.round(cov * 100)}%`} />
+        <Stat label="Coverage" value={formatCoverage(cov)} />
         <Stat label="Scored" value={String(scored.length)} />
         <Stat label="As of" value={asOf ?? "—"} />
       </CardContent>
@@ -36,12 +43,14 @@ export function MarketOverview({ items, asOf }: { items: RankingItem[]; asOf?: s
   );
 }
 
-/** Top-N leaderboard tile. */
+/** Top-N leaderboard tile — aligned rank / symbol / price / composite columns. */
+const TOP_RANKED_COLS = "grid grid-cols-[1.25rem_1fr_auto_3rem] items-center gap-x-3";
+
 export function TopRanked({ items }: { items: RankingItem[] }) {
   const top = items.slice(0, 6);
   return (
     <Card className="h-full">
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2">
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-semibold">Top ranked</h2>
           <Link href="/rankings" className="text-xs text-primary hover:underline">
@@ -49,21 +58,48 @@ export function TopRanked({ items }: { items: RankingItem[] }) {
           </Link>
         </div>
         {top.length ? (
-          <ol className="space-y-1.5">
-            {top.map((i) => (
-              <li key={i.symbol} className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2">
-                  <span className="w-4 tabular-nums text-muted-foreground">{i.rank}</span>
-                  <Link href={`/stocks/${i.symbol}`} className="font-medium hover:text-primary hover:underline">
-                    {i.symbol}
+          <div>
+            <div
+              className={cn(
+                TOP_RANKED_COLS,
+                "px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+              )}
+            >
+              <span className="text-right">#</span>
+              <span>Symbol</span>
+              <span className="text-right">Price</span>
+              <span className="text-right">Score</span>
+            </div>
+            <ol className="space-y-0.5">
+              {top.map((i) => (
+                <li key={i.symbol}>
+                  <Link
+                    href={`/stocks/${i.symbol}`}
+                    className={cn(
+                      TOP_RANKED_COLS,
+                      "rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
+                    )}
+                  >
+                    <span className="text-right text-xs tabular-nums text-muted-foreground">
+                      {i.rank}
+                    </span>
+                    <span className="min-w-0 truncate font-medium">{i.symbol}</span>
+                    <span className="text-right text-xs tabular-nums text-muted-foreground">
+                      {formatPrice(i.close)}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-right font-semibold tabular-nums",
+                        toneTextClass(scoreTone(i.composite_score)),
+                      )}
+                    >
+                      {formatScore(i.composite_score)}
+                    </span>
                   </Link>
-                </span>
-                <span className={cn("tabular-nums", toneTextClass(scoreTone(i.composite_score)))}>
-                  {formatScore(i.composite_score)}
-                </span>
-              </li>
-            ))}
-          </ol>
+                </li>
+              ))}
+            </ol>
+          </div>
         ) : (
           <p className="py-6 text-center text-sm text-muted-foreground">No rankings yet.</p>
         )}

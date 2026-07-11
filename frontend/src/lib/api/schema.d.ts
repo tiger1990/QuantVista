@@ -523,6 +523,8 @@ export interface components {
             composite_score: number | null;
             /** Coverage */
             coverage: number | null;
+            /** Close */
+            close: number | null;
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -685,6 +687,8 @@ export interface components {
             market: string;
             /** Composite Score */
             composite_score: number | null;
+            /** Close */
+            close: number | null;
         };
         /** TokenResponse */
         TokenResponse: {

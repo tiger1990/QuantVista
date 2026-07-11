@@ -136,7 +136,9 @@ def factor_values_for(
 # --- rankings read (QV-031 caching) ------------------------------------------
 _RANKINGS_SQL = text(
     """
-    SELECT st.symbol, sc.composite_score, sc.coverage, sc.model_version, sc.weights_version
+    SELECT st.symbol, sc.composite_score, sc.coverage, sc.model_version, sc.weights_version,
+        (SELECT p.close FROM daily_prices p
+         WHERE p.stock_id = st.id ORDER BY p.date DESC LIMIT 1) AS close
     FROM scores sc
     JOIN stocks st ON st.id = sc.stock_id
     JOIN markets m ON m.id = st.market_id
@@ -156,6 +158,7 @@ def rankings_for(session: Session, market: str, as_of: date) -> list[dict[str, o
             if r["composite_score"] is None
             else float(r["composite_score"]),
             "coverage": None if r["coverage"] is None else float(r["coverage"]),
+            "close": _f(r["close"]),
             "model_version": r["model_version"],
             "weights_version": r["weights_version"],
         }
@@ -172,7 +175,9 @@ _LIST_STOCKS_SQL = text(
     """
     SELECT s.symbol, s.company_name, s.sector, s.market_cap_bucket, m.code AS market,
         (SELECT sc.composite_score FROM scores sc
-         WHERE sc.stock_id = s.id ORDER BY sc.date DESC LIMIT 1) AS composite_score
+         WHERE sc.stock_id = s.id ORDER BY sc.date DESC LIMIT 1) AS composite_score,
+        (SELECT p.close FROM daily_prices p
+         WHERE p.stock_id = s.id ORDER BY p.date DESC LIMIT 1) AS close
     FROM stocks s
     JOIN markets m ON m.id = s.market_id
     WHERE m.code = :market
@@ -217,6 +222,7 @@ def list_stocks(
             "market_cap_bucket": r["market_cap_bucket"],
             "market": r["market"],
             "composite_score": _f(r["composite_score"]),
+            "close": _f(r["close"]),
         }
         for r in rows
     ]

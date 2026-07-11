@@ -1656,6 +1656,17 @@
               }
             ],
             "title": "Coverage"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
           }
         },
         "type": "object",
@@ -1663,7 +1674,8 @@
           "rank",
           "symbol",
           "composite_score",
-          "coverage"
+          "coverage",
+          "close"
         ],
         "title": "RankingItem"
       },
@@ -2241,6 +2253,17 @@
               }
             ],
             "title": "Composite Score"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close"
           }
         },
         "type": "object",
@@ -2250,7 +2273,8 @@
           "sector",
           "market_cap_bucket",
           "market",
-          "composite_score"
+          "composite_score",
+          "close"
         ],
         "title": "StockListItem"
       },
