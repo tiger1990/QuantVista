@@ -356,3 +356,92 @@ Non-advice posture, methodology content, data-vendor licensing, DPDP, audit.
 
 ### Story 10.6: QV-086 — Launch compliance content finalized
 `[PROD]` · 2pts · depends: QV-070, QV-080 · Sprint 11 · detail: `plans/sprints/sprint-11-launch-hardening.md`
+
+---
+
+## Epic 11: Event & Corporate-Actions Alerts (EPIC-EVENT-ALERT)
+
+Fast-follow to Epic 6. Epic 6 alerts fire only on **metric thresholds** (score/fundamental
+conditions). This epic adds **event-driven** alert types — earnings, IPO, dividend — that fire when
+a calendar/corporate-action event is detected, not when a number crosses a line. The branded HTML
+email templates (`earnings_alert` / `ipo_alert` / `dividend_alert`) already ship as scaffolds from
+the QV-049 branded-email enhancement; the work here is the **subscription model + event feeds +
+generation logic** that light them up. Each feed is dev-grade first (yfinance/free sources, like the
+market-data and news posture) → licensed vendor at scale (see QV-072/076).
+
+### Story 11.1: QV-096 — Event-alert subscription model + rule types + UI opt-in
+`[BE]` `[FE]` · 5pts · depends: QV-047, QV-050 · Sprint TBD · detail: TBD (fast-follow to Epic 6)
+
+Extend the alert model so a rule can be an **event subscription** (`type ∈ earnings | ipo |
+dividend`, scope stock/watchlist/all) rather than a metric condition. Migration for the new
+rule shape (or a discriminator on `alert_rules`), API validation, and the `/alerts` UI toggle to
+subscribe. Reuses the QV-048 dedup + QV-049 delivery pipeline unchanged (payload carries `type`,
+which `email_render` already routes to the right template).
+
+### Story 11.2: QV-097 — Earnings-calendar feed + earnings alert generation
+`[BE]` · 5pts · depends: QV-096, QV-013 · Sprint TBD · detail: TBD
+
+An `IEarningsCalendarProvider` (dev adapter: yfinance earnings dates) + a scheduled job that detects
+upcoming/updated results dates for subscribed stocks and generates deduped `earnings` alert events
+(fires the `earnings_alert.html.j2` template). Provider-agnostic seam for a licensed calendar later.
+
+### Story 11.3: QV-098 — IPO calendar feed + IPO alert generation
+`[BE]` · 5pts · depends: QV-096 · Sprint TBD · detail: TBD
+
+An `IIpoCalendarProvider` (dev adapter: a free NSE/BSE IPO calendar source) + a job that detects new
+IPO listings/subscription windows and generates deduped `ipo` alert events (fires
+`ipo_alert.html.j2`). Not stock-scoped by default (IPOs aren't in the universe yet) — subscription
+is watchlist/all.
+
+### Story 11.4: QV-099 — Dividend / corporate-actions alerts
+`[BE]` · 3pts · depends: QV-096, QV-017 · Sprint TBD · detail: TBD
+
+Reuses the **existing** `corporate_actions` data (QV-013 schema, QV-017 ingest) — no new feed. A job
+detects newly-ingested dividends / ex-dividend dates for subscribed stocks and generates deduped
+`dividend` alert events (fires `dividend_alert.html.j2`). Smallest of the three (data already lands).
+
+---
+
+## Epic 12: Valuation & Price Targets (EPIC-VALUE)
+
+Move from a **relative composite score** (rank within sector) to an **absolute price target +
+buy/hold/sell rating**. This is a deliberate posture change: a target price with a rating is
+*investment advice* under **SEBI (Research Analyst) Regulations 2014** — so client-facing delivery is
+**hard-gated on Epic 10 compliance** (RA registration, disclosures, rationale trail), independent of
+technical readiness. Two doors to a target: **valuation-based** (relative multiples / DCF — needs
+licensed forward estimates, QV-072/076, but not ML) and **ML expected-return** (needs Epic 9). Both
+need Epic 8 backtesting to be *trusted*. See memory `[[scoring-methodology-roadmap]]` — this extends
+score-v2. Storage is **additive** (a new global, PIT, partitioned `price_targets` table — mirrors
+`scores`; no change to existing tables).
+
+### Story 12.1: QV-100 — Schema: price_targets (global, PIT, partitioned)
+`[BE]` · 3pts · depends: QV-013 · Sprint TBD · detail: TBD
+
+New `price_targets` table modelled on `scores` (0006): `stock_id, date, horizon_months, target_price
+(numeric — money as Decimal), expected_return, rating, confidence_lo/hi, method, rationale (jsonb),
+model_version, created_at`; UNIQUE `(stock_id, date, horizon_months, method)`; RANGE-partitioned by
+`date` via the existing `_bootstrap_partitions` helper. Global (no RLS) — a target is the same for
+all users, like scores. Append-only / PIT: revisions are new rows, never mutations.
+
+### Story 12.2: QV-101 — Valuation-based price targets (relative multiples + DCF)
+`[QUANT]` · 8pts · depends: QV-100, QV-072, QV-076 · Sprint TBD · detail: TBD
+
+Explainable-first target: justified-multiple (`target = justified_PE/EV-EBITDA × forward_estimate`)
+and/or DCF, using **licensed forward estimates** (the whole reason this depends on the data-licensing
+track). Emits `method='relative'|'dcf'`, a confidence range, and a `rationale` (the drivers, for the
+disclosure trail). No ML dependency — this door opens on data licensing alone.
+
+### Story 12.3: QV-102 — ML expected-return targets
+`[QUANT]` `[ML]` · 8pts · depends: QV-100, QV-088, QV-090 · Sprint TBD · detail: TBD
+
+The statistical door: train `PIT features → realized forward return (6/12m)` on the Epic 9 feature
+store + walk-forward pipeline; map expected return to a target + range. Emits `method='ml'` (and a
+`blend` option combining with QV-101). Champion/challenger-gated (QV-089).
+
+### Story 12.4: QV-103 — Price-targets serving + rating display (compliance-gated)
+`[BE]` `[FE]` `[PROD]` · 5pts · depends: QV-101, QV-068, QV-070, QV-086 · Sprint TBD · detail: TBD
+
+Read repo + API + UI for targets/ratings, parallel to the `scores` read path. **Blocked from
+client-facing release** until Epic 10 compliance is finalized (QV-070 methodology/disclaimer,
+QV-086 launch content) and backtest evaluation (QV-068 metrics) validates the targets. Ships behind
+the disclosure/rationale surface; buy/sell wording only after RA sign-off.

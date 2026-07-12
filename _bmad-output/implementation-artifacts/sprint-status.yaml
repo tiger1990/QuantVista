@@ -179,3 +179,28 @@ development_status:
   10-5-qv-081-audit-logging-complete: backlog
   10-6-qv-086-launch-compliance-content-finalized: backlog
   epic-10-retrospective: optional
+
+  # ---- Epic 11: Event & Corporate-Actions Alerts (EPIC-EVENT-ALERT) ----
+  # Fast-follow to Epic 6. Epic 6 fires on METRIC thresholds only; this adds EVENT-driven alert
+  # types (earnings/ipo/dividend). Branded email templates already shipped as scaffolds in the
+  # QV-049 branded-email enhancement (alerts/templates/email/{earnings,ipo,dividend}_alert.html.j2)
+  # + email_render routes by payload "type"; work here = subscription model + event feeds + generation.
+  epic-11: backlog
+  11-1-qv-096-event-alert-subscription-model-rule-types-ui: backlog  # extend alert_rules for event subscriptions (type earnings|ipo|dividend, scope stock/watchlist/all) + API + /alerts UI opt-in; reuses QV-048 dedup + QV-049 delivery unchanged. depends QV-047, QV-050
+  11-2-qv-097-earnings-calendar-feed-earnings-alert-generation: backlog  # IEarningsCalendarProvider (dev: yfinance earnings dates) + job → deduped earnings alert events (earnings_alert.html.j2). depends QV-096, QV-013
+  11-3-qv-098-ipo-calendar-feed-ipo-alert-generation: backlog  # IIpoCalendarProvider (dev: free NSE/BSE IPO calendar) + job → deduped ipo alert events (ipo_alert.html.j2); watchlist/all scope. depends QV-096
+  11-4-qv-099-dividend-corporate-actions-alerts: backlog  # REUSES existing corporate_actions data (QV-013/QV-017), no new feed; job detects new dividends/ex-dates → deduped dividend alert events (dividend_alert.html.j2). depends QV-096, QV-017
+  epic-11-retrospective: optional
+
+  # ---- Epic 12: Valuation & Price Targets (EPIC-VALUE) ----
+  # Absolute price target + buy/hold/sell rating (vs today's relative composite score). A target +
+  # rating = investment advice → client delivery HARD-GATED on Epic 10 compliance (SEBI RA). Two
+  # doors: valuation (QV-101, needs licensed estimates QV-072/076, no ML) & ML (QV-102, needs Epic 9);
+  # both need Epic 8 backtesting to be trusted. Storage is ADDITIVE (new global PIT price_targets
+  # table, mirrors scores — no change to existing tables). Extends score-v2 roadmap.
+  epic-12: backlog
+  12-1-qv-100-schema-price-targets-global-pit-partitioned: backlog  # ADDITIVE new price_targets table modelled on scores (0006): stock_id,date,horizon_months,target_price(numeric),expected_return,rating,confidence_lo/hi,method,rationale(jsonb),model_version; UNIQUE(stock_id,date,horizon_months,method); RANGE-partitioned; global/no-RLS; append-only PIT. depends QV-013
+  12-2-qv-101-valuation-based-price-targets-multiples-dcf: backlog  # explainable-first: justified-multiple + DCF using LICENSED forward estimates; method relative|dcf + confidence range + rationale. NO ML dep — opens on data licensing alone. depends QV-100, QV-072, QV-076
+  12-3-qv-102-ml-expected-return-price-targets: backlog  # statistical door: PIT features→realized forward return (6/12m) on Epic 9 feature store + walk-forward; method ml|blend; champion/challenger-gated. depends QV-100, QV-088, QV-090
+  12-4-qv-103-price-targets-serving-rating-display-compliance-gated: backlog  # read repo+API+UI parallel to scores read path; BLOCKED from client release until Epic 10 compliance (QV-070/086) + backtest metrics (QV-068) validate; buy/sell wording only after RA sign-off. depends QV-101, QV-068, QV-070, QV-086
+  epic-12-retrospective: optional
