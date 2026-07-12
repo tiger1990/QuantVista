@@ -24,16 +24,18 @@ export type NewsItem = components["schemas"]["NewsItem"];
 const PAGE_SIZE = 50;
 const SCREENER_PAGE_SIZE = 100;
 
-/** Cursor-paginated stocks (keyset by symbol). Sector filter is server-side; "load more" via cursor. */
-export function useStocks(params: { market?: string; sector?: string | null }) {
+/** Cursor-paginated stocks (keyset by symbol). Sector + search filters are server-side (whole
+ * universe, not just loaded pages); "load more" via cursor. */
+export function useStocks(params: { market?: string; sector?: string | null; q?: string | null }) {
   const market = params.market ?? "NSE";
   const sector = params.sector ?? undefined;
+  const q = params.q?.trim() || undefined;
   return useInfiniteQuery({
-    queryKey: ["stocks", market, sector],
+    queryKey: ["stocks", market, sector, q],
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
       const { data, error } = await api.GET("/api/v1/stocks", {
-        params: { query: { market, sector, limit: PAGE_SIZE, cursor: pageParam ?? undefined } },
+        params: { query: { market, sector, q, limit: PAGE_SIZE, cursor: pageParam ?? undefined } },
       });
       if (error || !data) throw new Error("Failed to load stocks.");
       return data;

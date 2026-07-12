@@ -183,6 +183,7 @@ _LIST_STOCKS_SQL = text(
     WHERE m.code = :market
       AND (CAST(:sector AS text) IS NULL OR s.sector = :sector)
       AND (CAST(:cap AS text) IS NULL OR s.market_cap_bucket = :cap)
+      AND (CAST(:q AS text) IS NULL OR s.symbol ILIKE :q OR s.company_name ILIKE :q)
       AND (CAST(:after AS text) IS NULL OR s.symbol > :after)
     ORDER BY s.symbol
     LIMIT :limit
@@ -198,8 +199,13 @@ def list_stocks(
     market_cap_bucket: str | None,
     limit: int,
     after_symbol: str | None,
+    q: str | None = None,
 ) -> list[dict[str, object]]:
-    """Universe browse: filtered, keyset-paginated (``symbol`` asc) stocks + latest composite."""
+    """Universe browse: filtered, keyset-paginated (``symbol`` asc) stocks + latest composite.
+
+    ``q`` is a free-text filter on symbol OR company name (case-insensitive substring).
+    """
+    term = q.strip() if q else None
     rows = (
         session.execute(
             _LIST_STOCKS_SQL,
@@ -207,6 +213,7 @@ def list_stocks(
                 "market": market,
                 "sector": sector,
                 "cap": market_cap_bucket,
+                "q": f"%{term}%" if term else None,
                 "after": after_symbol,
                 "limit": limit,
             },

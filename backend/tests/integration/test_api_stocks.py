@@ -144,6 +144,18 @@ def test_list_filters_by_sector_and_shows_score(api: _Fixture) -> None:
     assert a_row["close"] == 101.0  # latest close price surfaced in the list (QV-093)
 
 
+def test_list_filters_by_search_q(api: _Fixture) -> None:
+    # symbol match → just that stock
+    r = api.client.get(f"/api/v1/stocks?market={api.market}&q={api.scored}", headers=_auth(api))
+    assert [i["symbol"] for i in r.json()["data"]] == [api.scored]
+    # company-name match (each is "<sym> Ltd") → all three, case-insensitive
+    r2 = api.client.get(f"/api/v1/stocks?market={api.market}&q=ltd", headers=_auth(api))
+    assert {i["symbol"] for i in r2.json()["data"]} == set(api.symbols)
+    # no match → empty
+    r3 = api.client.get(f"/api/v1/stocks?market={api.market}&q=zzznope", headers=_auth(api))
+    assert r3.json()["data"] == []
+
+
 def test_detail_returns_master_and_snapshot(api: _Fixture) -> None:
     r = api.client.get(f"/api/v1/stocks/{api.scored}", headers=_auth(api))
     assert r.status_code == 200

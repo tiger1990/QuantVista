@@ -118,7 +118,7 @@ export interface paths {
         };
         /**
          * List Stocks Endpoint
-         * @description Browse the universe: filter by market/sector/cap, keyset-paginated by symbol.
+         * @description Browse the universe: filter by market/sector/cap + free-text ``q``, keyset-paginated.
          */
         get: operations["list_stocks_endpoint_api_v1_stocks_get"];
         put?: never;
@@ -944,6 +944,8 @@ export interface operations {
                 market?: string;
                 sector?: string | null;
                 market_cap_bucket?: string | null;
+                /** @description Search by symbol or company name */
+                q?: string | null;
                 limit?: number;
                 cursor?: string | null;
             };

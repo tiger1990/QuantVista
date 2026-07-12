@@ -178,7 +178,7 @@
           "stocks"
         ],
         "summary": "List Stocks Endpoint",
-        "description": "Browse the universe: filter by market/sector/cap, keyset-paginated by symbol.",
+        "description": "Browse the universe: filter by market/sector/cap + free-text ``q``, keyset-paginated.",
         "operationId": "list_stocks_endpoint_api_v1_stocks_get",
         "parameters": [
           {
@@ -222,6 +222,25 @@
               ],
               "title": "Market Cap Bucket"
             }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search by symbol or company name",
+              "title": "Q"
+            },
+            "description": "Search by symbol or company name"
           },
           {
             "name": "limit",

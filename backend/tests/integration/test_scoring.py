@@ -16,12 +16,16 @@ import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
-from quantvista.analytics.factors import ALL_FACTORS
+from quantvista.analytics.factors import ALL_FACTORS, FactorCategory
 from quantvista.analytics.repositories import upsert_factor_values, upsert_scores
 from quantvista.analytics.scoring import compute_universe
 from quantvista.market_data.fundamentals import record_fundamental_version
 
 pytestmark = pytest.mark.integration
+
+# This suite seeds fundamentals + indicators but NO news, so the QV-046 sentiment factor is
+# unavailable — expect one factor_values row per stock for every NON-sentiment factor.
+_DATA_FACTORS = sum(1 for f in ALL_FACTORS if f.category is not FactorCategory.SENTIMENT)
 
 _PERIOD = date(2025, 12, 31)
 _KNOWN = datetime(2026, 1, 15, tzinfo=UTC)
@@ -102,7 +106,9 @@ def _persist(admin_engine: Engine, universe: list[UUID]) -> int:
 
 def test_scores_and_decomposition_persist(admin_engine: Engine, universe: list[UUID]) -> None:
     n_fv = _persist(admin_engine, universe)
-    assert n_fv == len(universe) * len(ALL_FACTORS)  # 3 × 10 factor_values rows
+    assert (
+        n_fv == len(universe) * _DATA_FACTORS
+    )  # 3 × 10 factor_values rows (no news → no sentiment)
 
     with admin_engine.connect() as conn:
         rows = conn.execute(
@@ -116,8 +122,9 @@ def test_scores_and_decomposition_persist(admin_engine: Engine, universe: list[U
     assert len(rows) == len(universe)
     for r in rows:
         assert 0 <= float(r.composite_score) <= 100
-        assert r.sentiment_score is None  # no sentiment factor yet
-        assert float(r.coverage) == 100.0  # all 10 factors present
+        assert r.sentiment_score is None  # no news seeded → sentiment factor unavailable
+        # 10 of 11 factors present (the sentiment factor needs news) → coverage = 10/11.
+        assert round(float(r.coverage), 2) == round(_DATA_FACTORS / len(ALL_FACTORS) * 100, 2)
         assert (r.weights_version, r.model_version) == ("v1", "score-v1")
         # decomposition sums to composite (re-normalized weights over the 4 scored categories)
         weighted = (
@@ -140,4 +147,4 @@ def test_rescore_is_idempotent(admin_engine: Engine, universe: list[UUID]) -> No
             text("SELECT count(*) FROM factor_values WHERE stock_id = ANY(:i)"), {"i": universe}
         ).scalar_one()
     assert n_scores == len(universe)  # overwritten, not duplicated
-    assert n_fv == len(universe) * len(ALL_FACTORS)
+    assert n_fv == len(universe) * _DATA_FACTORS

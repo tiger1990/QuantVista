@@ -101,13 +101,14 @@ def test_none_when_source_missing() -> None:
 
 
 def test_all_factors_cover_categories_with_unique_keys() -> None:
-    assert len(ALL_FACTORS) == 10
-    assert len({f.key for f in ALL_FACTORS}) == 10  # keys unique
+    assert len(ALL_FACTORS) == 11
+    assert len({f.key for f in ALL_FACTORS}) == 11  # keys unique
     categories = {f.category for f in ALL_FACTORS}
-    assert {
+    # QV-046 added the sentiment factor → all five categories now have ≥1 concrete factor.
+    assert categories == {
         FactorCategory.FUNDAMENTAL,
         FactorCategory.MOMENTUM,
         FactorCategory.QUALITY,
+        FactorCategory.SENTIMENT,
         FactorCategory.RISK,
-    } <= categories
-    assert FactorCategory.SENTIMENT not in categories  # deferred to Epic 5
+    }

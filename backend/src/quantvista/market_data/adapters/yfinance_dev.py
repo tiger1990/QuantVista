@@ -266,14 +266,25 @@ class YFinanceDevProvider:
 
         periods = list(inc.columns)  # period-end timestamps, newest first
         snapshots: list[FundamentalSnapshot] = []
+        valuation_done = False  # valuation goes on the latest period that actually has data
         for i, col in enumerate(periods):
+            revenue = _cell(inc, "revenue", col)
+            net_income = _cell(inc, "net_income", col)
+            equity = _cell(bs, "equity", col)
+            # yfinance sometimes carries an empty trailing column (a fiscal-year change, or a
+            # not-yet-reported year — e.g. NESTLEIND). Skip it rather than storing an all-None row
+            # that would shadow the latest REAL period in stock-detail/screener/scoring.
+            if revenue is None and net_income is None and equity is None:
+                continue
+            apply_valuation = not valuation_done
+            valuation_done = True
             prior = periods[i + 1] if i + 1 < len(periods) else None
             bundle = StatementBundle(
-                revenue=_cell(inc, "revenue", col),
+                revenue=revenue,
                 ebit=_cell(inc, "ebit", col),
                 ebitda=_cell(inc, "ebitda", col),
                 operating_income=_cell(inc, "operating_income", col),
-                net_income=_cell(inc, "net_income", col),
+                net_income=net_income,
                 tax_rate=_safe_div(
                     _cell(inc, "tax_provision", col), _cell(inc, "pretax_income", col)
                 ),
@@ -283,15 +294,15 @@ class YFinanceDevProvider:
                 inventory=_cell(bs, "inventory", col),
                 total_debt=_cell(bs, "total_debt", col),
                 cash=_cell(bs, "cash", col),
-                equity=_cell(bs, "equity", col),
+                equity=equity,
                 shares=_cell(bs, "shares", col) or info_shares,
                 operating_cash_flow=_cell(cf, "operating_cash_flow", col),
                 capex=_cell(cf, "capex", col),
                 prior_revenue=_cell(inc, "revenue", prior) if prior is not None else None,
                 prior_eps=_eps(inc, bs, prior, info_shares) if prior is not None else None,
                 prior_fcf=_fcf(cf, prior) if prior is not None else None,
-                price=price if i == 0 else None,  # valuation on the latest period only
-                forward_eps=forward_eps if i == 0 else None,
+                price=price if apply_valuation else None,
+                forward_eps=forward_eps if apply_valuation else None,
             )
             snapshots.append(
                 FundamentalSnapshot(
