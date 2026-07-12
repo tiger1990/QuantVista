@@ -8,11 +8,10 @@ constructed with what it needs (a session / a sender) and exposes the uniform ``
 
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy.orm import Session
 
 from quantvista.alerts.email import IEmailSender
+from quantvista.alerts.email_render import render_email
 from quantvista.alerts.interfaces import DeliveryTarget
 from quantvista.alerts.repositories import insert_notification
 
@@ -36,26 +35,15 @@ class InAppChannel:
 
 
 class EmailChannel:
-    """Email delivery via the injected sender (``LogEmailSender`` in dev)."""
+    """Email delivery via the injected sender (``LogEmailSender`` in dev).
+
+    Renders a branded, provider-portable HTML email from the event payload (``email_render``); the
+    sender ships the HTML verbatim, so the template is identical across Brevo/SES/log.
+    """
 
     def __init__(self, sender: IEmailSender) -> None:
         self._sender = sender
 
     def deliver(self, target: DeliveryTarget) -> None:
-        self._sender.send(
-            to=target.email,
-            subject=_subject(target.payload),
-            body=_body(target.payload),
-        )
-
-
-def _subject(payload: dict[str, Any]) -> str:
-    metric = payload.get("metric", "alert")
-    return f"QuantVista alert: {metric} {payload.get('op', '')} {payload.get('threshold', '')}"
-
-
-def _body(payload: dict[str, Any]) -> str:
-    return (
-        f"An alert you configured fired: {payload.get('metric')} is {payload.get('value')} "
-        f"({payload.get('op')} {payload.get('threshold')})."
-    )
+        subject, html = render_email(target.payload)
+        self._sender.send(to=target.email, subject=subject, body=html)

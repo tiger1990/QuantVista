@@ -28,7 +28,10 @@ _SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 class IEmailSender(Protocol):
-    """Sends one email. Raises on failure (the delivery service records status per event)."""
+    """Sends one email; ``body`` is the ready-to-send HTML document (see ``email_render``).
+
+    Raises on failure (the delivery service records status per event).
+    """
 
     def send(self, *, to: str, subject: str, body: str) -> None: ...
 
@@ -56,7 +59,7 @@ class BrevoEmailSender:
                 "sender": self._sender,
                 "to": [{"email": to}],
                 "subject": subject,
-                "htmlContent": f"<p>{body}</p>",
+                "htmlContent": body,
             }
         ).encode()
         request = urllib.request.Request(  # noqa: S310 - fixed https Brevo endpoint

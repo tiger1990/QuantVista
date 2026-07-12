@@ -1,0 +1,18 @@
+{# SCAFFOLD — IPO alerts do not fire yet (needs an IPO calendar feed; future story). Template +
+   registry entry exist so the type is ready. Context: company_name, symbol, event_date, message,
+   cta_url. #}
+{% extends "_base.html.j2" %}
+{% block content %}
+<p style="margin:0 0 4px; font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.6px; color:#2f5aa6;">IPO alert</p>
+<h1 style="margin:0 0 16px; font-size:22px; line-height:28px; font-weight:700; color:#1a2233;">
+  {{ company_name or symbol }}
+</h1>
+<p style="margin:0 0 8px; font-size:15px; line-height:22px; color:#4a5568;">
+  {% if event_date %}Opens for subscription on <strong style="color:#1a2233;">{{ event_date }}</strong>. {% endif %}{{ message }}
+</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 4px;">
+  <tr><td style="border-radius:8px; background-color:#2f5aa6;">
+    <a href="{{ cta_url }}" style="display:inline-block; padding:12px 28px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none;">View in QuantVista &rarr;</a>
+  </td></tr>
+</table>
+{% endblock %}

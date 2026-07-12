@@ -35,6 +35,9 @@ dependencies = [
     "polars>=1.0",
     # Macro data (QV-026): certifi CA bundle for FRED TLS (consistent trust store across platforms).
     "certifi>=2024.0",
+    # Alert emails (QV-049 enhancement): Jinja2 renders the branded, provider-portable HTML
+    # templates (alerts/templates/email/*.html.j2). Autoescaping guards injected payload values.
+    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +74,10 @@ finbert = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# Ship the Jinja HTML email templates (non-.py) with the package so a wheel install can render them.
+"quantvista.alerts" = ["templates/email/*.j2"]
 
 [tool.ruff]
 target-version = "py313"

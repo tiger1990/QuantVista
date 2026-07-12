@@ -46,6 +46,9 @@ class AlertEvaluationService:
                 if not matches(value, cond["op"], float(cond["value"])):
                     continue
                 payload = {
+                    "type": "metric_alert",
+                    "symbol": rule.get("target_symbol"),
+                    "company_name": rule.get("company_name"),
                     "metric": cond["metric"],
                     "op": cond["op"],
                     "threshold": cond["value"],

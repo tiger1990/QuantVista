@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     email_from: str = "alerts@quantvista.local"
     email_from_name: str = "QuantVista Alerts"
     brevo_api_key: str | None = None  # env: BREVO_API_KEY (gitignored .env only)
+    # Branded HTML alert emails (QV-049 enhancement). `email_logo_url`, when set to a PUBLICLY
+    # hosted image, renders as the header logo; unset → a styled "QUANTVISTA" text wordmark (no
+    # hosting dependency). `app_base_url` is the CTA link target ("View in QuantVista").
+    email_logo_url: str | None = None  # e.g. https://cdn.quantvista.app/logo.png
+    app_base_url: str = "http://localhost:3000"
 
 
 @lru_cache

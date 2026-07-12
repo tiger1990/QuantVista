@@ -116,7 +116,10 @@ def active_alert_rules(session: Session) -> list[dict[str, Any]]:
     rows = (
         session.execute(
             text(
-                "SELECT id, tenant_id, scope, target_id, condition FROM alert_rules WHERE is_active"
+                "SELECT r.id, r.tenant_id, r.scope, r.target_id, r.condition, "
+                "s.symbol AS target_symbol, s.company_name "
+                "FROM alert_rules r LEFT JOIN stocks s ON s.id = r.target_id "
+                "WHERE r.is_active"
             )
         )
         .mappings()
@@ -129,6 +132,10 @@ def active_alert_rules(session: Session) -> list[dict[str, Any]]:
             "scope": r["scope"],
             "target_id": r["target_id"],
             "condition": r["condition"],
+            "target_symbol": r[
+                "target_symbol"
+            ],  # None if the target isn't a stock (e.g. portfolio)
+            "company_name": r["company_name"],
         }
         for r in rows
     ]
