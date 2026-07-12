@@ -18,6 +18,7 @@ from quantvista.api.routes import router as auth_router
 from quantvista.api.routes_alerts import AlertNotFound
 from quantvista.api.routes_alerts import router as alerts_router
 from quantvista.api.routes_news import router as news_router
+from quantvista.api.routes_notifications import router as notifications_router
 from quantvista.api.routes_scores import router as scores_router
 from quantvista.api.routes_screener import ScreenerError
 from quantvista.api.routes_screener import router as screener_router
@@ -132,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(screener_router)
     app.include_router(screens_router)
     app.include_router(alerts_router)
+    app.include_router(notifications_router)
     app.include_router(news_router)
     _register_error_handlers(app)
     return app

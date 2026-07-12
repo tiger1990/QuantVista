@@ -26,6 +26,8 @@ export interface AuthUser {
   name: string | null;
   tenantId: string;
   tenantName: string;
+  /** Resolved plan entitlements, e.g. `{ alerts: 3 }` (number = limit, null = unlimited). */
+  entitlements: Record<string, number | boolean | null>;
 }
 
 type Status = "loading" | "authed" | "anon";
@@ -58,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: me.name,
             tenantId: me.tenant_id,
             tenantName: me.tenant_name,
+            entitlements: (me.entitlements ?? {}) as Record<string, number | boolean | null>,
           }
         : null,
     );

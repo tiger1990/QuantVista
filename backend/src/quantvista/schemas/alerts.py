@@ -29,6 +29,7 @@ class AlertRule(BaseModel):
     id: str
     scope: str
     target_id: str
+    target_symbol: str | None  # resolved stock symbol for display (QV-050)
     condition: dict[str, Any]
     channel: str
     is_active: bool

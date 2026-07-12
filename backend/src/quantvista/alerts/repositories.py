@@ -34,6 +34,7 @@ def _row(r: Any) -> dict[str, object]:
         "id": str(r["id"]),
         "scope": r["scope"],
         "target_id": str(r["target_id"]),
+        "target_symbol": r["target_symbol"],  # resolved for display (QV-050); None if not a stock
         "condition": r["condition"],  # jsonb → dict
         "channel": r["channel"],
         "is_active": r["is_active"],
@@ -58,7 +59,9 @@ def create_alert_rule(
                 "INSERT INTO alert_rules "
                 "(tenant_id, user_id, scope, target_id, condition, channel) "
                 "VALUES (:t, :u, :sc, :tg, CAST(:c AS jsonb), :ch) "
-                "RETURNING id, scope, target_id, condition, channel, is_active, created_at"
+                "RETURNING id, scope, target_id, "
+                "(SELECT symbol FROM stocks WHERE id = target_id) AS target_symbol, "
+                "condition, channel, is_active, created_at"
             ),
             {
                 "t": tenant_id,
@@ -79,8 +82,10 @@ def list_alert_rules(session: Session) -> list[dict[str, object]]:
     rows = (
         session.execute(
             text(
-                "SELECT id, scope, target_id, condition, channel, is_active, created_at "
-                "FROM alert_rules ORDER BY created_at DESC"
+                "SELECT r.id, r.scope, r.target_id, s.symbol AS target_symbol, r.condition, "
+                "r.channel, r.is_active, r.created_at "
+                "FROM alert_rules r LEFT JOIN stocks s ON s.id = r.target_id "
+                "ORDER BY r.created_at DESC"
             )
         )
         .mappings()
@@ -244,3 +249,42 @@ def insert_notification(
         ),
         {"t": tenant_id, "u": user_id, "ty": type, "p": json.dumps(payload)},
     )
+
+
+# --- notification center reads (QV-050): the RLS tenant session scopes to the tenant; we further
+# filter to the current user (a tenant can have several users) ----------------------------------
+def list_notifications(session: Session, user_id: UUID, limit: int = 50) -> list[dict[str, object]]:
+    """The user's most-recent notifications (RLS session; newest first)."""
+    rows = (
+        session.execute(
+            text(
+                "SELECT id, type, payload, read_at, created_at FROM notifications "
+                "WHERE user_id = :u ORDER BY created_at DESC LIMIT :n"
+            ),
+            {"u": user_id, "n": limit},
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        {
+            "id": str(r["id"]),
+            "type": r["type"],
+            "payload": r["payload"],
+            "read_at": r["read_at"].isoformat() if r["read_at"] else None,
+            "created_at": r["created_at"].isoformat(),
+        }
+        for r in rows
+    ]
+
+
+def mark_all_notifications_read(session: Session, user_id: UUID) -> int:
+    """Mark the user's unread notifications read; returns how many were updated."""
+    rows = session.execute(
+        text(
+            "UPDATE notifications SET read_at = now() "
+            "WHERE user_id = :u AND read_at IS NULL RETURNING id"
+        ),
+        {"u": user_id},
+    ).all()
+    return len(rows)

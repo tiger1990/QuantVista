@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,7 @@ const LINKS = [
   { href: "/rankings", label: "Rankings" },
   { href: "/screener", label: "Screener" },
   { href: "/news", label: "News" },
+  { href: "/alerts", label: "Alerts" },
 ];
 
 export function AppNav() {
@@ -58,6 +60,7 @@ export function AppNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1">
+          {user ? <NotificationBell /> : null}
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

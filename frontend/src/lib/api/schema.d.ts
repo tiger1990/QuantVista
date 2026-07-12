@@ -305,6 +305,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notifications Endpoint
+         * @description The current user's recent notifications (newest first).
+         */
+        get: operations["list_notifications_endpoint_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Read Endpoint
+         * @description Mark all of the current user's unread notifications read; returns the count updated.
+         */
+        post: operations["mark_read_endpoint_api_v1_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/{symbol}/news": {
         parameters: {
             query?: never;
@@ -369,6 +409,8 @@ export interface components {
             scope: string;
             /** Target Id */
             target_id: string;
+            /** Target Symbol */
+            target_symbol: string | null;
             /** Condition */
             condition: {
                 [key: string]: unknown;
@@ -489,6 +531,20 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** Envelope[dict[str, int]] */
+        Envelope_dict_str__int__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: {
+                [key: string]: number;
+            } | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** Envelope[dict[str, str]] */
         Envelope_dict_str__str__: {
             /** Success */
@@ -521,6 +577,18 @@ export interface components {
             success: boolean;
             /** Data */
             data?: components["schemas"]["NewsItem"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[Notification]] */
+        Envelope_list_Notification__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["Notification"][] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -694,6 +762,21 @@ export interface components {
              */
             published_at: string;
         };
+        /** Notification */
+        Notification: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Read At */
+            read_at: string | null;
+            /** Created At */
+            created_at: string;
+        };
         /** RankingItem */
         RankingItem: {
             /** Rank */
@@ -856,6 +939,8 @@ export interface components {
         };
         /** StockListItem */
         StockListItem: {
+            /** Id */
+            id: string;
             /** Symbol */
             symbol: string;
             /** Company Name */
@@ -1410,6 +1495,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notifications_endpoint_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_Notification__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_read_endpoint_api_v1_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__int__"];
                 };
             };
         };
