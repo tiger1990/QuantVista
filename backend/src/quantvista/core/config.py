@@ -80,6 +80,14 @@ class Settings(BaseSettings):
     cache_enabled: bool = True  # false → NullCache (dev/tests with no Redis)
     cache_ttl_seconds: int = 3600  # TTL backstop if an invalidation event is ever missed
 
+    # Email delivery (QV-049): plug-and-play provider. `log` = LogEmailSender (dev/CI, no creds).
+    # `brevo` = Brevo transactional REST API (300/day free); a later `ses` adds Amazon SES. Only the
+    # selected provider's key is needed. `email_from` MUST be a sender verified in the provider.
+    email_provider: str = "log"  # log | brevo
+    email_from: str = "alerts@quantvista.local"
+    email_from_name: str = "QuantVista Alerts"
+    brevo_api_key: str | None = None  # env: BREVO_API_KEY (gitignored .env only)
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -19,7 +19,7 @@ import structlog
 
 from quantvista.core.cache import get_cache
 from quantvista.core.interfaces import IEventBus
-from quantvista.jobs.alerts import evaluate_alerts
+from quantvista.jobs.alerts import deliver_notifications, evaluate_alerts
 from quantvista.jobs.compute import compute_indicators
 from quantvista.jobs.corrections import recompute_on_correction
 from quantvista.jobs.ingest import ingest_daily_prices  # noqa: F401  (task registry side-effect)
@@ -80,6 +80,12 @@ def on_news_scored(envelope: dict[str, Any]) -> None:
     evaluate_alerts.delay(None, "news")  # None → latest completed session as the cycle date
 
 
+def on_alerts_fired(envelope: dict[str, Any]) -> None:
+    """Alerts fired → deliver the pending events via their channel (QV-049)."""
+    _log.info("consume_alerts_fired", count=envelope["payload"].get("count"))
+    deliver_notifications.delay()
+
+
 def on_news_ingested(envelope: dict[str, Any]) -> None:
     """Fresh news landed → tag the untagged articles to stocks (QV-042)."""
     payload = envelope["payload"]
@@ -111,5 +117,6 @@ def register_pipeline_consumers(bus: IEventBus) -> None:
     bus.subscribe("FactorsComputed", on_factors_computed)
     bus.subscribe("ScoresComputed", on_scores_computed)
     bus.subscribe("NewsScored", on_news_scored)
+    bus.subscribe("AlertsFired", on_alerts_fired)
     bus.subscribe("NewsIngested", on_news_ingested)
     bus.subscribe("FundamentalsRevised", on_fundamentals_revised)

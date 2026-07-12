@@ -185,3 +185,62 @@ def insert_alert_event(
         {"t": tenant_id, "r": alert_rule_id, "dk": dedup_key, "p": json.dumps(payload)},
     ).first()
     return row is not None
+
+
+# --- delivery (QV-049): undelivered events joined to their rule's channel + the user's email -----
+_PENDING_EVENTS_SQL = text(
+    """
+    SELECT e.id, e.tenant_id, r.user_id, r.channel, u.email, e.payload
+    FROM alert_events e
+    JOIN alert_rules r ON r.id = e.alert_rule_id
+    JOIN users u ON u.id = r.user_id
+    WHERE e.status IN ('pending','failed')
+    ORDER BY e.fired_at
+    """
+)
+
+
+def pending_alert_events(session: Session) -> list[dict[str, Any]]:
+    """Undelivered/failed events + their delivery target (privileged; failed rows get retried)."""
+    rows = session.execute(_PENDING_EVENTS_SQL).mappings().all()
+    return [
+        {
+            "id": r["id"],
+            "tenant_id": r["tenant_id"],
+            "user_id": r["user_id"],
+            "channel": r["channel"],
+            "email": r["email"],
+            "payload": r["payload"],
+        }
+        for r in rows
+    ]
+
+
+def mark_alert_event(session: Session, event_id: UUID, status: str) -> None:
+    """Record a delivery outcome; ``delivered_at`` is set only when actually delivered."""
+    session.execute(
+        text(
+            "UPDATE alert_events SET status = :s, "
+            "delivered_at = CASE WHEN :s = 'delivered' THEN now() ELSE delivered_at END "
+            "WHERE id = :id"
+        ),
+        {"s": status, "id": event_id},
+    )
+
+
+def insert_notification(
+    session: Session,
+    *,
+    tenant_id: UUID,
+    user_id: UUID,
+    type: str,
+    payload: dict[str, Any],
+) -> None:
+    """Persist an in-app notification (0010) for the user (privileged session sets tenant_id)."""
+    session.execute(
+        text(
+            "INSERT INTO notifications (tenant_id, user_id, type, payload) "
+            "VALUES (:t, :u, :ty, CAST(:p AS jsonb))"
+        ),
+        {"t": tenant_id, "u": user_id, "ty": type, "p": json.dumps(payload)},
+    )
