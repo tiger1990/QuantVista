@@ -680,6 +680,103 @@
         }
       }
     },
+    "/api/v1/alerts": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List Alerts Endpoint",
+        "operationId": "list_alerts_endpoint_api_v1_alerts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_AlertRule__"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Create Alert Endpoint",
+        "description": "Create an alert rule, tier-limited by the ``alerts`` entitlement.",
+        "operationId": "create_alert_endpoint_api_v1_alerts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAlertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_AlertRule_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/{rule_id}": {
+      "delete": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Delete Alert Endpoint",
+        "operationId": "delete_alert_endpoint_api_v1_alerts__rule_id__delete",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/stocks/{symbol}/news": {
       "get": {
         "tags": [
@@ -784,6 +881,118 @@
   },
   "components": {
     "schemas": {
+      "AlertConditionSchema": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Metric"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "gte",
+              "lte",
+              "gt",
+              "lt",
+              "eq"
+            ],
+            "title": "Op"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "op",
+          "value"
+        ],
+        "title": "AlertConditionSchema"
+      },
+      "AlertRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "condition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scope",
+          "target_id",
+          "condition",
+          "channel",
+          "is_active",
+          "created_at"
+        ],
+        "title": "AlertRule"
+      },
+      "CreateAlertRequest": {
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "stock",
+              "portfolio"
+            ],
+            "title": "Scope"
+          },
+          "target_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Target Id"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/AlertConditionSchema"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "in_app"
+            ],
+            "title": "Channel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scope",
+          "target_id",
+          "condition",
+          "channel"
+        ],
+        "title": "CreateAlertRequest"
+      },
       "DecompositionResponse": {
         "properties": {
           "symbol": {
@@ -819,6 +1028,51 @@
           "factors"
         ],
         "title": "DecompositionResponse"
+      },
+      "Envelope_AlertRule_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertRule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[AlertRule]"
       },
       "Envelope_DecompositionResponse_": {
         "properties": {
@@ -1138,6 +1392,55 @@
           "success"
         ],
         "title": "Envelope[dict[str, str]]"
+      },
+      "Envelope_list_AlertRule__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AlertRule"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[list[AlertRule]]"
       },
       "Envelope_list_NewsItem__": {
         "properties": {

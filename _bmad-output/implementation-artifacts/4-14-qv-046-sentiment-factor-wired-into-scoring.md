@@ -2,7 +2,7 @@
 baseline_commit: c8c2e65
 ---
 
-Status: review
+Status: done
 
 # QV-046 — Sentiment factor wired into scoring
 
