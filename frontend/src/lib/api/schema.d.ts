@@ -267,6 +267,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Alerts Endpoint */
+        get: operations["list_alerts_endpoint_api_v1_alerts_get"];
+        put?: never;
+        /**
+         * Create Alert Endpoint
+         * @description Create an alert rule, tier-limited by the ``alerts`` entitlement.
+         */
+        post: operations["create_alert_endpoint_api_v1_alerts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/alerts/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Alert Endpoint */
+        delete: operations["delete_alert_endpoint_api_v1_alerts__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/{symbol}/news": {
         parameters: {
             query?: never;
@@ -311,6 +349,56 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AlertConditionSchema */
+        AlertConditionSchema: {
+            /** Metric */
+            metric: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "gte" | "lte" | "gt" | "lt" | "eq";
+            /** Value */
+            value: number;
+        };
+        /** AlertRule */
+        AlertRule: {
+            /** Id */
+            id: string;
+            /** Scope */
+            scope: string;
+            /** Target Id */
+            target_id: string;
+            /** Condition */
+            condition: {
+                [key: string]: unknown;
+            };
+            /** Channel */
+            channel: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Created At */
+            created_at: string;
+        };
+        /** CreateAlertRequest */
+        CreateAlertRequest: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "stock" | "portfolio";
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            condition: components["schemas"]["AlertConditionSchema"];
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "email" | "in_app";
+        };
         /** DecompositionResponse */
         DecompositionResponse: {
             /** Symbol */
@@ -323,6 +411,17 @@ export interface components {
             sum_of_contributions: number;
             /** Factors */
             factors: components["schemas"]["FactorContribution"][];
+        };
+        /** Envelope[AlertRule] */
+        Envelope_AlertRule_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["AlertRule"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** Envelope[DecompositionResponse] */
         Envelope_DecompositionResponse_: {
@@ -398,6 +497,18 @@ export interface components {
             data?: {
                 [key: string]: string;
             } | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[AlertRule]] */
+        Envelope_list_AlertRule__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["AlertRule"][] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -1198,6 +1309,88 @@ export interface operations {
             header?: never;
             path: {
                 screen_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_alerts_endpoint_api_v1_alerts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_AlertRule__"];
+                };
+            };
+        };
+    };
+    create_alert_endpoint_api_v1_alerts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAlertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AlertRule_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_alert_endpoint_api_v1_alerts__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
             };
             cookie?: never;
         };

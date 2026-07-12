@@ -11,9 +11,12 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 
+from quantvista.alerts.rules import AlertRuleError
 from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.pagination import InvalidCursor
 from quantvista.api.routes import router as auth_router
+from quantvista.api.routes_alerts import AlertNotFound
+from quantvista.api.routes_alerts import router as alerts_router
 from quantvista.api.routes_news import router as news_router
 from quantvista.api.routes_scores import router as scores_router
 from quantvista.api.routes_screener import ScreenerError
@@ -94,6 +97,14 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _screen_missing(_req: Request, _exc: ScreenNotFound) -> JSONResponse:
         return _fail("not_found", "screen not found")
 
+    @app.exception_handler(AlertRuleError)
+    async def _bad_alert(_req: Request, exc: AlertRuleError) -> JSONResponse:
+        return _fail("validation_error", str(exc))
+
+    @app.exception_handler(AlertNotFound)
+    async def _alert_missing(_req: Request, _exc: AlertNotFound) -> JSONResponse:
+        return _fail("not_found", "alert rule not found")
+
 
 def _register_metrics(app: FastAPI) -> None:
     """Mount the Prometheus scrape endpoint + RED middleware (ops surface, no envelope)."""
@@ -120,6 +131,7 @@ def create_app() -> FastAPI:
     app.include_router(scores_router)
     app.include_router(screener_router)
     app.include_router(screens_router)
+    app.include_router(alerts_router)
     app.include_router(news_router)
     _register_error_handlers(app)
     return app
