@@ -22,8 +22,8 @@ As a user, I want configurable alert rules, so I'm notified on conditions I care
 
 ## Tasks / Subtasks
 
-- [x] **Task 1 — migration 0016** (AC: #1, #5)
-  - [x] `0016_alerts.py`: `alert_rules` + `alert_events` per `03` §4.3; enable+FORCE RLS + `{table}_isolation` policy on both; `ix_*_tenant_id` + partial `ix_alert_rules_active WHERE is_active` (for QV-048). Applied (0016 head), app role granted.
+- [x] **Task 1 — schema (already migration 0010)** (AC: #1, #5)
+  - [x] **No new migration** — `alert_rules` + `alert_events` (+ `notifications`) were forward-declared in **migration 0010** (tenant-scoped, RLS FORCE + isolation, `ix_alert_rules_active WHERE is_active`, and `alert_events.dedup_key` + `UNIQUE(alert_rule_id, dedup_key)` ready for QV-048). Verified the repo/API use only 0010's columns. (A duplicate 0016 was created then removed — 0010 already had it, like sentiment in 0007.)
 - [x] **Task 2 — rule validation (pure)** (AC: #2)
   - [x] `alerts/rules.py`: `METRICS` (screener numeric fields) / `OPS` / `SCOPES` / `CHANNELS`; `validate_condition/scope/channel` → `AlertRuleError` (unknown metric/op, non-numeric/bool value, bad scope/channel). 11 unit tests.
 - [x] **Task 3 — repository + schemas** (AC: #4)
@@ -56,7 +56,7 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
 ### Debug Log References
 
 - Gates: ruff + format clean · mypy clean (196 files) · import-linter 3/3 (`alerts` is top-of-DAG) · pytest **424 passed / 5 skipped** (+11 rule-validation unit, +4 alerts API integration).
-- Migration 0016 applied to dev (`alembic current` = 0016 head); `alert_rules`/`alert_events` both `rowsecurity=t`; app role granted DML.
+- **No migration** — `alert_rules`/`alert_events` were already created by migration **0010** (found after a duplicate 0016 failed CI with `DuplicateTable`; 0010's schema is a superset — has `dedup_key`/`updated_at` this story doesn't use). Chain head stays 0015; both tables `rowsecurity=t`.
 
 ### Completion Notes List
 
@@ -68,7 +68,6 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
 
 ### File List
 
-- `backend/src/quantvista/db/migrations/versions/0016_alerts.py` (new) — alert_rules + alert_events, RLS
 - `backend/src/quantvista/alerts/rules.py` (new) — allow-list validation
 - `backend/src/quantvista/alerts/repositories.py` — RLS-scoped CRUD (was a stub)
 - `backend/src/quantvista/schemas/alerts.py` (new) — wire DTOs
@@ -79,4 +78,4 @@ claude-opus-4-8 (BMAD dev-story workflow, executed inline)
 
 ### Change Log
 
-- QV-047: Alerts schema + rule engine — `alert_rules`/`alert_events` tables (tenant-scoped, RLS FORCE + isolation), pure allow-list condition validation, and validated + tier-limited CRUD (`POST/GET/DELETE /api/v1/alerts`) mirroring saved-screens. Firing (QV-048) and delivery (QV-049) build on this. No entitlement/seed change.
+- QV-047: Alerts schema + rule engine — builds on the pre-existing `alert_rules`/`alert_events` tables (migration 0010, tenant-scoped RLS) with pure allow-list condition validation and validated + tier-limited CRUD (`POST/GET/DELETE /api/v1/alerts`) mirroring saved-screens. Firing (QV-048) and delivery (QV-049) build on this. No migration, no entitlement/seed change.
