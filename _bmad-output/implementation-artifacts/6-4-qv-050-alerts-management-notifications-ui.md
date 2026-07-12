@@ -2,7 +2,7 @@
 baseline_commit: cd87646
 ---
 
-Status: review
+Status: done
 
 # QV-050 — Frontend: Alerts management + notifications
 

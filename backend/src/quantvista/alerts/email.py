@@ -10,16 +10,21 @@ providers); a non-2xx raises so the caller marks the event ``failed`` and retrie
 from __future__ import annotations
 
 import json
+import ssl
 import urllib.error
 import urllib.request
 from typing import Protocol
 
+import certifi
 import structlog
 
 from quantvista.core.config import Settings, get_settings
 
 _log = structlog.get_logger()
 _BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+# certifi CA bundle so TLS verifies everywhere (Homebrew Python on macOS has no usable trust store);
+# mirrors market_data/macro.py + news/providers.py.
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 
 
 class IEmailSender(Protocol):
@@ -65,7 +70,9 @@ class BrevoEmailSender:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout) as resp:  # noqa: S310
+            with urllib.request.urlopen(  # noqa: S310
+                request, timeout=self._timeout, context=_SSL_CONTEXT
+            ) as resp:
                 if resp.status not in (200, 201):
                     raise RuntimeError(f"Brevo send failed: HTTP {resp.status}")
         except urllib.error.HTTPError as exc:

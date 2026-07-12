@@ -48,7 +48,7 @@ def test_brevo_posts_expected_request(monkeypatch: pytest.MonkeyPatch) -> None:
         def __exit__(self, *a: object) -> None:
             return None
 
-    def _fake_urlopen(request: Any, timeout: float) -> _Resp:
+    def _fake_urlopen(request: Any, timeout: float, context: Any = None) -> _Resp:
         captured["url"] = request.full_url
         captured["headers"] = {k.lower(): v for k, v in request.headers.items()}
         captured["body"] = json.loads(request.data)
@@ -68,7 +68,7 @@ def test_brevo_posts_expected_request(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_brevo_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
     import urllib.error
 
-    def _boom(request: Any, timeout: float) -> None:
+    def _boom(request: Any, timeout: float, context: Any = None) -> None:
         raise urllib.error.HTTPError("u", 401, "Unauthorized", {}, None)  # type: ignore[arg-type]
 
     monkeypatch.setattr("urllib.request.urlopen", _boom)
