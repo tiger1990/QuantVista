@@ -2,7 +2,7 @@
 baseline_commit: 45f5407bb82fbd6b2798dd6972513ef445a8c848
 ---
 
-Status: review
+Status: done
 
 # Story 7.1: QV-051 — Schema: portfolios + portfolio_positions (RLS)
 
