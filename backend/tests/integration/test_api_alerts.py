@@ -90,10 +90,20 @@ def test_invalid_condition_returns_422(api: tuple[TestClient, str, str]) -> None
 
 
 def test_cross_tenant_isolation(api: tuple[TestClient, str, str]) -> None:
+    # Both tenants own a rule → prove the RLS policy *scopes* (each sees only its own), not merely
+    # that an empty tenant sees nothing. A stronger check than "B sees []".
     client, token_a, token_b = api
-    rule_id = client.post("/api/v1/alerts", json=_payload(), headers=_h(token_a)).json()["data"][
-        "id"
-    ]
-    assert client.get("/api/v1/alerts", headers=_h(token_b)).json()["data"] == []  # B sees none
-    assert client.delete(f"/api/v1/alerts/{rule_id}", headers=_h(token_b)).status_code == 404
-    assert len(client.get("/api/v1/alerts", headers=_h(token_a)).json()["data"]) == 1  # A intact
+    a_id = client.post("/api/v1/alerts", json=_payload(), headers=_h(token_a)).json()["data"]["id"]
+    b_id = client.post("/api/v1/alerts", json=_payload(), headers=_h(token_b)).json()["data"]["id"]
+    assert a_id != b_id
+
+    a_list = client.get("/api/v1/alerts", headers=_h(token_a)).json()["data"]
+    b_list = client.get("/api/v1/alerts", headers=_h(token_b)).json()["data"]
+    assert [r["id"] for r in a_list] == [a_id]  # A sees ONLY its own
+    assert [r["id"] for r in b_list] == [b_id]  # B sees ONLY its own (never A's)
+
+    # B cannot reach A's rule by id — the DELETE is RLS-scoped, so it matches no row → 404.
+    assert client.delete(f"/api/v1/alerts/{a_id}", headers=_h(token_b)).status_code == 404
+    assert [r["id"] for r in client.get("/api/v1/alerts", headers=_h(token_a)).json()["data"]] == [
+        a_id
+    ]  # A's rule survives B's cross-tenant delete attempt
