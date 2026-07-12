@@ -2,7 +2,7 @@
 baseline_commit: 29bf95f
 ---
 
-Status: review
+Status: done
 
 # QV-048 — evaluate_alerts + deduplication
 

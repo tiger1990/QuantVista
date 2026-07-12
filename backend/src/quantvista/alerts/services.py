@@ -12,10 +12,15 @@ from datetime import date
 
 import structlog
 
+from quantvista.alerts.channels import EmailChannel, InAppChannel
+from quantvista.alerts.email import IEmailSender, get_email_sender
 from quantvista.alerts.evaluation import matches
+from quantvista.alerts.interfaces import DeliveryTarget, INotificationChannel
 from quantvista.alerts.repositories import (
     active_alert_rules,
     insert_alert_event,
+    mark_alert_event,
+    pending_alert_events,
     stock_metrics,
 )
 from quantvista.core.db import privileged_session_scope
@@ -58,3 +63,52 @@ class AlertEvaluationService:
 
         self._log.info("alerts_evaluated", trigger=trigger, cycle=dedup_key, fired=fired)
         return fired
+
+
+class NotificationDeliveryService:
+    """Deliver pending ``alert_events`` (QV-049) via each event's rule channel; per-event status.
+
+    Cross-tenant on the privileged session (like the evaluator). Each event is delivered inside a
+    SAVEPOINT so one failure marks only that event ``failed`` (and rolls back its partial write)
+    without aborting the run — a later run re-attempts ``failed`` events (the retry).
+    """
+
+    def __init__(self, email_sender: IEmailSender | None = None) -> None:
+        # Default to the configured provider (EMAIL_PROVIDER); tests inject a spy/fake.
+        self._email_sender = email_sender or get_email_sender()
+        self._log = structlog.get_logger()
+
+    def deliver_pending(self) -> int:
+        with privileged_session_scope() as session:
+            events = pending_alert_events(session)
+            channels: dict[str, INotificationChannel] = {
+                "in_app": InAppChannel(session),
+                "email": EmailChannel(self._email_sender),
+            }
+            delivered = 0
+            for ev in events:
+                channel = channels.get(ev["channel"])
+                target = DeliveryTarget(
+                    tenant_id=ev["tenant_id"],
+                    user_id=ev["user_id"],
+                    email=ev["email"],
+                    payload=ev["payload"],
+                )
+                try:
+                    if channel is None:
+                        raise ValueError(f"unknown channel {ev['channel']!r}")
+                    with session.begin_nested():  # savepoint → isolate a failed delivery
+                        channel.deliver(target)
+                        mark_alert_event(session, ev["id"], "delivered")
+                    delivered += 1
+                except Exception as exc:
+                    self._log.warning(
+                        "notification_delivery_failed",
+                        event_id=str(ev["id"]),
+                        channel=ev["channel"],
+                        error=str(exc),
+                    )
+                    mark_alert_event(session, ev["id"], "failed")
+
+        self._log.info("notifications_delivered", delivered=delivered, total=len(events))
+        return delivered
