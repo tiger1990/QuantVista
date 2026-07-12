@@ -1,0 +1,39 @@
+DB schema — new table, purely additive
+
+Yes, one new table — no modification to any existing table. scores, fundamentals, etc. stay untouched. This is the safe, standard pattern (a new Alembic migration that only does CREATE TABLE).
+
+Two design facts that fall out of how the codebase already works:
+
+- It's a global table, not tenant-scoped — no tenant_id, no RLS. A price target for RELIANCE is identical for every user (it's research output, like scores). Contrast with alert_rules/portfolios, which are tenant-scoped with RLS. So it mirrors scores, not alerts.
+- Same PIT + versioning + partitioning discipline as scores — append-only (never mutate a past row; a revision is a new row), model_version fingerprint, partitioned by date.
+
+Concretely, modelled directly on your scores table (migration 0006):
+
+CREATE TABLE price_targets (
+    id              bigint GENERATED ALWAYS AS IDENTITY,
+    stock_id        uuid NOT NULL REFERENCES stocks(id),
+    date            date NOT NULL,              -- as-of date (PIT)
+    horizon_months  smallint NOT NULL,          -- 6 / 12 — a stock can have several
+    target_price    numeric(14, 4) NOT NULL,    -- money as Decimal, never float
+    expected_return numeric(7, 4),              -- (target - current)/current
+    rating          text NOT NULL,              -- buy | hold | sell
+    confidence_lo   numeric(14, 4),             -- target RANGE, not false precision
+    confidence_hi   numeric(14, 4),
+    method          text NOT NULL,              -- relative | dcf | ml | blend
+    rationale       jsonb,                       -- the drivers, for the disclosure trail
+    model_version   text NOT NULL,              -- methodology fingerprint (like scores)
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (id, date),
+    UNIQUE (stock_id, date, horizon_months, method)
+) PARTITION BY RANGE (date);
+
+CREATE INDEX ix_price_targets_stock_date ON price_targets (stock_id, date DESC);
+
+Notes on the choices:
+- horizon_months in the key — because 6m and 12m targets coexist on the same date.
+- method in the key — lets you persist a valuation target and an ML target side-by-side for comparison; if you only ever want one canonical row, drop method from the UNIQUE.
+- rationale jsonb — the factor/driver breakdown. This isn't just nice-to-have: for SEBI RA you must be able to show why a rating was issued, so the rationale trail is a compliance artifact, not decoration.
+- confidence_lo/hi — ship a range, never a bare point estimate.
+- Reuse the existing _bootstrap_partitions("price_targets") helper from 0006 — same monthly-range partition machinery.
+
+Serving would be a new price_targets read repo + an API route, exactly parallel to how scores is read today — but that's application code, not schema.
