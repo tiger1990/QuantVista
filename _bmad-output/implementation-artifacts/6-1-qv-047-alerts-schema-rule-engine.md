@@ -2,7 +2,7 @@
 baseline_commit: c2255e6
 ---
 
-Status: review
+Status: done
 
 # QV-047 — Alerts schema + rule engine
 

@@ -109,3 +109,12 @@ class NewsScored(_Event):
     VERSION: ClassVar[int] = 1
     news_batch: str
     count: int
+
+
+@dataclass(frozen=True, slots=True)
+class AlertsFired(_Event):
+    TOPIC: ClassVar[str] = "AlertsFired"
+    VERSION: ClassVar[int] = 1
+    date: str  # the cycle date (dedup key)
+    trigger: str  # 'scores' | 'news'
+    count: int  # new alert_events written

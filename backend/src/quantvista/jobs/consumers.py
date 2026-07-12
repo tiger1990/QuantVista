@@ -19,6 +19,7 @@ import structlog
 
 from quantvista.core.cache import get_cache
 from quantvista.core.interfaces import IEventBus
+from quantvista.jobs.alerts import evaluate_alerts
 from quantvista.jobs.compute import compute_indicators
 from quantvista.jobs.corrections import recompute_on_correction
 from quantvista.jobs.ingest import ingest_daily_prices  # noqa: F401  (task registry side-effect)
@@ -70,6 +71,13 @@ def on_scores_computed(envelope: dict[str, Any]) -> None:
     cache = get_cache()
     cache.delete(f"rank:{market}:{day}", f"score:{market}:{day}")
     cache.delete_pattern("stock:*:detail")
+    evaluate_alerts.delay(day, "scores")  # fresh scores → re-evaluate alert rules (QV-048)
+
+
+def on_news_scored(envelope: dict[str, Any]) -> None:
+    """News sentiment landed → re-evaluate alert rules (QV-048); dedup keeps it from re-spamming."""
+    _log.info("consume_news_scored", batch=envelope["payload"].get("news_batch"))
+    evaluate_alerts.delay(None, "news")  # None → latest completed session as the cycle date
 
 
 def on_news_ingested(envelope: dict[str, Any]) -> None:
@@ -102,5 +110,6 @@ def register_pipeline_consumers(bus: IEventBus) -> None:
     bus.subscribe("IndicatorsComputed", on_indicators_computed)
     bus.subscribe("FactorsComputed", on_factors_computed)
     bus.subscribe("ScoresComputed", on_scores_computed)
+    bus.subscribe("NewsScored", on_news_scored)
     bus.subscribe("NewsIngested", on_news_ingested)
     bus.subscribe("FundamentalsRevised", on_fundamentals_revised)
