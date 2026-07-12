@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-10
+last_updated: 2026-07-13
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -134,8 +134,8 @@ development_status:
   epic-6-retrospective: optional
 
   # ---- Epic 7: Portfolio & Risk (EPIC-PORT) ----
-  epic-7: backlog
-  7-1-qv-051-schema-portfolios-portfolio-positions-rls: backlog
+  epic-7: in-progress
+  7-1-qv-051-schema-portfolios-portfolio-positions-rls: review  # schema already in 0008 (forward-declared, NO migration); DONE: portfolio.repositories (CRUD, RLS) + services.enforce_portfolio_limit (pure guard) + RLS cross-tenant tests. 474 passed, coverage 98%. entitlement key = portfolios (Free1/Pro5/∞)
   7-2-qv-052-portfolio-crud-api: backlog
   7-3-qv-053-constraints-engine: backlog
   7-4-qv-054-mean-variance-optimizer-shrinkage-covariance: backlog
