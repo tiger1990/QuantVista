@@ -173,7 +173,7 @@ def _f(x: Any) -> float | None:
 
 _LIST_STOCKS_SQL = text(
     """
-    SELECT s.symbol, s.company_name, s.sector, s.market_cap_bucket, m.code AS market,
+    SELECT s.id, s.symbol, s.company_name, s.sector, s.market_cap_bucket, m.code AS market,
         (SELECT sc.composite_score FROM scores sc
          WHERE sc.stock_id = s.id ORDER BY sc.date DESC LIMIT 1) AS composite_score,
         (SELECT p.close FROM daily_prices p
@@ -223,6 +223,7 @@ def list_stocks(
     )
     return [
         {
+            "id": str(r["id"]),
             "symbol": r["symbol"],
             "company_name": r["company_name"],
             "sector": r["sector"],

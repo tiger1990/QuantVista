@@ -2,7 +2,7 @@
 baseline_commit: 27361b0
 ---
 
-Status: review
+Status: done
 
 # QV-049 — Notification delivery (in-app + email)
 

@@ -20,6 +20,9 @@ export type FactorContribution = components["schemas"]["FactorContribution"];
 export type ScreenerRow = components["schemas"]["ScreenerRow"];
 export type SavedScreen = components["schemas"]["SavedScreen"];
 export type NewsItem = components["schemas"]["NewsItem"];
+export type AlertRule = components["schemas"]["AlertRule"];
+export type CreateAlertRequest = components["schemas"]["CreateAlertRequest"];
+export type NotificationItem = components["schemas"]["Notification"];
 
 const PAGE_SIZE = 50;
 const SCREENER_PAGE_SIZE = 100;
@@ -217,5 +220,89 @@ export function useDeleteScreen() {
       if (error) throw new Error("Failed to delete the screen.");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["saved-screens"] }),
+  });
+}
+
+// --- Alerts (QV-047 API / QV-050 UI), RLS-scoped to the user's own rules --------------------
+/** The user's alert rules. */
+export function useAlerts() {
+  return useQuery({
+    queryKey: ["alerts"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/alerts");
+      if (error || !data) throw new Error("Failed to load alerts.");
+      return data.data ?? [];
+    },
+  });
+}
+
+export type CreateAlertErrorKind = "limit" | "invalid" | "unknown";
+
+/** Typed create failure so the form can branch: over-cap (403) → upgrade CTA, invalid (422). */
+export class CreateAlertError extends Error {
+  readonly kind: CreateAlertErrorKind;
+  constructor(kind: CreateAlertErrorKind) {
+    super(kind);
+    this.name = "CreateAlertError";
+    this.kind = kind;
+  }
+}
+
+/** Create an alert rule; invalidates the list on success. */
+export function useCreateAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: CreateAlertRequest) => {
+      const { data, error, response } = await api.POST("/api/v1/alerts", { body: vars });
+      if (error || !data) {
+        const kind: CreateAlertErrorKind =
+          response.status === 403 ? "limit" : response.status === 422 ? "invalid" : "unknown";
+        throw new CreateAlertError(kind);
+      }
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["alerts"] }),
+  });
+}
+
+/** Delete an alert rule by id; invalidates the list on success. */
+export function useDeleteAlert() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE("/api/v1/alerts/{rule_id}", {
+        params: { path: { rule_id: id } },
+      });
+      if (error) throw new Error("Failed to delete the alert.");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["alerts"] }),
+  });
+}
+
+// --- Notifications (QV-050): the in-app center feed -----------------------------------------
+/** The user's recent notifications; polled so the bell stays fresh. */
+export function useNotifications() {
+  return useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/notifications", {
+        params: { query: { limit: 20 } },
+      });
+      if (error || !data) throw new Error("Failed to load notifications.");
+      return data.data ?? [];
+    },
+    refetchInterval: 60_000,
+  });
+}
+
+/** Mark all of the user's notifications read; invalidates the feed on success. */
+export function useMarkNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await api.POST("/api/v1/notifications/read", {});
+      if (error) throw new Error("Failed to mark notifications read.");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }

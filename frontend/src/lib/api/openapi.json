@@ -777,6 +777,74 @@
         }
       }
     },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "List Notifications Endpoint",
+        "description": "The current user's recent notifications (newest first).",
+        "operationId": "list_notifications_endpoint_api_v1_notifications_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_Notification__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/read": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark Read Endpoint",
+        "description": "Mark all of the current user's unread notifications read; returns the count updated.",
+        "operationId": "mark_read_endpoint_api_v1_notifications_read_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__int__"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/stocks/{symbol}/news": {
       "get": {
         "tags": [
@@ -927,6 +995,17 @@
             "type": "string",
             "title": "Target Id"
           },
+          "target_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Symbol"
+          },
           "condition": {
             "additionalProperties": true,
             "type": "object",
@@ -950,6 +1029,7 @@
           "id",
           "scope",
           "target_id",
+          "target_symbol",
           "condition",
           "channel",
           "is_active",
@@ -1344,6 +1424,55 @@
         ],
         "title": "Envelope[TokenResponse]"
       },
+      "Envelope_dict_str__int__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[dict[str, int]]"
+      },
       "Envelope_dict_str__str__": {
         "properties": {
           "success": {
@@ -1490,6 +1619,55 @@
           "success"
         ],
         "title": "Envelope[list[NewsItem]]"
+      },
+      "Envelope_list_Notification__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Notification"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "meta": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "Envelope[list[Notification]]"
       },
       "Envelope_list_RankingItem__": {
         "properties": {
@@ -2157,6 +2335,47 @@
         ],
         "title": "NewsItem"
       },
+      "Notification": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "payload",
+          "read_at",
+          "created_at"
+        ],
+        "title": "Notification"
+      },
       "RankingItem": {
         "properties": {
           "rank": {
@@ -2741,6 +2960,10 @@
       },
       "StockListItem": {
         "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
           "symbol": {
             "type": "string",
             "title": "Symbol"
@@ -2800,6 +3023,7 @@
         },
         "type": "object",
         "required": [
+          "id",
           "symbol",
           "company_name",
           "sector",

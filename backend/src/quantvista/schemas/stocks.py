@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 
 class StockListItem(BaseModel):
+    id: str  # stock UUID — the alert-rule target_id (QV-050)
     symbol: str
     company_name: str
     sector: str | None
