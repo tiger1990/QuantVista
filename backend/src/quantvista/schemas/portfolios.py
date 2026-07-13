@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CreatePortfolioRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     benchmark: str = Field(default="NIFTY200_TRI", min_length=1, max_length=40)
-    base_currency: str = Field(default="INR", min_length=3, max_length=3)
+    base_currency: str = Field(default="INR", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
 
 
 class Portfolio(BaseModel):
@@ -36,6 +36,14 @@ class UpsertPositionRequest(BaseModel):
     target_weight: Decimal | None = Field(default=None, ge=0, le=1)
     shares: Decimal | None = Field(default=None, ge=0)
     avg_cost: Decimal | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _require_at_least_one(self) -> UpsertPositionRequest:
+        if all(v is None for v in (self.weight, self.target_weight, self.shares, self.avg_cost)):
+            raise ValueError(
+                "at least one of weight, target_weight, shares, or avg_cost must be set"
+            )
+        return self
 
 
 class Position(BaseModel):

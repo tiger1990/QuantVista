@@ -62,7 +62,9 @@ def _lookup(session: Session, key: str) -> tuple[str, int, dict[str, Any]] | Non
     )
     if row is None:
         return None
-    return (row["request_fingerprint"], row["response_status"], row["response_body"])
+    body = row["response_body"]
+    parsed = json.loads(body) if isinstance(body, str) else body
+    return (row["request_fingerprint"], row["response_status"], parsed)
 
 
 def _store(
