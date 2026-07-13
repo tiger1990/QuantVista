@@ -83,8 +83,10 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
           cache-dependency-path: backend/pyproject.toml
-      - name: Install backend (with dev tooling)
-        run: python -m pip install -e ".[dev]"
+      - name: Install backend (with dev tooling + portfolio solver stack)
+        # [portfolio] (cvxpy/osqp) so the QV-054 optimizer tests run in CI (cp313 wheels on Linux;
+        # not environment-gated like [finbert]).
+        run: python -m pip install -e ".[dev,portfolio]"
       - name: Setup promtool (deterministic alert-rule tests — QV-020)
         run: |
           PROM_VERSION=3.1.0

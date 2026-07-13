@@ -4,7 +4,7 @@ baseline_commit: 0eaf451c3ede8196b97d92029ce915b9e5c58ea4
 
 # Story 7.3: QV-053 — Constraints engine
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 5 · **Depends:** — (none; this is the shared primitive the optimizers build on)
 

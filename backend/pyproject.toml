@@ -33,6 +33,10 @@ dependencies = [
     "exchange-calendars>=4",
     # Technical indicators (QV-025): Polars-vectorized compute (ships py.typed).
     "polars>=1.0",
+    # Numerics (QV-054): the PIT returns-matrix reader (market_data) + covariance estimators
+    # (portfolio) work in numpy float64. Lightweight, typed (py.typed); the heavy *solver* stack
+    # (cvxpy/osqp) stays in the optional `portfolio` extra below.
+    "numpy>=2.0",
     # Macro data (QV-026): certifi CA bundle for FRED TLS (consistent trust store across platforms).
     "certifi>=2024.0",
     # Alert emails (QV-049 enhancement): Jinja2 renders the branded, provider-portable HTML
@@ -70,6 +74,16 @@ kafka = [
 finbert = [
     "torch>=2.2",
     "transformers>=4.40",
+]
+# Portfolio optimizer solver stack (QV-054). CVXPY expresses the convex mean-variance QP; OSQP is
+# the QP backend (Clarabel/SCS ship bundled with cvxpy — no need to list a 2nd backend). Verified
+# installing + solving on macOS 12 x86_64 / py3.13 AND CI-Linux (cp313 wheels; scs builds from
+# source cleanly), so the optimizer is locally testable — unlike [finbert]. The optimize modules
+# (portfolio/optimizer.py) are imported only by the optimize feature; base install stays lean.
+# Install with `pip install -e .[portfolio]`.
+portfolio = [
+    "cvxpy>=1.5",
+    "osqp>=0.6",
 ]
 
 [tool.setuptools.packages.find]
@@ -131,6 +145,14 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["exchange_calendars", "exchange_calendars.*", "pandas", "pandas.*"]
 ignore_missing_imports = true
+
+# CVXPY/OSQP (QV-054) ship no py.typed stubs and are an optional [portfolio] extra. `follow_imports
+# = skip` makes mypy treat them as Any whether or not the extra is installed — so the strict run is
+# identical on the dev box (extra present) and in the backend-quality CI job (extra absent).
+[[tool.mypy.overrides]]
+module = ["cvxpy", "cvxpy.*", "osqp", "osqp.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
 
 # The ingest + quality + universe + ops-metrics Celery tasks use the untyped @app.task decorator.
 [[tool.mypy.overrides]]
