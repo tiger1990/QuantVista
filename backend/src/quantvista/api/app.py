@@ -20,7 +20,7 @@ from quantvista.api.routes_alerts import AlertNotFound
 from quantvista.api.routes_alerts import router as alerts_router
 from quantvista.api.routes_news import router as news_router
 from quantvista.api.routes_notifications import router as notifications_router
-from quantvista.api.routes_portfolios import PortfolioNotFound, PositionNotFound
+from quantvista.api.routes_portfolios import OptimizeError, PortfolioNotFound, PositionNotFound
 from quantvista.api.routes_portfolios import router as portfolios_router
 from quantvista.api.routes_scores import router as scores_router
 from quantvista.api.routes_screener import ScreenerError
@@ -42,6 +42,7 @@ from quantvista.identity.models import (
     InvalidCredentials,
     InvalidRefreshToken,
 )
+from quantvista.portfolio.constraints import InfeasibleConstraints
 from quantvista.portfolio.services import WeightValidationError
 from quantvista.schemas.envelope import ERROR_STATUS, Envelope
 
@@ -125,6 +126,14 @@ def _register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(IdempotencyConflict)
     async def _idem_conflict(_req: Request, _exc: IdempotencyConflict) -> JSONResponse:
         return _fail("conflict", "idempotency key already used with a different request")
+
+    @app.exception_handler(OptimizeError)
+    async def _optimize_bad_request(_req: Request, exc: OptimizeError) -> JSONResponse:
+        return _fail("validation_error", str(exc))
+
+    @app.exception_handler(InfeasibleConstraints)
+    async def _optimize_infeasible(_req: Request, exc: InfeasibleConstraints) -> JSONResponse:
+        return _fail("infeasible", exc.binding.detail)
 
 
 def _register_metrics(app: FastAPI) -> None:

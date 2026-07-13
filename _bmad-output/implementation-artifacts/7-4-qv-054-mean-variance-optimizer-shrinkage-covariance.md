@@ -4,7 +4,7 @@ baseline_commit: 560f6104f18735a7311d21b3de6ba1fb292b6fb6
 
 # Story 7.4: QV-054 — Mean-Variance optimizer (shrinkage covariance)
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 8 · **Depends:** QV-053 (`Constraints`/`check`/`feasibility`/`InfeasibleConstraints` ✓ done), QV-025 (technical indicators / `daily_prices.adj_close` history ✓)
 
