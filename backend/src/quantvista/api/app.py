@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 
 from quantvista.alerts.rules import AlertRuleError
+from quantvista.api.idempotency import IdempotencyConflict
 from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.pagination import InvalidCursor
 from quantvista.api.routes import router as auth_router
@@ -19,6 +20,8 @@ from quantvista.api.routes_alerts import AlertNotFound
 from quantvista.api.routes_alerts import router as alerts_router
 from quantvista.api.routes_news import router as news_router
 from quantvista.api.routes_notifications import router as notifications_router
+from quantvista.api.routes_portfolios import PortfolioNotFound, PositionNotFound
+from quantvista.api.routes_portfolios import router as portfolios_router
 from quantvista.api.routes_scores import router as scores_router
 from quantvista.api.routes_screener import ScreenerError
 from quantvista.api.routes_screener import router as screener_router
@@ -39,6 +42,7 @@ from quantvista.identity.models import (
     InvalidCredentials,
     InvalidRefreshToken,
 )
+from quantvista.portfolio.services import WeightValidationError
 from quantvista.schemas.envelope import ERROR_STATUS, Envelope
 
 health_router = APIRouter(prefix="/api/v1", tags=["health"])
@@ -106,6 +110,22 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _alert_missing(_req: Request, _exc: AlertNotFound) -> JSONResponse:
         return _fail("not_found", "alert rule not found")
 
+    @app.exception_handler(PortfolioNotFound)
+    async def _portfolio_missing(_req: Request, _exc: PortfolioNotFound) -> JSONResponse:
+        return _fail("not_found", "portfolio not found")
+
+    @app.exception_handler(PositionNotFound)
+    async def _position_missing(_req: Request, _exc: PositionNotFound) -> JSONResponse:
+        return _fail("not_found", "position not found")
+
+    @app.exception_handler(WeightValidationError)
+    async def _bad_weights(_req: Request, exc: WeightValidationError) -> JSONResponse:
+        return _fail("validation_error", str(exc))
+
+    @app.exception_handler(IdempotencyConflict)
+    async def _idem_conflict(_req: Request, _exc: IdempotencyConflict) -> JSONResponse:
+        return _fail("conflict", "idempotency key already used with a different request")
+
 
 def _register_metrics(app: FastAPI) -> None:
     """Mount the Prometheus scrape endpoint + RED middleware (ops surface, no envelope)."""
@@ -132,6 +152,7 @@ def create_app() -> FastAPI:
     app.include_router(scores_router)
     app.include_router(screener_router)
     app.include_router(screens_router)
+    app.include_router(portfolios_router)
     app.include_router(alerts_router)
     app.include_router(notifications_router)
     app.include_router(news_router)
