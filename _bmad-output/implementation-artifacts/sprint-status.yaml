@@ -137,7 +137,7 @@ development_status:
   epic-7: in-progress
   7-1-qv-051-schema-portfolios-portfolio-positions-rls: done  # MERGED PR #58. schema already in 0008 (forward-declared, NO migration); portfolio.repositories (CRUD, RLS) + services.enforce_portfolio_limit (pure guard) + RLS cross-tenant tests. 474 passed, coverage 98%. entitlement key = portfolios (Free1/Pro5/∞)
   7-2-qv-052-portfolio-crud-api: done  # merged PR #59; review patches: IntegrityError branch tests, json.loads guard, base_currency ISO pattern, UpsertPositionRequest at-least-one validator. 310 unit tests pass.
-  7-3-qv-053-constraints-engine: backlog
+  7-3-qv-053-constraints-engine: review  # DONE: portfolio/constraints.py — Constraints value object + check()/feasibility() → per-constraint ConstraintReport, deterministic binding constraint on infeasible (US-03), InfeasibleConstraints exc. 49 unit tests, 100% module cov; lint-imports 3/3; 357 passed. NO db/api/migration/dependency (numpy → QV-054).
   7-4-qv-054-mean-variance-optimizer-shrinkage-covariance: backlog
   7-5-qv-055-optimize-api: backlog
   7-6-qv-056-frontend-portfolio-builder-optimization-ui: backlog
