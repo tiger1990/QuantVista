@@ -18,6 +18,7 @@ from quantvista.portfolio.constraints import (
     ConstraintKind,
     ConstraintReport,
     Constraints,
+    ConstraintStatus,
     InfeasibleConstraints,
     check,
     feasibility,
@@ -31,7 +32,7 @@ C = UUID(int=3)
 D = UUID(int=4)
 
 
-def _status(report: ConstraintReport, kind: ConstraintKind):
+def _status(report: ConstraintReport, kind: ConstraintKind) -> ConstraintStatus | None:
     return next((s for s in report.statuses if s.kind == kind), None)
 
 
