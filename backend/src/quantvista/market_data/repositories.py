@@ -104,6 +104,18 @@ def latest_price_date(session: Session) -> date | None:
     return latest
 
 
+_SECTORS_SQL = text("SELECT id, sector FROM stocks WHERE id = ANY(:ids) AND sector IS NOT NULL")
+
+
+def sectors_for(session: Session, stock_ids: Sequence[UUID]) -> dict[UUID, str]:
+    """Map each stock to its ``stocks.sector`` (global table; NULL sectors omitted). For QV-055
+    sector-cap enforcement."""
+    if not stock_ids:
+        return {}
+    rows = session.execute(_SECTORS_SQL, {"ids": list(stock_ids)}).all()
+    return {row[0]: row[1] for row in rows}
+
+
 def upsert_daily_prices(session: Session, stock_id: UUID, bars: Sequence[PriceBar]) -> int:
     """Idempotently upsert OHLCV bars for ``stock_id``; returns the number of bars written."""
     if not bars:
