@@ -6,8 +6,12 @@ Tenant-scoped domain (RLS-enforced). Depends on Analytics (through interfaces).
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from quantvista.market_data.returns import ReturnsMatrix
+    from quantvista.portfolio.optimizer import OptimizationRequest, OptimizationResult
 
 
 @runtime_checkable
@@ -21,10 +25,14 @@ class IPortfolioService(Protocol):
 class IOptimizer(Protocol):
     """Allocation optimizer (Ledoit-Wolf shrinkage covariance).
 
-    Infeasible problems raise/return the binding constraint, never a silent result.
+    Infeasible problems raise ``InfeasibleConstraints`` with the binding constraint — never a
+    silent or degenerate result (US-03). Implemented by ``MeanVarianceOptimizer`` (QV-054);
+    risk-parity / Black-Litterman implementations arrive with later Epic-7 stories.
     """
 
-    def optimize(self, spec: dict[str, Any]) -> dict[UUID, Decimal]: ...
+    def optimize(
+        self, request: OptimizationRequest, returns: ReturnsMatrix
+    ) -> OptimizationResult: ...
 
 
 @runtime_checkable
