@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-13
+last_updated: 2026-07-21
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -140,8 +140,8 @@ development_status:
   7-3-qv-053-constraints-engine: done  # merged PR #60 (560f610). portfolio/constraints.py — Constraints value object + check()/feasibility() → per-constraint ConstraintReport, deterministic binding constraint on infeasible (US-03), InfeasibleConstraints exc. 49 unit tests, 100% module cov; lint-imports 3/3; 357 passed. NO db/api/migration/dependency (numpy → QV-054).
   7-4-qv-054-mean-variance-optimizer-shrinkage-covariance: done  # merged PR #61 (02c525a). CVXPY+OSQP mean-variance optimizer + hand-rolled NumPy Ledoit-Wolf (CovarianceEstimator Protocol) + PIT returns-matrix reader; reuses QV-053 Constraints/check/feasibility, reports binding constraint on infeasible (US-03); Decimal↔float boundary. cvxpy/osqp = optional `portfolio` extra (verified install+solve locally). Full solver framework DEFERRED → deferred-work.md (by end of Epic 7).
   7-5-qv-055-optimize-api: done  # merged PR #62 (9c67d12). POST /portfolios/{id}/optimize wiring QV-054 optimizer: OptimizeConstraints DTO → QV-053 Constraints, PIT returns matrix from current_positions, entitlement (optimization flag) + method/tier gating (mean_variance only; risk_parity=QV-057), InfeasibleConstraints → infeasible 422 + binding, research-not-advice disclaimer. Pure compute (no optimization_runs persist). Reuse-heavy; cvxpy lazy-imported in handler + test importorskip.
-  7-6-qv-056-frontend-portfolio-builder-optimization-ui: review  # DONE: visual portfolio builder + optimize UI on established Next.js FE patterns: regen typed openapi-fetch client (QV-052/055 endpoints), TanStack Query hooks, features/portfolios (list+builder+OptimizePanel+Recharts weights chart), rhf+zod constraints form matching OptimizeConstraints, 403→upgrade CTA + infeasible→binding-constraint msg, disclaimer. Mirrors alerts/screener/compare; no new design language, no hand-written API types. Watch FE CI jobs.
-  7-7-qv-057-risk-parity-optimizer: backlog
+  7-6-qv-056-frontend-portfolio-builder-optimization-ui: done  # merged PR #64 (60d3994). visual portfolio builder + optimize UI on established Next.js FE patterns: regen typed openapi-fetch client (QV-052/055 endpoints), TanStack Query hooks, features/portfolios (list+builder+OptimizePanel+Recharts weights chart), rhf+zod constraints form matching OptimizeConstraints, 403→upgrade CTA + infeasible→binding-constraint msg, disclaimer. Mirrors alerts/screener/compare; no new design language, no hand-written API types. Watch FE CI jobs.
+  7-7-qv-057-risk-parity-optimizer: review
   7-8-qv-058-riskengine-metrics: backlog
   7-9-qv-059-rebalancing-drift-alerts: backlog
   7-10-qv-060-frontend-risk-dashboard-rebalancing-ui: backlog

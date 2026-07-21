@@ -27,7 +27,7 @@ from quantvista.portfolio.constraints import (
 # the extra isn't installed (e.g. the DB-only CI job) — the optimizer's own job installs it.
 pytest.importorskip("cvxpy")
 
-from quantvista.portfolio.optimizer import (  # noqa: E402
+from quantvista.portfolio.optimization import (  # noqa: E402
     MeanVarianceOptimizer,
     Objective,
     OptimizationRequest,
