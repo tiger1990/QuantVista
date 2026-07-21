@@ -191,6 +191,13 @@ class YFinanceDevProvider:
             bar_date = index.date()
             if bar_date > end:  # defensive: never return a bar past the requested end
                 continue
+            close = _dec(row.get("Close"))
+            if close is None:
+                # yfinance often returns the latest/unsettled session with a NaN close (OHLCV
+                # partially populated). Persisting it as a null-close row breaks rankings (which
+                # read `close`) and every adj_close-derived indicator (momentum/risk). Skip the
+                # incomplete bar — the last *settled* session stays the newest usable one.
+                continue
             bars.append(
                 PriceBar(
                     symbol=symbol,
@@ -198,7 +205,7 @@ class YFinanceDevProvider:
                     open=_dec(row.get("Open")),
                     high=_dec(row.get("High")),
                     low=_dec(row.get("Low")),
-                    close=_dec(row.get("Close")),
+                    close=close,
                     adj_close=_dec(row.get("Adj Close")),
                     volume=_int(row.get("Volume")),
                     provenance=prov,

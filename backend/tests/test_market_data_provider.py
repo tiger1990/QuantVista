@@ -82,12 +82,13 @@ def test_get_prices_maps_rows_to_decimal_bars_with_dev_license() -> None:
     provider = _provider(_FakeTicker(history=frame))
     # Act
     bars = provider.get_prices("RELIANCE.NS", date(2026, 6, 1), date(2026, 7, 2))
-    # Assert
-    assert len(bars) == 2
+    # Assert — a NaN-close row (an unsettled/incomplete session, e.g. yfinance's latest bar) is
+    # SKIPPED, not persisted as a null-close row that would break rankings + adj_close indicators.
+    assert len(bars) == 1
     assert bars[0].date == date(2026, 6, 30)
     assert isinstance(bars[0].close, Decimal) and bars[0].close == Decimal("2940.55")
     assert bars[0].volume == 1_200_000  # int, not float
-    assert bars[1].close is None  # NaN → None, no crash
+    assert all(b.date != date(2026, 7, 1) for b in bars)  # the NaN-close bar is dropped
     # AC #4: every datum is hard-stamped as non-commercial dev
     assert all(b.provenance.license_class is LicenseClass.NON_COMMERCIAL_DEV for b in bars)
     assert bars[0].provenance.source == "yfinance"
