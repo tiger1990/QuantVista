@@ -65,6 +65,7 @@ def api(admin_engine: Engine) -> Iterator[dict[str, Any]]:
     client = TestClient(create_app(), base_url="https://testserver")
     email_pro, token_pro = _register(client)
     email_free, token_free = _register(client)
+    email_quant, token_quant = _register(client)
     market = uuid4()
     stocks = [uuid4() for _ in _SECTORS]
     with admin_engine.begin() as conn:
@@ -91,18 +92,26 @@ def api(admin_engine: Engine) -> Iterator[dict[str, Any]]:
             ),
             _price_rows(stocks),
         )
-        # Upgrade the "pro" tenant so it holds the `optimization` entitlement flag.
-        conn.execute(
-            text(
-                "UPDATE subscriptions SET plan_id = (SELECT id FROM plans WHERE code = 'pro') "
-                "WHERE tenant_id IN (SELECT m.tenant_id FROM memberships m "
-                "JOIN users u ON u.id = m.user_id WHERE u.email = :e)"
-            ),
-            {"e": email_pro},
-        )
-    yield {"client": client, "pro": token_pro, "free": token_free, "stocks": stocks}
+        # Upgrade the "pro" tenant (holds `optimization`) and the "quant" tenant (also holds
+        # `optimization_advanced`, so it reaches the BL/HRP not-yet-available branch).
+        for email, plan in ((email_pro, "pro"), (email_quant, "quant")):
+            conn.execute(
+                text(
+                    "UPDATE subscriptions SET plan_id = (SELECT id FROM plans WHERE code = :plan) "
+                    "WHERE tenant_id IN (SELECT m.tenant_id FROM memberships m "
+                    "JOIN users u ON u.id = m.user_id WHERE u.email = :e)"
+                ),
+                {"e": email, "plan": plan},
+            )
+    yield {
+        "client": client,
+        "pro": token_pro,
+        "free": token_free,
+        "quant": token_quant,
+        "stocks": stocks,
+    }
     with admin_engine.begin() as conn:
-        for email in (email_pro, email_free):
+        for email in (email_pro, email_free, email_quant):
             conn.execute(
                 text(
                     "DELETE FROM tenants WHERE id IN (SELECT m.tenant_id FROM memberships m "
@@ -179,12 +188,34 @@ def test_optimize_unknown_portfolio_404(api: dict[str, Any]) -> None:
     assert r.status_code == 404
 
 
-def test_optimize_unimplemented_method_422(api: dict[str, Any]) -> None:
+def test_optimize_risk_parity_returns_weights(api: dict[str, Any]) -> None:
     client, token, stocks = api["client"], api["pro"], api["stocks"]
     pid = _portfolio_with_positions(client, token, stocks)
-    r = _optimize(client, token, pid, method="risk_parity")
+    r = _optimize(client, token, pid, method="risk_parity", constraints={"max_weight": "0.6"})
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert set(data["weights"]) == {str(s) for s in stocks}
+    total = sum(Decimal(w) for w in data["weights"].values())
+    assert abs(total - Decimal(1)) <= Decimal("0.0001")
+    assert r.headers["X-QuantVista-Disclaimer"] == "research-only; not investment advice"
+
+
+def test_optimize_unimplemented_method_422(api: dict[str, Any]) -> None:
+    # A Quant tenant clears the `optimization_advanced` gate but BL/HRP aren't built yet → 422.
+    client, token, stocks = api["client"], api["quant"], api["stocks"]
+    pid = _portfolio_with_positions(client, token, stocks)
+    r = _optimize(client, token, pid, method="hrp")
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "validation_error"
+
+
+def test_optimize_advanced_method_forbidden_for_pro(api: dict[str, Any]) -> None:
+    # Pro holds `optimization` but not `optimization_advanced` → BL/HRP are 403, not 422.
+    client, token, stocks = api["client"], api["pro"], api["stocks"]
+    pid = _portfolio_with_positions(client, token, stocks)
+    r = _optimize(client, token, pid, method="black_litterman")
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "entitlement_exceeded"
 
 
 def test_optimize_empty_portfolio_422(api: dict[str, Any]) -> None:

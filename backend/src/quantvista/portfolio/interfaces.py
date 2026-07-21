@@ -11,7 +11,7 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from quantvista.market_data.returns import ReturnsMatrix
-    from quantvista.portfolio.optimizer import OptimizationRequest, OptimizationResult
+    from quantvista.portfolio.optimization import OptimizationRequest, OptimizationResult
 
 
 @runtime_checkable

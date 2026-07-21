@@ -14,11 +14,17 @@ import {
 } from "@/lib/api/queries";
 
 type Objective = "max_sharpe" | "min_vol" | "target_return";
+type Method = "mean_variance" | "risk_parity";
 
 const OBJECTIVES: { value: Objective; label: string }[] = [
   { value: "max_sharpe", label: "Max Sharpe" },
   { value: "min_vol", label: "Min volatility" },
   { value: "target_return", label: "Target return" },
+];
+
+const METHODS: { value: Method; label: string }[] = [
+  { value: "mean_variance", label: "Mean-variance" },
+  { value: "risk_parity", label: "Risk parity" },
 ];
 
 /** Format a Decimal-string as a percentage for display. */
@@ -40,11 +46,16 @@ export function OptimizePanel({
   hasHoldings: boolean;
   onOptimized: (result: OptimizeResponse | null) => void;
 }) {
+  const [method, setMethod] = useState<Method>("mean_variance");
   const [objective, setObjective] = useState<Objective>("max_sharpe");
   const [maxWeight, setMaxWeight] = useState("");
   const [targetReturn, setTargetReturn] = useState("");
   const [longOnly, setLongOnly] = useState(true);
   const optimize = useOptimize(portfolioId);
+
+  // Risk parity equalizes risk contribution — it has no return target, so the objective and
+  // target-return inputs don't apply and are disabled when it's selected.
+  const isRiskParity = method === "risk_parity";
 
   const err = optimize.error instanceof OptimizeError ? optimize.error : null;
 
@@ -58,16 +69,17 @@ export function OptimizePanel({
     }
     optimize.reset();
     onOptimized(null);
-  }, [objective, maxWeight, targetReturn, longOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [method, objective, maxWeight, targetReturn, longOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = () => {
     const constraints: OptimizeConstraints = { long_only: longOnly };
     if (maxWeight.trim()) constraints.max_weight = maxWeight.trim();
-    if (targetReturn.trim()) constraints.target_return = targetReturn.trim();
+    // Risk parity ignores the return target; only send it for a mean-variance target_return run.
+    if (!isRiskParity && targetReturn.trim()) constraints.target_return = targetReturn.trim();
     optimize.mutate(
       {
-        method: "mean_variance",
-        objective,
+        method,
+        objective, // risk parity ignores this; the request DTO still requires a valid value
         constraints,
         candidate_universe: "current_positions",
         risk_free_rate: "0",
@@ -92,14 +104,35 @@ export function OptimizePanel({
 
   return (
     <div className="space-y-4">
+      <div className="space-y-1">
+        <Label htmlFor="method">Method</Label>
+        <select
+          id="method"
+          value={method}
+          onChange={(e) => setMethod(e.target.value as Method)}
+          className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm sm:w-56"
+        >
+          {METHODS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+        {isRiskParity ? (
+          <p className="text-xs text-muted-foreground">
+            Balances each holding’s risk contribution — no return target.
+          </p>
+        ) : null}
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="space-y-1">
           <Label htmlFor="objective">Objective</Label>
           <select
             id="objective"
             value={objective}
+            disabled={isRiskParity}
             onChange={(e) => setObjective(e.target.value as Objective)}
-            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm"
+            className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm disabled:opacity-50"
           >
             {OBJECTIVES.map((o) => (
               <option key={o.value} value={o.value}>
@@ -126,7 +159,7 @@ export function OptimizePanel({
             value={targetReturn}
             inputMode="decimal"
             placeholder="e.g. 0.15"
-            disabled={objective !== "target_return"}
+            disabled={isRiskParity || objective !== "target_return"}
             onChange={(e) => setTargetReturn(e.target.value)}
             className="h-9"
           />

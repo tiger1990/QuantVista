@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OptimizeError, type OptimizeResponse } from "@/lib/api/queries";
@@ -7,6 +7,7 @@ import { OptimizePanel } from "./OptimizePanel";
 
 type OptimizeState = {
   mutate: ReturnType<typeof vi.fn>;
+  reset: ReturnType<typeof vi.fn>;
   isPending: boolean;
   data: OptimizeResponse | null;
   error: unknown;
@@ -20,7 +21,7 @@ vi.mock("@/lib/api/queries", async () => {
 });
 
 beforeEach(() => {
-  state = { mutate: vi.fn(), isPending: false, data: null, error: null };
+  state = { mutate: vi.fn(), reset: vi.fn(), isPending: false, data: null, error: null };
 });
 
 const RESULT: OptimizeResponse = {
@@ -52,5 +53,25 @@ describe("OptimizePanel", () => {
     render(<OptimizePanel portfolioId="p" canOptimize hasHoldings onOptimized={noop} />);
     expect(screen.getByText(/no feasible allocation/i)).toBeInTheDocument();
     expect(screen.getByText(/sector 'IT' weight 0.90 vs cap 0.30/i)).toBeInTheDocument();
+  });
+
+  it("offers both optimization methods and switching to risk parity disables the objective", () => {
+    render(<OptimizePanel portfolioId="p" canOptimize hasHoldings onOptimized={noop} />);
+    const method = screen.getByLabelText<HTMLSelectElement>("Method");
+    expect([...method.options].map((o) => o.value)).toEqual(["mean_variance", "risk_parity"]);
+    fireEvent.change(method, { target: { value: "risk_parity" } });
+    expect(screen.getByLabelText<HTMLSelectElement>("Objective")).toBeDisabled();
+    expect(screen.getByText(/no return target/i)).toBeInTheDocument();
+  });
+
+  it("runs the selected method (risk parity) without a return target", () => {
+    render(<OptimizePanel portfolioId="p" canOptimize hasHoldings onOptimized={noop} />);
+    fireEvent.change(screen.getByLabelText("Method"), { target: { value: "risk_parity" } });
+    fireEvent.click(screen.getByRole("button", { name: /run optimization/i }));
+    expect(state.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ method: "risk_parity" }),
+      expect.anything(),
+    );
+    expect(state.mutate.mock.calls[0][0].constraints).not.toHaveProperty("target_return");
   });
 });

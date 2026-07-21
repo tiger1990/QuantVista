@@ -58,12 +58,13 @@ router = APIRouter(prefix="/api/v1", tags=["portfolios"])
 
 _CREATE_PATH = "/api/v1/portfolios"
 
-# Optimize (QV-055): endpoint requires the `optimization` flag; BL/HRP additionally need
-# `optimization_advanced`. Only mean_variance is implemented (risk_parity → QV-057). The returns
-# matrix is built over ~2y of PIT history.
+# Optimize (QV-055/QV-057): endpoint requires the `optimization` flag; BL/HRP additionally need
+# `optimization_advanced`. mean_variance (QV-054) and risk_parity (QV-057) are implemented; BL/HRP
+# are not yet available. The returns matrix is built over ~2y of PIT history.
 _OPTIMIZE_KEY = "optimization"
 _ADVANCED_KEY = "optimization_advanced"
 _ADVANCED_METHODS = frozenset({"black_litterman", "hrp"})
+_IMPLEMENTED_METHODS = frozenset({"mean_variance", "risk_parity"})
 _LOOKBACK_DAYS = 730
 _MIN_OBSERVATIONS = 60
 
@@ -246,16 +247,16 @@ def optimize_portfolio_endpoint(
 
     Entitlement-gated (``optimization``; BL/HRP also ``optimization_advanced``), tenant-scoped
     (unknown/foreign portfolio → 404). Builds a PIT returns matrix from the current positions and
-    runs the QV-054 mean-variance optimizer; an infeasible problem surfaces as ``infeasible`` (422)
-    with the binding constraint. cvxpy is imported lazily so ``create_app()`` stays importable
-    without the ``portfolio`` extra.
+    runs the selected optimizer — ``mean_variance`` (QV-054) or ``risk_parity`` (QV-057); an
+    infeasible problem surfaces as ``infeasible`` (422) with the binding constraint. cvxpy is
+    imported lazily so ``create_app()`` stays importable without the ``portfolio`` extra.
     """
     entitlements.check(ctx.tenant_id, _OPTIMIZE_KEY)
     if body.method in _ADVANCED_METHODS:
         entitlements.check(ctx.tenant_id, _ADVANCED_KEY)
     if get_portfolio(session, portfolio_id) is None:  # RLS-invisible / absent → 404
         raise PortfolioNotFound(portfolio_id)
-    if body.method != "mean_variance":  # risk_parity → QV-057; BL/HRP → later
+    if body.method not in _IMPLEMENTED_METHODS:  # BL/HRP → later
         raise OptimizeError(f"method '{body.method}' is not yet available")
 
     stock_ids = [UUID(str(p["stock_id"])) for p in list_positions(session, portfolio_id)]
@@ -271,13 +272,15 @@ def optimize_portfolio_endpoint(
     sector_of = sectors_for(session, stock_ids)
 
     # Lazy import: pulls cvxpy (the optional `portfolio` extra) only when optimize is actually hit.
-    from quantvista.portfolio.optimizer import (
+    from quantvista.portfolio.optimization import (
         MeanVarianceOptimizer,
         Objective,
         OptimizationRequest,
+        RiskParityOptimizer,
     )
 
-    result = MeanVarianceOptimizer().optimize(
+    optimizer = RiskParityOptimizer() if body.method == "risk_parity" else MeanVarianceOptimizer()
+    result = optimizer.optimize(
         OptimizationRequest(
             objective=Objective(body.objective),
             constraints=_to_constraints(body.constraints),

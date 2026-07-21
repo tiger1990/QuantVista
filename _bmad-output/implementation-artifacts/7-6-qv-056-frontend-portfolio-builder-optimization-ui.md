@@ -4,7 +4,7 @@ baseline_commit: 13171ad96c6a92424ecb52eb3427a2f5f861ff21
 
 # Story 7.6: QV-056 — Frontend: Portfolio builder + optimization UI
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 8 · **Depends:** QV-052 (portfolio CRUD API ✓), QV-055 (optimize API ✓), QV-035 (dashboard/stocks FE foundation ✓)
 
