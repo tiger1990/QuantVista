@@ -50,6 +50,7 @@ class Position(BaseModel):
     id: str
     portfolio_id: str
     stock_id: str
+    symbol: str
     weight: Decimal | None
     target_weight: Decimal | None
     shares: Decimal | None

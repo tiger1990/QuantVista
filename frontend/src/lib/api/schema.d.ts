@@ -267,6 +267,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/portfolios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Portfolios Endpoint */
+        get: operations["list_portfolios_endpoint_api_v1_portfolios_get"];
+        put?: never;
+        /**
+         * Create Portfolio Endpoint
+         * @description Create a portfolio (``portfolios`` entitlement enforced; ``Idempotency-Key`` de-duplicated).
+         *
+         *     The limit check lives inside ``_produce`` so a replay returns the original 201 — the created
+         *     portfolio already counts against the quota and must not re-trip the guard.
+         */
+        post: operations["create_portfolio_endpoint_api_v1_portfolios_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Portfolio Endpoint */
+        get: operations["get_portfolio_endpoint_api_v1_portfolios__portfolio_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Portfolio Endpoint */
+        delete: operations["delete_portfolio_endpoint_api_v1_portfolios__portfolio_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/positions/{stock_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upsert Position Endpoint
+         * @description Upsert a position, rejecting a set of target weights that over-allocates the portfolio.
+         */
+        put: operations["upsert_position_endpoint_api_v1_portfolios__portfolio_id__positions__stock_id__put"];
+        post?: never;
+        /** Delete Position Endpoint */
+        delete: operations["delete_position_endpoint_api_v1_portfolios__portfolio_id__positions__stock_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/positions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Positions Endpoint */
+        get: operations["list_positions_endpoint_api_v1_portfolios__portfolio_id__positions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/optimize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Optimize Portfolio Endpoint
+         * @description Optimize a portfolio's allocation (research signal, not advice — US-03/D1).
+         *
+         *     Entitlement-gated (``optimization``; BL/HRP also ``optimization_advanced``), tenant-scoped
+         *     (unknown/foreign portfolio → 404). Builds a PIT returns matrix from the current positions and
+         *     runs the QV-054 mean-variance optimizer; an infeasible problem surfaces as ``infeasible`` (422)
+         *     with the binding constraint. cvxpy is imported lazily so ``create_app()`` stays importable
+         *     without the ``portfolio`` extra.
+         */
+        post: operations["optimize_portfolio_endpoint_api_v1_portfolios__portfolio_id__optimize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/alerts": {
         parameters: {
             query?: never;
@@ -422,6 +528,15 @@ export interface components {
             /** Created At */
             created_at: string;
         };
+        /** ConstraintStatusDTO */
+        ConstraintStatusDTO: {
+            /** Kind */
+            kind: string;
+            /** Satisfied */
+            satisfied: boolean;
+            /** Detail */
+            detail: string;
+        };
         /** CreateAlertRequest */
         CreateAlertRequest: {
             /**
@@ -440,6 +555,21 @@ export interface components {
              * @enum {string}
              */
             channel: "email" | "in_app";
+        };
+        /** CreatePortfolioRequest */
+        CreatePortfolioRequest: {
+            /** Name */
+            name: string;
+            /**
+             * Benchmark
+             * @default NIFTY200_TRI
+             */
+            benchmark: string;
+            /**
+             * Base Currency
+             * @default INR
+             */
+            base_currency: string;
         };
         /** DecompositionResponse */
         DecompositionResponse: {
@@ -481,6 +611,39 @@ export interface components {
             /** Success */
             success: boolean;
             data?: components["schemas"]["MeResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[OptimizeResponse] */
+        Envelope_OptimizeResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["OptimizeResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[Portfolio] */
+        Envelope_Portfolio_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["Portfolio"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[Position] */
+        Envelope_Position_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["Position"] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -589,6 +752,30 @@ export interface components {
             success: boolean;
             /** Data */
             data?: components["schemas"]["Notification"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[Portfolio]] */
+        Envelope_list_Portfolio__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["Portfolio"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[Position]] */
+        Envelope_list_Position__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["Position"][] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -776,6 +963,107 @@ export interface components {
             read_at: string | null;
             /** Created At */
             created_at: string;
+        };
+        /**
+         * OptimizeConstraints
+         * @description Wire form of ``portfolio.Constraints`` (mapped to the domain object in the api layer).
+         */
+        OptimizeConstraints: {
+            /** Max Weight */
+            max_weight?: number | string | null;
+            /** Min Weight */
+            min_weight?: number | string | null;
+            /**
+             * Long Only
+             * @default true
+             */
+            long_only: boolean;
+            /** Sector Caps */
+            sector_caps?: {
+                [key: string]: number | string;
+            };
+            /** Cardinality Min */
+            cardinality_min?: number | null;
+            /** Cardinality Max */
+            cardinality_max?: number | null;
+            /** Target Volatility */
+            target_volatility?: number | string | null;
+            /** Target Return */
+            target_return?: number | string | null;
+            /** Max Turnover */
+            max_turnover?: number | string | null;
+        };
+        /** OptimizeRequest */
+        OptimizeRequest: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "mean_variance" | "risk_parity" | "black_litterman" | "hrp";
+            /**
+             * Objective
+             * @enum {string}
+             */
+            objective: "max_sharpe" | "min_vol" | "target_return";
+            constraints?: components["schemas"]["OptimizeConstraints"];
+            /**
+             * Candidate Universe
+             * @default current_positions
+             * @constant
+             */
+            candidate_universe: "current_positions";
+            /**
+             * Risk Free Rate
+             * @default 0
+             */
+            risk_free_rate: number | string;
+        };
+        /** OptimizeResponse */
+        OptimizeResponse: {
+            /** Weights */
+            weights: {
+                [key: string]: string;
+            };
+            /** Expected Return */
+            expected_return: string;
+            /** Expected Volatility */
+            expected_volatility: string;
+            /** Constraints */
+            constraints: components["schemas"]["ConstraintStatusDTO"][];
+        };
+        /** Portfolio */
+        Portfolio: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Benchmark */
+            benchmark: string;
+            /** Base Currency */
+            base_currency: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** Position */
+        Position: {
+            /** Id */
+            id: string;
+            /** Portfolio Id */
+            portfolio_id: string;
+            /** Stock Id */
+            stock_id: string;
+            /** Symbol */
+            symbol: string;
+            /** Weight */
+            weight: string | null;
+            /** Target Weight */
+            target_weight: string | null;
+            /** Shares */
+            shares: string | null;
+            /** Avg Cost */
+            avg_cost: string | null;
         };
         /** RankingItem */
         RankingItem: {
@@ -965,6 +1253,20 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /**
+         * UpsertPositionRequest
+         * @description ``stock_id`` comes from the path, not the body. All fields optional (partial curation).
+         */
+        UpsertPositionRequest: {
+            /** Weight */
+            weight?: number | string | null;
+            /** Target Weight */
+            target_weight?: number | string | null;
+            /** Shares */
+            shares?: number | string | null;
+            /** Avg Cost */
+            avg_cost?: number | string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1405,6 +1707,253 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_portfolios_endpoint_api_v1_portfolios_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_Portfolio__"];
+                };
+            };
+        };
+    };
+    create_portfolio_endpoint_api_v1_portfolios_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortfolioRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_Portfolio_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_endpoint_api_v1_portfolios__portfolio_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_Portfolio_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_portfolio_endpoint_api_v1_portfolios__portfolio_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_position_endpoint_api_v1_portfolios__portfolio_id__positions__stock_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                stock_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPositionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_Position_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_position_endpoint_api_v1_portfolios__portfolio_id__positions__stock_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+                stock_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_positions_endpoint_api_v1_portfolios__portfolio_id__positions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_Position__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    optimize_portfolio_endpoint_api_v1_portfolios__portfolio_id__optimize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptimizeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_OptimizeResponse_"];
+                };
             };
             /** @description Validation Error */
             422: {

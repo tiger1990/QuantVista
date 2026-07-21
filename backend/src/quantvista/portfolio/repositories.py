@@ -32,6 +32,7 @@ def _position_row(r: Any) -> dict[str, object]:
         "id": str(r["id"]),
         "portfolio_id": str(r["portfolio_id"]),
         "stock_id": str(r["stock_id"]),
+        "symbol": r["symbol"],  # joined from stocks so the UI shows a name, not a raw id
         "weight": r["weight"],  # Decimal | None (numeric)
         "target_weight": r["target_weight"],
         "shares": r["shares"],
@@ -121,6 +122,7 @@ def upsert_position(
     row = (
         session.execute(
             text(
+                "WITH up AS ("
                 "INSERT INTO portfolio_positions "
                 "(tenant_id, portfolio_id, stock_id, weight, target_weight, shares, avg_cost) "
                 "VALUES (:t, :p, :s, :w, :tw, :sh, :ac) "
@@ -128,6 +130,9 @@ def upsert_position(
                 "weight = EXCLUDED.weight, target_weight = EXCLUDED.target_weight, "
                 "shares = EXCLUDED.shares, avg_cost = EXCLUDED.avg_cost "
                 f"RETURNING {_POSITION_COLS}"
+                ") SELECT up.id, up.portfolio_id, up.stock_id, up.weight, up.target_weight, "
+                "up.shares, up.avg_cost, s.symbol "
+                "FROM up JOIN stocks s ON s.id = up.stock_id"
             ),
             {
                 "t": tenant_id,
@@ -150,8 +155,10 @@ def list_positions(session: Session, portfolio_id: UUID) -> list[dict[str, objec
     rows = (
         session.execute(
             text(
-                f"SELECT {_POSITION_COLS} FROM portfolio_positions "
-                "WHERE portfolio_id = :p ORDER BY created_at"
+                "SELECT pp.id, pp.portfolio_id, pp.stock_id, pp.weight, pp.target_weight, "
+                "pp.shares, pp.avg_cost, s.symbol "
+                "FROM portfolio_positions pp JOIN stocks s ON s.id = pp.stock_id "
+                "WHERE pp.portfolio_id = :p ORDER BY pp.created_at"
             ),
             {"p": portfolio_id},
         )

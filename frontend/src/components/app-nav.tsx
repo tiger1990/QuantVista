@@ -23,6 +23,7 @@ const LINKS = [
   { href: "/stocks", label: "Stocks" },
   { href: "/rankings", label: "Rankings" },
   { href: "/screener", label: "Screener" },
+  { href: "/portfolios", label: "Portfolios" },
   { href: "/news", label: "News" },
   { href: "/alerts", label: "Alerts" },
 ];
