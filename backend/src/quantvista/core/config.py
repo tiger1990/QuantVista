@@ -8,6 +8,7 @@ are overridden by env in every real environment.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from functools import lru_cache
 
 from pydantic import Field
@@ -79,6 +80,10 @@ class Settings(BaseSettings):
     # Caching (QV-031): Redis cache-aside for scores/rankings, invalidated on ScoresComputed.
     cache_enabled: bool = True  # false → NullCache (dev/tests with no Redis)
     cache_ttl_seconds: int = 3600  # TTL backstop if an invalidation event is ever missed
+
+    # Risk metrics (QV-058): annualized risk-free rate for Sharpe/Sortino. 0 = excess-over-zero
+    # (a common simplification); a real Treasury-curve provider is future work.
+    risk_free_rate: Decimal = Decimal(0)
 
     # Email delivery (QV-049): plug-and-play provider. `log` = LogEmailSender (dev/CI, no creds).
     # `brevo` = Brevo transactional REST API (300/day free); a later `ses` adds Amazon SES. Only the
