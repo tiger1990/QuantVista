@@ -23,6 +23,13 @@ export type NewsItem = components["schemas"]["NewsItem"];
 export type AlertRule = components["schemas"]["AlertRule"];
 export type CreateAlertRequest = components["schemas"]["CreateAlertRequest"];
 export type NotificationItem = components["schemas"]["Notification"];
+export type Portfolio = components["schemas"]["Portfolio"];
+export type Position = components["schemas"]["Position"];
+export type UpsertPositionRequest = components["schemas"]["UpsertPositionRequest"];
+export type OptimizeRequest = components["schemas"]["OptimizeRequest"];
+export type OptimizeConstraints = components["schemas"]["OptimizeConstraints"];
+export type OptimizeResponse = components["schemas"]["OptimizeResponse"];
+export type ConstraintStatusDTO = components["schemas"]["ConstraintStatusDTO"];
 
 const PAGE_SIZE = 50;
 const SCREENER_PAGE_SIZE = 100;
@@ -304,5 +311,173 @@ export function useMarkNotificationsRead() {
       if (error) throw new Error("Failed to mark notifications read.");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
+  });
+}
+
+// --- Portfolios (QV-052 CRUD / QV-055 optimize), RLS-scoped, entitlement-gated --------------
+
+/** Read the standard envelope's `error.message` off a non-2xx openapi-fetch error body. */
+function envelopeMessage(error: unknown): string | undefined {
+  const err = error as { error?: { message?: string } } | undefined;
+  return err?.error?.message;
+}
+
+/** The tenant's portfolios, newest first. */
+export function usePortfolios() {
+  return useQuery({
+    queryKey: ["portfolios"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/portfolios");
+      if (error || !data) throw new Error("Failed to load portfolios.");
+      return data.data ?? [];
+    },
+  });
+}
+
+/** A single portfolio by id (404 → thrown). */
+export function usePortfolio(id: string) {
+  return useQuery({
+    queryKey: ["portfolio", id],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/portfolios/{portfolio_id}", {
+        params: { path: { portfolio_id: id } },
+      });
+      if (error || !data) throw new Error("Failed to load portfolio.");
+      return data.data;
+    },
+    enabled: Boolean(id),
+  });
+}
+
+export type CreatePortfolioErrorKind = "limit" | "invalid" | "unknown";
+
+/** Typed create failure so the form can branch: over-cap (403) → upgrade CTA, invalid (422). */
+export class CreatePortfolioError extends Error {
+  readonly kind: CreatePortfolioErrorKind;
+  constructor(kind: CreatePortfolioErrorKind) {
+    super(kind);
+    this.name = "CreatePortfolioError";
+    this.kind = kind;
+  }
+}
+
+/** Create a portfolio; invalidates the list on success. */
+export function useCreatePortfolio() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { name: string }) => {
+      const { data, error, response } = await api.POST("/api/v1/portfolios", {
+        body: { name: vars.name, benchmark: "NIFTY200_TRI", base_currency: "INR" },
+      });
+      if (error || !data) {
+        const kind: CreatePortfolioErrorKind =
+          response.status === 403 ? "limit" : response.status === 422 ? "invalid" : "unknown";
+        throw new CreatePortfolioError(kind);
+      }
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["portfolios"] }),
+  });
+}
+
+/** Delete a portfolio by id; invalidates the list on success. */
+export function useDeletePortfolio() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE("/api/v1/portfolios/{portfolio_id}", {
+        params: { path: { portfolio_id: id } },
+      });
+      if (error) throw new Error("Failed to delete the portfolio.");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["portfolios"] }),
+  });
+}
+
+/** The portfolio's positions. */
+export function usePositions(portfolioId: string) {
+  return useQuery({
+    queryKey: ["positions", portfolioId],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/portfolios/{portfolio_id}/positions", {
+        params: { path: { portfolio_id: portfolioId } },
+      });
+      if (error || !data) throw new Error("Failed to load positions.");
+      return data.data ?? [];
+    },
+    enabled: Boolean(portfolioId),
+  });
+}
+
+/** Upsert a position (weight/shares/etc.) under a portfolio; invalidates positions on success. */
+export function useUpsertPosition(portfolioId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: { stockId: string; body: UpsertPositionRequest }) => {
+      const { data, error } = await api.PUT(
+        "/api/v1/portfolios/{portfolio_id}/positions/{stock_id}",
+        { params: { path: { portfolio_id: portfolioId, stock_id: vars.stockId } }, body: vars.body },
+      );
+      if (error || !data) throw new Error("Failed to save the holding.");
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["positions", portfolioId] }),
+  });
+}
+
+/** Remove a holding from a portfolio; invalidates positions on success. */
+export function useDeletePosition(portfolioId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (stockId: string) => {
+      const { error } = await api.DELETE(
+        "/api/v1/portfolios/{portfolio_id}/positions/{stock_id}",
+        { params: { path: { portfolio_id: portfolioId, stock_id: stockId } } },
+      );
+      if (error) throw new Error("Failed to remove the holding.");
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["positions", portfolioId] }),
+  });
+}
+
+export type OptimizeErrorKind = "limit" | "infeasible" | "invalid" | "unknown";
+
+/** Typed optimize failure: 403 → upgrade CTA, `infeasible` (422) carries the binding-constraint
+ * message, other 422 → invalid. */
+export class OptimizeError extends Error {
+  readonly kind: OptimizeErrorKind;
+  readonly detail?: string;
+  constructor(kind: OptimizeErrorKind, detail?: string) {
+    super(detail ?? kind);
+    this.name = "OptimizeError";
+    this.kind = kind;
+    this.detail = detail;
+  }
+}
+
+/** Optimize a portfolio's allocation. Returns weights + metrics + per-constraint status; an
+ * infeasible problem surfaces the binding constraint (US-03), a Free-tier caller gets a 403. */
+export function useOptimize(portfolioId: string) {
+  return useMutation({
+    mutationFn: async (vars: OptimizeRequest) => {
+      const { data, error, response } = await api.POST(
+        "/api/v1/portfolios/{portfolio_id}/optimize",
+        { params: { path: { portfolio_id: portfolioId } }, body: vars },
+      );
+      if (error || !data) {
+        const message = envelopeMessage(error);
+        const code = (error as { error?: { code?: string } } | undefined)?.error?.code;
+        const kind: OptimizeErrorKind =
+          response.status === 403
+            ? "limit"
+            : code === "infeasible"
+              ? "infeasible"
+              : response.status === 422
+                ? "invalid"
+                : "unknown";
+        throw new OptimizeError(kind, message);
+      }
+      return data.data;
+    },
   });
 }
