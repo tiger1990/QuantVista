@@ -4,7 +4,7 @@ baseline_commit: 02c525accb19e9010c6e855b851c6954b93cca9b
 
 # Story 7.5: QV-055 — Optimize API
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 3 · **Depends:** QV-054 (`MeanVarianceOptimizer` + `returns_matrix_as_of` ✓ done), QV-052 (portfolio CRUD + positions ✓ done)
 

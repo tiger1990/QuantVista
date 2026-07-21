@@ -58,8 +58,11 @@ dev = [
 # Internal-only dev data source (QV-012). yfinance/Yahoo is NOT licensed for commercial
 # use — kept OUT of the default/prod install on purpose (project rule #8). The dev adapter
 # lazily imports it; install with `pip install -e .[dev-data]` for a live data pull.
+# Pinned to the validated 1.x major: the old unpinned `>=0.2` silently floated to 1.5.1, whose
+# `history()` still returns Adj Close but stamps the latest/unsettled bar with a NaN close (now
+# skipped in the adapter). `<2` guards against another silent breaking major jump.
 dev-data = [
-    "yfinance>=0.2",
+    "yfinance>=1.5,<2",
 ]
 # Kafka event-bus backend (QV-024). Optional — only needed when event_bus_backend=kafka.
 # kafka-python-ng is pure-Python (no librdkafka C build → installs on macOS 12 + CI Linux).
