@@ -561,6 +561,47 @@ def technical_indicators_as_of(
     return {c: row[c] for c in _TI_COLUMNS} if row is not None else None
 
 
+# --- bulk PIT readers (QV-058 RiskEngine: one query for N holdings, not N+1) ---
+_LATEST_CLOSES_SQL = text(
+    """
+    SELECT DISTINCT ON (stock_id) stock_id, close
+    FROM daily_prices
+    WHERE stock_id = ANY(:ids) AND date <= :as_of
+    ORDER BY stock_id, date DESC
+    """
+)
+
+_LATEST_BETAS_SQL = text(
+    """
+    SELECT DISTINCT ON (stock_id) stock_id, beta_1y
+    FROM technical_indicators
+    WHERE stock_id = ANY(:ids) AND date <= :as_of
+    ORDER BY stock_id, date DESC
+    """
+)
+
+
+def latest_closes(session: Session, stock_ids: Sequence[UUID], as_of: date) -> dict[UUID, Decimal]:
+    """``{stock_id: close}`` — the latest raw ``daily_prices.close`` with ``date <= as_of`` per
+    stock (PIT — no future bar). Names with no price in range are omitted. One query (no N+1)."""
+    if not stock_ids:
+        return {}
+    rows = session.execute(_LATEST_CLOSES_SQL, {"ids": list(stock_ids), "as_of": as_of}).all()
+    return {r.stock_id: r.close for r in rows}
+
+
+def latest_betas(
+    session: Session, stock_ids: Sequence[UUID], as_of: date
+) -> dict[UUID, Decimal | None]:
+    """``{stock_id: beta_1y}`` — the latest ``technical_indicators.beta_1y`` with ``date <= as_of``
+    per stock (PIT). Names with no indicator row in range are omitted; a present row with a NULL
+    ``beta_1y`` maps to ``None``. One query (no N+1)."""
+    if not stock_ids:
+        return {}
+    rows = session.execute(_LATEST_BETAS_SQL, {"ids": list(stock_ids), "as_of": as_of}).all()
+    return {r.stock_id: r.beta_1y for r in rows}
+
+
 # --- stock sectors (QV-029 scoring: sector-relative normalization) ------------
 _STOCK_SECTORS_SQL = text("SELECT id, sector FROM stocks WHERE id = ANY(:ids)")
 

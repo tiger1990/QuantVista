@@ -20,9 +20,15 @@ from sqlalchemy.orm import Session
 from quantvista.api.deps import get_entitlement_service, get_tenant_context, get_tenant_session
 from quantvista.api.idempotency import idempotent
 from quantvista.api.routes_stocks import DISCLAIMER, _with_disclaimer
+from quantvista.core.config import get_settings
 from quantvista.identity.entitlements import EntitlementService
 from quantvista.identity.models import TenantContext
-from quantvista.market_data.repositories import latest_price_date, sectors_for
+from quantvista.market_data.repositories import (
+    latest_betas,
+    latest_closes,
+    latest_price_date,
+    sectors_for,
+)
 from quantvista.market_data.returns import returns_matrix_as_of
 from quantvista.portfolio.constraints import Constraints
 from quantvista.portfolio.repositories import (
@@ -34,7 +40,9 @@ from quantvista.portfolio.repositories import (
     list_portfolios,
     list_positions,
     upsert_position,
+    upsert_risk_snapshot,
 )
+from quantvista.portfolio.risk import RiskEngine
 from quantvista.portfolio.services import (
     PORTFOLIO_LIMIT_KEY,
     enforce_portfolio_limit,
@@ -53,6 +61,7 @@ from quantvista.schemas.portfolios import (
     Position,
     UpsertPositionRequest,
 )
+from quantvista.schemas.risk import BetaCoverageDTO, RiskResponse
 
 router = APIRouter(prefix="/api/v1", tags=["portfolios"])
 
@@ -297,6 +306,78 @@ def optimize_portfolio_endpoint(
             ConstraintStatusDTO(kind=s.kind.value, satisfied=s.satisfied, detail=s.detail)
             for s in result.constraint_report.statuses
         ],
+    ).model_dump()
+    _with_disclaimer(response)
+    return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})
+
+
+@router.get("/portfolios/{portfolio_id}/risk", response_model=Envelope[RiskResponse])
+def portfolio_risk_endpoint(
+    portfolio_id: UUID,
+    response: Response,
+    ctx: TenantContext = Depends(get_tenant_context),
+    session: Session = Depends(get_tenant_session),
+) -> Envelope[dict[str, Any]]:
+    """Portfolio risk metrics (research signal, not advice — US-03/D1).
+
+    Tenant-scoped (unknown/foreign portfolio → 404); available to any authenticated owner (no paid
+    gate — risk is basic portfolio info). Computes beta / annualized vol / max drawdown / Sharpe /
+    Sortino / HHI / sector exposure over a PIT returns matrix on **market-value weights** (target
+    fallback), persists a `risk_snapshots` row (idempotent per as-of date), and returns them as
+    Decimal strings. Numpy-only compute (no cvxpy).
+    """
+    if get_portfolio(session, portfolio_id) is None:  # RLS-invisible / absent → 404
+        raise PortfolioNotFound(portfolio_id)
+    positions = list_positions(session, portfolio_id)
+    if not positions:
+        raise OptimizeError("portfolio has no positions to assess")
+    as_of = latest_price_date(session)
+    if as_of is None:
+        raise OptimizeError("no price data available to assess risk")
+
+    stock_ids = [UUID(str(p["stock_id"])) for p in positions]
+    returns = returns_matrix_as_of(
+        session, stock_ids, as_of, lookback_days=_LOOKBACK_DAYS, min_observations=_MIN_OBSERVATIONS
+    )
+    metrics = RiskEngine().metrics(
+        positions,
+        returns,
+        betas=latest_betas(session, stock_ids, as_of),
+        sectors=sectors_for(session, stock_ids),
+        closes=latest_closes(session, stock_ids, as_of),
+        risk_free_rate=get_settings().risk_free_rate,
+    )
+    upsert_risk_snapshot(
+        session,
+        tenant_id=ctx.tenant_id,
+        portfolio_id=portfolio_id,
+        as_of_date=as_of,
+        beta=metrics.beta,
+        volatility=metrics.volatility,
+        max_drawdown=metrics.max_drawdown,
+        sharpe=metrics.sharpe,
+        sortino=metrics.sortino,
+        hhi=metrics.hhi,
+        sector_exposure=metrics.sector_exposure,
+    )
+
+    def _s(x: Decimal | None) -> str | None:
+        return None if x is None else str(x)
+
+    payload = RiskResponse(
+        as_of_date=as_of.isoformat(),
+        beta=_s(metrics.beta),
+        volatility=_s(metrics.volatility),
+        max_drawdown=_s(metrics.max_drawdown),
+        sharpe=_s(metrics.sharpe),
+        sortino=_s(metrics.sortino),
+        hhi=str(metrics.hhi),
+        sector_exposure={s: str(w) for s, w in metrics.sector_exposure.items()},
+        beta_coverage=BetaCoverageDTO(
+            covered=metrics.beta_coverage.covered,
+            total=metrics.beta_coverage.total,
+            ratio=str(metrics.beta_coverage.ratio),
+        ),
     ).model_dump()
     _with_disclaimer(response)
     return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})

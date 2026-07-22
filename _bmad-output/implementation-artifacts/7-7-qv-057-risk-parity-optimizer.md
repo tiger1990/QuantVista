@@ -4,7 +4,7 @@ baseline_commit: 60d3994055e097243a4515a6d60ba371efaa5dac
 
 # Story 7.7: QV-057 — Risk Parity optimizer
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 5 · **Depends:** QV-053 (`Constraints`/`check`/`feasibility`/`InfeasibleConstraints` ✓), QV-054 (`MeanVarianceOptimizer` + `CovarianceEstimator` + returns matrix ✓ — the pattern to extract from)
 

@@ -9,6 +9,9 @@ returned as `Decimal`, never `float`.
 
 from __future__ import annotations
 
+import json
+from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -177,3 +180,54 @@ def delete_position(session: Session, portfolio_id: UUID, stock_id: UUID) -> boo
         {"p": portfolio_id, "s": stock_id},
     ).first()
     return row is not None
+
+
+# --- risk snapshots (QV-058) --------------------------------------------------
+_UPSERT_RISK_SNAPSHOT_SQL = text(
+    """
+    INSERT INTO risk_snapshots
+        (tenant_id, portfolio_id, as_of_date, beta, volatility, max_drawdown, sharpe, sortino,
+         hhi, sector_exposure)
+    VALUES (:t, :p, :d, :beta, :vol, :dd, :sharpe, :sortino, :hhi, CAST(:sector AS jsonb))
+    ON CONFLICT (portfolio_id, as_of_date) DO UPDATE SET
+        beta = EXCLUDED.beta, volatility = EXCLUDED.volatility,
+        max_drawdown = EXCLUDED.max_drawdown,
+        sharpe = EXCLUDED.sharpe, sortino = EXCLUDED.sortino, hhi = EXCLUDED.hhi,
+        sector_exposure = EXCLUDED.sector_exposure, created_at = now()
+    RETURNING id
+    """
+)
+
+
+def upsert_risk_snapshot(
+    session: Session,
+    *,
+    tenant_id: UUID,
+    portfolio_id: UUID,
+    as_of_date: date,
+    beta: Decimal | None,
+    volatility: Decimal | None,
+    max_drawdown: Decimal | None,
+    sharpe: Decimal | None,
+    sortino: Decimal | None,
+    hhi: Decimal,
+    sector_exposure: dict[str, Decimal],
+) -> str:
+    """Idempotently upsert one `risk_snapshots` row keyed `(portfolio_id, as_of_date)` (RLS-scoped).
+    `sector_exposure` weights are stored as Decimal strings in `jsonb`. Returns the row id."""
+    row = session.execute(
+        _UPSERT_RISK_SNAPSHOT_SQL,
+        {
+            "t": tenant_id,
+            "p": portfolio_id,
+            "d": as_of_date,
+            "beta": beta,
+            "vol": volatility,
+            "dd": max_drawdown,
+            "sharpe": sharpe,
+            "sortino": sortino,
+            "hhi": hhi,
+            "sector": json.dumps({s: str(w) for s, w in sector_exposure.items()}),
+        },
+    ).one()
+    return str(row.id)
