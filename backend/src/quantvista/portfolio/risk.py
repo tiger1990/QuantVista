@@ -57,7 +57,7 @@ class RiskMetrics:
     beta_coverage: BetaCoverage
 
 
-def _weights(
+def compute_portfolio_weights(
     positions: list[dict[str, object]], closes: dict[UUID, Decimal]
 ) -> dict[UUID, Decimal]:
     """Market-value weights (`shares·close`), normalized. Fall back to ``target_weight`` only when
@@ -102,7 +102,7 @@ class RiskEngine:
         *,
         risk_free_rate: Decimal = Decimal(0),
     ) -> RiskMetrics:
-        weights = _weights(positions, closes)
+        weights = compute_portfolio_weights(positions, closes)
         assert abs(sum(weights.values(), Decimal(0)) - Decimal(1)) <= WEIGHT_SUM_EPSILON
 
         hhi = _q(sum((w * w for w in weights.values()), Decimal(0)))
@@ -186,4 +186,4 @@ class RiskEngine:
         }
 
 
-__all__ = ["BetaCoverage", "RiskEngine", "RiskMetrics"]
+__all__ = ["BetaCoverage", "RiskEngine", "RiskMetrics", "compute_portfolio_weights"]

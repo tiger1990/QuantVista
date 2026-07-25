@@ -4,7 +4,7 @@ baseline_commit: 9cef731273559799b1fbda7bc078155295dc141b
 
 # Story 7.8: QV-058 — RiskEngine metrics
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 8 · **Depends:** QV-025 (`technical_indicators` incl. `beta_1y` + PIT reader ✓), QV-051 (`portfolios`/`portfolio_positions` + `risk_snapshots` table ✓)
 
