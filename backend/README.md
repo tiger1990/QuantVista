@@ -95,7 +95,7 @@ function resolves it and **RLS policies filter every query to that tenant**. The
 ```python
 from quantvista.core.db import session_scope
 
-with session_scope(tenant_id) as s:        # sees only this tenant's rows
+with session_scope(tenant_id) as s:  # sees only this tenant's rows
     s.execute(text("SELECT * FROM watchlists"))
 ```
 
@@ -149,6 +149,7 @@ session as the unit of work. Dependencies live in `quantvista.api.deps`:
 
 ```python
 from quantvista.api.deps import TenantSessionDep, require_entitlement
+
 
 @router.get("/things", dependencies=[require_entitlement("backtest")])
 def list_things(session: Session = TenantSessionDep) -> Envelope[...]:
