@@ -8,6 +8,7 @@ in weight basis (degenerate guard from QV-058 compute_portfolio_weights).
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from quantvista.portfolio.rebalance import (
@@ -30,7 +31,7 @@ def _pos(
     shares: dict[UUID, str] | None = None,
     target: dict[UUID, str] | None = None,
     ids: tuple[UUID, ...] = (_A, _B),
-) -> list[dict[str, object]]:
+) -> list[dict[str, Any]]:
     out = []
     for sid in ids:
         out.append(

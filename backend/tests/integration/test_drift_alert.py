@@ -58,10 +58,12 @@ def _create_rule(client: TestClient, token: str, portfolio_id: UUID, threshold: 
 
 def _event_count(engine: Engine, rule_id: str) -> int:
     with engine.connect() as conn:
-        return conn.execute(
-            text("SELECT count(*) FROM alert_events WHERE alert_rule_id = :r"),
-            {"r": rule_id},
-        ).scalar_one()
+        return int(
+            conn.execute(
+                text("SELECT count(*) FROM alert_events WHERE alert_rule_id = :r"),
+                {"r": rule_id},
+            ).scalar_one()
+        )
 
 
 @pytest.fixture
