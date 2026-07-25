@@ -21,6 +21,7 @@ from quantvista.alerts.repositories import (
     insert_alert_event,
     mark_alert_event,
     pending_alert_events,
+    portfolio_drift_metrics,
     stock_metrics,
 )
 from quantvista.core.db import privileged_session_scope
@@ -36,13 +37,23 @@ class AlertEvaluationService:
         """Fire matching rules for the ``as_of`` cycle; returns the count of NEW events."""
         dedup_key = as_of.isoformat()
         with privileged_session_scope() as session:
-            rules = [r for r in active_alert_rules(session) if r["scope"] == "stock"]
-            metrics = stock_metrics(session, [r["target_id"] for r in rules])
+            all_rules = active_alert_rules(session)
+            stock_rules = [r for r in all_rules if r["scope"] == "stock"]
+            portfolio_rules = [r for r in all_rules if r["scope"] == "portfolio"]
+
+            # Stock-scope: look up latest score/fundamentals per stock
+            stock_met = stock_metrics(session, [r["target_id"] for r in stock_rules])
+
+            # Portfolio-scope: compute drift per portfolio (drift only metric for now)
+            portfolio_drift = portfolio_drift_metrics(
+                session, [r["target_id"] for r in portfolio_rules], as_of
+            )
 
             fired = 0
-            for rule in rules:
+
+            for rule in stock_rules:
                 cond = rule["condition"]
-                value = metrics.get(rule["target_id"], {}).get(cond["metric"])
+                value = stock_met.get(rule["target_id"], {}).get(cond["metric"])
                 if not matches(value, cond["op"], float(cond["value"])):
                     continue
                 payload = {
@@ -50,6 +61,31 @@ class AlertEvaluationService:
                     "symbol": rule.get("target_symbol"),
                     "company_name": rule.get("company_name"),
                     "metric": cond["metric"],
+                    "op": cond["op"],
+                    "threshold": cond["value"],
+                    "value": value,
+                    "trigger": trigger,
+                }
+                if insert_alert_event(
+                    session,
+                    tenant_id=rule["tenant_id"],
+                    alert_rule_id=rule["id"],
+                    dedup_key=dedup_key,
+                    payload=payload,
+                ):
+                    fired += 1
+
+            for rule in portfolio_rules:
+                cond = rule["condition"]
+                if cond["metric"] != "drift":
+                    continue  # future portfolio metrics go here
+                value = portfolio_drift.get(rule["target_id"])
+                if not matches(value, cond["op"], float(cond["value"])):
+                    continue
+                payload = {
+                    "type": "drift_alert",
+                    "portfolio_id": str(rule["target_id"]),
+                    "metric": "drift",
                     "op": cond["op"],
                     "threshold": cond["value"],
                     "value": value,

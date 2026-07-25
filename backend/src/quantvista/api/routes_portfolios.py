@@ -61,6 +61,7 @@ from quantvista.schemas.portfolios import (
     Position,
     UpsertPositionRequest,
 )
+from quantvista.schemas.rebalance import RebalanceRequest, RebalanceResponse, TradeSuggestionDTO
 from quantvista.schemas.risk import BetaCoverageDTO, RiskResponse
 
 router = APIRouter(prefix="/api/v1", tags=["portfolios"])
@@ -378,6 +379,61 @@ def portfolio_risk_endpoint(
             total=metrics.beta_coverage.total,
             ratio=str(metrics.beta_coverage.ratio),
         ),
+    ).model_dump()
+    _with_disclaimer(response)
+    return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})
+
+
+@router.post("/portfolios/{portfolio_id}/rebalance", response_model=Envelope[RebalanceResponse])
+def rebalance_portfolio_endpoint(
+    portfolio_id: UUID,
+    body: RebalanceRequest,
+    response: Response,
+    _ctx: TenantContext = Depends(get_tenant_context),
+    session: Session = Depends(get_tenant_session),
+) -> Envelope[dict[str, Any]]:
+    """Suggest rebalancing trades to return a portfolio to its target weights (research only).
+
+    No entitlement gate — rebalancing is basic portfolio tooling available to all owners.
+    Tenant-scoped (unknown/foreign portfolio → 404). Raises 422 when the portfolio has no
+    positions or none have target weights (run /optimize first to get suggested targets).
+    All weight fields are Decimal-as-string on the wire; no float.
+    """
+    if get_portfolio(session, portfolio_id) is None:
+        raise PortfolioNotFound(portfolio_id)
+    positions = list_positions(session, portfolio_id)
+    if not positions:
+        raise OptimizeError("portfolio has no positions to rebalance")
+    as_of = latest_price_date(session)
+    if as_of is None:
+        raise OptimizeError("no price data available to rebalance")
+
+    stock_ids = [UUID(str(p["stock_id"])) for p in positions]
+    closes = latest_closes(session, stock_ids, as_of)
+
+    from quantvista.portfolio.rebalance import RebalanceEngine
+
+    plan = RebalanceEngine().suggest(
+        positions, closes, as_of.isoformat(), drift_threshold=body.drift_threshold
+    )
+    if plan is None:
+        raise OptimizeError("no target weights set; run /optimize first to get suggested targets")
+
+    payload = RebalanceResponse(
+        as_of_date=plan.as_of_date,
+        total_drift=str(plan.total_drift),
+        needs_rebalance=plan.needs_rebalance,
+        trades=[
+            TradeSuggestionDTO(
+                stock_id=str(t.stock_id),
+                symbol=t.symbol,
+                direction=t.direction,
+                current_weight=str(t.current_weight),
+                target_weight=str(t.target_weight),
+                delta_weight=str(t.delta_weight),
+            )
+            for t in plan.trades
+        ],
     ).model_dump()
     _with_disclaimer(response)
     return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})

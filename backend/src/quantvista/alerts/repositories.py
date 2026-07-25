@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -181,6 +183,71 @@ _INSERT_EVENT_SQL = text(
     RETURNING id
     """
 )
+
+
+_PORTFOLIO_POSITIONS_SQL = text(
+    """
+    SELECT pp.portfolio_id, pp.stock_id, pp.shares, pp.target_weight, dp.close
+    FROM portfolio_positions pp
+    LEFT JOIN LATERAL (
+        SELECT close FROM daily_prices
+        WHERE stock_id = pp.stock_id AND date <= :as_of
+        ORDER BY date DESC LIMIT 1
+    ) dp ON true
+    WHERE pp.portfolio_id = ANY(:pids)
+    """  # noqa: S608 - static table/column names, params bound
+)
+
+
+def portfolio_drift_metrics(
+    session: Session, portfolio_ids: Sequence[UUID], as_of: date
+) -> dict[UUID, float | None]:
+    """Total-variation drift for each portfolio (QV-059), as floats for alert evaluation.
+
+    Uses a LATERAL PIT join to fetch the latest close on or before ``as_of`` for every
+    position. Imports ``portfolio_total_drift`` (alerts → portfolio, DAG-legal). Returns
+    ``None`` per portfolio when it has no positions with ``target_weight`` set.
+    """
+    if not portfolio_ids:
+        return {}
+
+    from quantvista.portfolio.rebalance import portfolio_total_drift
+
+    rows = (
+        session.execute(_PORTFOLIO_POSITIONS_SQL, {"pids": list(portfolio_ids), "as_of": as_of})
+        .mappings()
+        .all()
+    )
+
+    # Group rows by portfolio
+    from collections import defaultdict
+
+    positions_by_pid: dict[UUID, list[dict[str, object]]] = defaultdict(list)
+    for r in rows:
+        pid = UUID(str(r["portfolio_id"]))
+        positions_by_pid[pid].append(
+            {
+                "stock_id": str(r["stock_id"]),
+                "shares": r["shares"],
+                "target_weight": r["target_weight"],
+            }
+        )
+
+    # Build closes dict per portfolio and compute drift
+    result: dict[UUID, float | None] = {}
+    for pid in portfolio_ids:
+        pos_rows = positions_by_pid.get(pid, [])
+
+        # Re-fetch closes per portfolio to pass correct dict
+        closes: dict[UUID, Decimal] = {}
+        for r in rows:
+            if UUID(str(r["portfolio_id"])) == pid and r["close"] is not None:
+                closes[UUID(str(r["stock_id"]))] = Decimal(str(r["close"]))
+
+        drift = portfolio_total_drift(pos_rows, closes) if pos_rows else None
+        result[pid] = float(drift) if drift is not None else None
+
+    return result
 
 
 def insert_alert_event(

@@ -27,6 +27,7 @@ METRICS: frozenset[str] = frozenset(
         "roe",
         "roce",
         "debt_equity",
+        "drift",  # portfolio-scope only (QV-059)
     }
 )
 OPS: frozenset[str] = frozenset({"gte", "lte", "gt", "lt", "eq"})

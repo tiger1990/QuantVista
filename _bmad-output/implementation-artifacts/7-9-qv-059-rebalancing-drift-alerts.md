@@ -1,10 +1,10 @@
 ---
-baseline_commit:
+baseline_commit: 64d26c5e8b7fe9f7a93d0a1a480324cb21d4fca8
 ---
 
 # Story 7.9: QV-059 — Rebalancing + drift alerts
 
-Status: ready-for-dev
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 5 · **Depends:** QV-058 (RiskEngine + `compute_portfolio_weights`), QV-048 (alert evaluation + `insert_alert_event`)
 
@@ -47,29 +47,29 @@ As a user, I want suggested trades to reach target weights and drift alerts, so 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: `portfolio/rebalance.py` — `RebalanceEngine` + `portfolio_total_drift`
-  - [ ] 1a. Rename `_weights` → `compute_portfolio_weights` (public) in `portfolio/risk.py`; update the one call site in `RiskEngine.metrics`
-  - [ ] 1b. Create `backend/src/quantvista/portfolio/rebalance.py` with `TradeSuggestion`, `RebalancePlan`, `RebalanceEngine.suggest`, `portfolio_total_drift`
-  - [ ] 1c. Unit tests `backend/tests/test_rebalance_engine.py` (RED→GREEN)
-  - [ ] 1d. Run: `pytest tests/test_rebalance_engine.py tests/test_risk_engine.py -x` — risk tests must still pass after rename
+- [x] Task 1: `portfolio/rebalance.py` — `RebalanceEngine` + `portfolio_total_drift`
+  - [x] 1a. Rename `_weights` → `compute_portfolio_weights` (public) in `portfolio/risk.py`; update the one call site in `RiskEngine.metrics`
+  - [x] 1b. Create `backend/src/quantvista/portfolio/rebalance.py` with `TradeSuggestion`, `RebalancePlan`, `RebalanceEngine.suggest`, `portfolio_total_drift`
+  - [x] 1c. Unit tests `backend/tests/test_rebalance_engine.py` (RED→GREEN)
+  - [x] 1d. Run: `pytest tests/test_rebalance_engine.py tests/test_risk_engine.py -x` — risk tests must still pass after rename
 
-- [ ] Task 2: `schemas/rebalance.py` + `POST /portfolios/{id}/rebalance`
-  - [ ] 2a. Create `backend/src/quantvista/schemas/rebalance.py` — `RebalanceRequest`, `TradeSuggestionDTO`, `RebalanceResponse`
-  - [ ] 2b. Add endpoint to `api/routes_portfolios.py` (same file as existing portfolio endpoints)
-  - [ ] 2c. Integration tests `backend/tests/integration/test_api_rebalance.py` (RED→GREEN)
+- [x] Task 2: `schemas/rebalance.py` + `POST /portfolios/{id}/rebalance`
+  - [x] 2a. Create `backend/src/quantvista/schemas/rebalance.py` — `RebalanceRequest`, `TradeSuggestionDTO`, `RebalanceResponse`
+  - [x] 2b. Add endpoint to `api/routes_portfolios.py` (same file as existing portfolio endpoints)
+  - [x] 2c. Integration tests `backend/tests/integration/test_api_rebalance.py` (RED→GREEN)
 
-- [ ] Task 3: Drift alert type — allow-list + evaluator extension
-  - [ ] 3a. Add `"drift"` to `METRICS` frozenset in `alerts/rules.py`
-  - [ ] 3b. Add `portfolio_drift_metrics(session, portfolio_ids, as_of)` to `alerts/repositories.py` (SQL + `portfolio_total_drift` call)
-  - [ ] 3c. Extend `AlertEvaluationService.evaluate` in `alerts/services.py` to handle portfolio-scope rules
-  - [ ] 3d. Integration tests for drift alert evaluation (RED→GREEN)
+- [x] Task 3: Drift alert type — allow-list + evaluator extension
+  - [x] 3a. Add `"drift"` to `METRICS` frozenset in `alerts/rules.py`
+  - [x] 3b. Add `portfolio_drift_metrics(session, portfolio_ids, as_of)` to `alerts/repositories.py` (SQL + `portfolio_total_drift` call)
+  - [x] 3c. Extend `AlertEvaluationService.evaluate` in `alerts/services.py` to handle portfolio-scope rules
+  - [x] 3d. Integration tests for drift alert evaluation (RED→GREEN)
 
-- [ ] Task 4: Full-tree gates
-  - [ ] 4a. `ruff check . && ruff format --check .`
-  - [ ] 4b. `mypy src/quantvista --ignore-missing-imports`
-  - [ ] 4c. `lint-imports`
-  - [ ] 4d. `pytest tests/ -x --ignore=tests/integration -q` (full unit suite)
-  - [ ] 4e. `pytest tests/integration/ -x -q -m integration` (full integration suite)
+- [x] Task 4: Full-tree gates
+  - [x] 4a. `ruff check . && ruff format --check .`
+  - [x] 4b. `mypy src/quantvista --ignore-missing-imports`
+  - [x] 4c. `lint-imports`
+  - [x] 4d. `pytest tests/ -x --ignore=tests/integration -q` (full unit suite)
+  - [x] 4e. `pytest tests/integration/ -x -q -m integration` (full integration suite)
 
 ## Dev Notes
 
