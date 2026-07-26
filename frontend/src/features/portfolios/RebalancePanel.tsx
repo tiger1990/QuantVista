@@ -14,7 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RebalanceError, useApplyTargets, useRebalance } from "@/lib/api/queries";
+import {
+  RebalanceError,
+  type RebalanceResponse,
+  useApplyTargets,
+  useRebalance,
+} from "@/lib/api/queries";
 import { fmtPct } from "@/lib/risk";
 import { cn } from "@/lib/utils";
 
@@ -28,13 +33,25 @@ export function RebalancePanel({
   hasHoldings: boolean;
 }) {
   const [threshold, setThreshold] = useState("0.05");
+  // Hold the last plan in local state so a re-check UPDATES the result card in place instead of
+  // unmounting it (the mutation resets `data` to undefined while pending → the card would collapse
+  // and remount, flickering the page as its height toggles the scrollbar).
+  const [plan, setPlan] = useState<RebalanceResponse | null>(null);
+  const [err, setErr] = useState<RebalanceError | null>(null);
   const rebalance = useRebalance(portfolioId);
   const applyTargets = useApplyTargets(portfolioId);
 
-  const plan = rebalance.data;
-  const err = rebalance.error instanceof RebalanceError ? rebalance.error : null;
-
-  const check = () => rebalance.mutate(threshold.trim() || "0.05");
+  const check = () =>
+    rebalance.mutate(threshold.trim() || "0.05", {
+      onSuccess: (data) => {
+        setPlan(data);
+        setErr(null);
+      },
+      onError: (e) => {
+        setPlan(null);
+        setErr(e instanceof RebalanceError ? e : new RebalanceError("unknown"));
+      },
+    });
 
   const apply = () => {
     if (!plan || plan.trades.length === 0) return;

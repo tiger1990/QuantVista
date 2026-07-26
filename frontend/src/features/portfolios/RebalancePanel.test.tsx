@@ -51,17 +51,26 @@ beforeEach(() => {
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
+const clickCheck = () =>
+  fireEvent.click(screen.getByRole("button", { name: /check drift/i }));
+
 describe("RebalancePanel", () => {
   it("prompts to set targets on a no_targets (422) result", () => {
-    rebalance.error = new RebalanceError("no_targets");
+    rebalance.mutate.mockImplementation((_t: string, opts?: { onError?: (e: unknown) => void }) =>
+      opts?.onError?.(new RebalanceError("no_targets")),
+    );
     render(<RebalancePanel portfolioId="p" hasHoldings />);
+    clickCheck();
     expect(screen.getByText(/no target weights set/i)).toBeInTheDocument();
     expect(screen.getByText(/run an optimization and set targets/i)).toBeInTheDocument();
   });
 
   it("renders trades with buy/sell tone and drift", () => {
-    rebalance.data = PLAN;
+    rebalance.mutate.mockImplementation(
+      (_t: string, opts?: { onSuccess?: (d: RebalanceResponse) => void }) => opts?.onSuccess?.(PLAN),
+    );
     render(<RebalancePanel portfolioId="p" hasHoldings />);
+    clickCheck();
     expect(screen.getAllByText("25.00%").length).toBeGreaterThan(0); // drift + weights
     expect(screen.getByText(/rebalance suggested/i)).toBeInTheDocument();
     expect(screen.getByText("buy")).toBeInTheDocument();
@@ -69,8 +78,11 @@ describe("RebalancePanel", () => {
   });
 
   it("applies one PUT per trade with the suggested target_weight", () => {
-    rebalance.data = PLAN;
+    rebalance.mutate.mockImplementation(
+      (_t: string, opts?: { onSuccess?: (d: RebalanceResponse) => void }) => opts?.onSuccess?.(PLAN),
+    );
     render(<RebalancePanel portfolioId="p" hasHoldings />);
+    clickCheck();
     fireEvent.click(screen.getByRole("button", { name: /apply targets/i }));
     expect(apply.mutate).toHaveBeenCalledWith([
       { stock_id: "s1", target_weight: "0.50" },
@@ -81,7 +93,7 @@ describe("RebalancePanel", () => {
   it("checks drift with the entered threshold", () => {
     render(<RebalancePanel portfolioId="p" hasHoldings />);
     fireEvent.change(screen.getByLabelText(/drift threshold/i), { target: { value: "0.1" } });
-    fireEvent.click(screen.getByRole("button", { name: /check drift/i }));
-    expect(rebalance.mutate).toHaveBeenCalledWith("0.1");
+    clickCheck();
+    expect(rebalance.mutate).toHaveBeenCalledWith("0.1", expect.anything());
   });
 });
