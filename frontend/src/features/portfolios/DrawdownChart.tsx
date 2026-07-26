@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Area,
   AreaChart,
@@ -13,8 +14,13 @@ import {
 import type { DrawdownPointDTO } from "@/lib/api/queries";
 import { drawdownChartData } from "@/lib/risk";
 
-/** Drawdown-over-time: the portfolio's decline from its running equity peak (%, ≤ 0). */
-export function DrawdownChart({ series }: { series: DrawdownPointDTO[] }) {
+/** Drawdown-over-time: the portfolio's decline from its running equity peak (%, ≤ 0). Memoized so a
+ * sibling update (e.g. a rebalance check) can't re-render/re-flash it (`series` ref is stable). */
+export const DrawdownChart = memo(function DrawdownChart({
+  series,
+}: {
+  series: DrawdownPointDTO[];
+}) {
   const data = drawdownChartData(series);
   if (data.length < 2) {
     return <p className="text-sm text-muted-foreground">Not enough history for a drawdown chart.</p>;
@@ -60,9 +66,10 @@ export function DrawdownChart({ series }: { series: DrawdownPointDTO[] }) {
             stroke="var(--color-destructive)"
             fill="url(#drawdownFill)"
             strokeWidth={1.5}
+            isAnimationActive={false}
           />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   );
-}
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Bar,
   BarChart,
@@ -12,16 +13,22 @@ import {
 
 import { sectorChartData } from "@/lib/risk";
 
-/** Portfolio weight by sector (%), sorted descending. */
-export function SectorExposureChart({ exposure }: { exposure: Record<string, string> }) {
+/** Portfolio weight by sector (%), sorted descending. Memoized: the `exposure` prop is
+ * referentially stable across parent re-renders (TanStack Query structural sharing), so a sibling
+ * update (e.g. a rebalance check) won't re-render/re-flash this chart. */
+export const SectorExposureChart = memo(function SectorExposureChart({
+  exposure,
+}: {
+  exposure: Record<string, string>;
+}) {
   const data = sectorChartData(exposure);
   if (data.length === 0) {
     return <p className="text-sm text-muted-foreground">No sector exposure.</p>;
   }
   return (
-    <div className="h-56 w-full" aria-label="Portfolio weight by sector">
+    <div className="h-72 w-full" aria-label="Portfolio weight by sector">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: -8 }}>
+        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 24, left: -8 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
           <XAxis
             dataKey="sector"
@@ -29,7 +36,8 @@ export function SectorExposureChart({ exposure }: { exposure: Record<string, str
             interval={0}
             angle={-30}
             textAnchor="end"
-            height={50}
+            height={72}
+            tickMargin={8}
           />
           <YAxis tick={{ fontSize: 11, fill: "var(--color-muted-foreground)" }} unit="%" width={44} />
           <Tooltip
@@ -45,9 +53,15 @@ export function SectorExposureChart({ exposure }: { exposure: Record<string, str
             itemStyle={{ color: "var(--color-popover-foreground)" }}
             formatter={(v) => `${v}%`}
           />
-          <Bar dataKey="pct" name="Weight" fill="var(--color-primary)" radius={[2, 2, 0, 0]} />
+          <Bar
+            dataKey="pct"
+            name="Weight"
+            fill="var(--color-primary)"
+            radius={[2, 2, 0, 0]}
+            isAnimationActive={false}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
   );
-}
+});
