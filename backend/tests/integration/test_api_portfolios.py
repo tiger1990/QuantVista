@@ -120,6 +120,20 @@ def test_positions_upsert_list_delete(api: tuple[TestClient, str, str, UUID]) ->
     assert client.get(f"/api/v1/portfolios/{pid}/positions", headers=_h(token)).json()["data"] == []
 
 
+def test_partial_upsert_preserves_other_fields(api: tuple[TestClient, str, str, UUID]) -> None:
+    """Editing shares alone must NOT wipe target_weight (needed for a meaningful drift)."""
+    client, token, _, stock = api
+    pid = _create(client, token).json()["data"]["id"]
+    url = f"/api/v1/portfolios/{pid}/positions/{stock}"
+
+    client.put(url, json={"target_weight": "0.5"}, headers=_h(token))
+    # A later partial update that only sets shares must keep the target_weight.
+    r = client.put(url, json={"shares": "10"}, headers=_h(token))
+    data = r.json()["data"]
+    assert data["shares"] == "10.000000"
+    assert data["target_weight"] == "0.500000"  # preserved, not wiped to null
+
+
 def test_weight_over_one_rejected(api: tuple[TestClient, str, str, UUID]) -> None:
     client, token, _, stock = api
     pid = _create(client, token).json()["data"]["id"]
