@@ -7,6 +7,9 @@ import { type OptimizeResponse, usePositions } from "@/lib/api/queries";
 
 import { OptimizePanel } from "./OptimizePanel";
 import { PositionsEditor } from "./PositionsEditor";
+import { RebalancePanel } from "./RebalancePanel";
+import { RiskDashboard } from "./RiskDashboard";
+import { SetTargetsButton } from "./SetTargetsButton";
 import { WeightsChart } from "./WeightsChart";
 
 /** The builder surface for one portfolio: holdings editor + optimize panel + weights chart.
@@ -45,12 +48,27 @@ export function PortfolioBuilder({ portfolioId }: { portfolioId: string }) {
 
       {result ? (
         <section className="space-y-3 lg:col-span-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Optimized vs current
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Optimized vs current
+            </h2>
+            <SetTargetsButton portfolioId={portfolioId} weights={result.weights} />
+          </div>
           <WeightsChart positions={items} optimized={result.weights} />
         </section>
       ) : null}
+
+      <section className="space-y-3 lg:col-span-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Risk</h2>
+        <RiskDashboard portfolioId={portfolioId} />
+      </section>
+
+      <section className="space-y-3 lg:col-span-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Rebalance
+        </h2>
+        <RebalancePanel portfolioId={portfolioId} hasHoldings={items.length > 0} />
+      </section>
     </div>
   );
 }

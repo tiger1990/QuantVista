@@ -362,11 +362,62 @@ export interface paths {
          *
          *     Entitlement-gated (``optimization``; BL/HRP also ``optimization_advanced``), tenant-scoped
          *     (unknown/foreign portfolio → 404). Builds a PIT returns matrix from the current positions and
-         *     runs the QV-054 mean-variance optimizer; an infeasible problem surfaces as ``infeasible`` (422)
-         *     with the binding constraint. cvxpy is imported lazily so ``create_app()`` stays importable
-         *     without the ``portfolio`` extra.
+         *     runs the selected optimizer — ``mean_variance`` (QV-054) or ``risk_parity`` (QV-057); an
+         *     infeasible problem surfaces as ``infeasible`` (422) with the binding constraint. cvxpy is
+         *     imported lazily so ``create_app()`` stays importable without the ``portfolio`` extra.
          */
         post: operations["optimize_portfolio_endpoint_api_v1_portfolios__portfolio_id__optimize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Risk Endpoint
+         * @description Portfolio risk metrics (research signal, not advice — US-03/D1).
+         *
+         *     Tenant-scoped (unknown/foreign portfolio → 404); available to any authenticated owner (no paid
+         *     gate — risk is basic portfolio info). Computes beta / annualized vol / max drawdown / Sharpe /
+         *     Sortino / HHI / sector exposure over a PIT returns matrix on **market-value weights** (target
+         *     fallback), persists a `risk_snapshots` row (idempotent per as-of date), and returns them as
+         *     Decimal strings. Numpy-only compute (no cvxpy).
+         */
+        get: operations["portfolio_risk_endpoint_api_v1_portfolios__portfolio_id__risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/portfolios/{portfolio_id}/rebalance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rebalance Portfolio Endpoint
+         * @description Suggest rebalancing trades to return a portfolio to its target weights (research only).
+         *
+         *     No entitlement gate — rebalancing is basic portfolio tooling available to all owners.
+         *     Tenant-scoped (unknown/foreign portfolio → 404). Raises 422 when the portfolio has no
+         *     positions or none have target weights (run /optimize first to get suggested targets).
+         *     All weight fields are Decimal-as-string on the wire; no float.
+         */
+        post: operations["rebalance_portfolio_endpoint_api_v1_portfolios__portfolio_id__rebalance_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -528,6 +579,15 @@ export interface components {
             /** Created At */
             created_at: string;
         };
+        /** BetaCoverageDTO */
+        BetaCoverageDTO: {
+            /** Covered */
+            covered: number;
+            /** Total */
+            total: number;
+            /** Ratio */
+            ratio: string;
+        };
         /** ConstraintStatusDTO */
         ConstraintStatusDTO: {
             /** Kind */
@@ -583,6 +643,16 @@ export interface components {
             sum_of_contributions: number;
             /** Factors */
             factors: components["schemas"]["FactorContribution"][];
+        };
+        /**
+         * DrawdownPointDTO
+         * @description One point on the portfolio drawdown-over-time series (QV-060).
+         */
+        DrawdownPointDTO: {
+            /** Date */
+            date: string;
+            /** Value */
+            value: string;
         };
         /** Envelope[AlertRule] */
         Envelope_AlertRule_: {
@@ -644,6 +714,28 @@ export interface components {
             /** Success */
             success: boolean;
             data?: components["schemas"]["Position"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[RebalanceResponse] */
+        Envelope_RebalanceResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["RebalanceResponse"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[RiskResponse] */
+        Envelope_RiskResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["RiskResponse"] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -1078,6 +1170,25 @@ export interface components {
             /** Close */
             close: number | null;
         };
+        /** RebalanceRequest */
+        RebalanceRequest: {
+            /**
+             * Drift Threshold
+             * @default 0.05
+             */
+            drift_threshold: number | string;
+        };
+        /** RebalanceResponse */
+        RebalanceResponse: {
+            /** As Of Date */
+            as_of_date: string;
+            /** Total Drift */
+            total_drift: string;
+            /** Needs Rebalance */
+            needs_rebalance: boolean;
+            /** Trades */
+            trades: components["schemas"]["TradeSuggestionDTO"][];
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /** Email */
@@ -1086,6 +1197,30 @@ export interface components {
             password: string;
             /** Name */
             name?: string | null;
+        };
+        /** RiskResponse */
+        RiskResponse: {
+            /** As Of Date */
+            as_of_date: string;
+            /** Beta */
+            beta: string | null;
+            /** Volatility */
+            volatility: string | null;
+            /** Max Drawdown */
+            max_drawdown: string | null;
+            /** Sharpe */
+            sharpe: string | null;
+            /** Sortino */
+            sortino: string | null;
+            /** Hhi */
+            hhi: string;
+            /** Sector Exposure */
+            sector_exposure: {
+                [key: string]: string;
+            };
+            beta_coverage: components["schemas"]["BetaCoverageDTO"];
+            /** Drawdown Series */
+            drawdown_series: components["schemas"]["DrawdownPointDTO"][];
         };
         /** SaveScreenRequest */
         SaveScreenRequest: {
@@ -1253,6 +1388,21 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+        };
+        /** TradeSuggestionDTO */
+        TradeSuggestionDTO: {
+            /** Stock Id */
+            stock_id: string;
+            /** Symbol */
+            symbol: string;
+            /** Direction */
+            direction: string;
+            /** Current Weight */
+            current_weight: string;
+            /** Target Weight */
+            target_weight: string;
+            /** Delta Weight */
+            delta_weight: string;
         };
         /**
          * UpsertPositionRequest
@@ -1953,6 +2103,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_OptimizeResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_risk_endpoint_api_v1_portfolios__portfolio_id__risk_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_RiskResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rebalance_portfolio_endpoint_api_v1_portfolios__portfolio_id__rebalance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                portfolio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RebalanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_RebalanceResponse_"];
                 };
             };
             /** @description Validation Error */

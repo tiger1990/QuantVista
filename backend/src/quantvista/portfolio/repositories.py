@@ -129,9 +129,14 @@ def upsert_position(
                 "INSERT INTO portfolio_positions "
                 "(tenant_id, portfolio_id, stock_id, weight, target_weight, shares, avg_cost) "
                 "VALUES (:t, :p, :s, :w, :tw, :sh, :ac) "
+                # COALESCE so a PARTIAL update preserves fields it doesn't supply — editing
+                # `shares` alone must not wipe `target_weight` (needed for drift), and vice versa.
                 "ON CONFLICT (portfolio_id, stock_id) DO UPDATE SET "
-                "weight = EXCLUDED.weight, target_weight = EXCLUDED.target_weight, "
-                "shares = EXCLUDED.shares, avg_cost = EXCLUDED.avg_cost "
+                "weight = COALESCE(EXCLUDED.weight, portfolio_positions.weight), "
+                "target_weight = COALESCE(EXCLUDED.target_weight, "
+                "portfolio_positions.target_weight), "
+                "shares = COALESCE(EXCLUDED.shares, portfolio_positions.shares), "
+                "avg_cost = COALESCE(EXCLUDED.avg_cost, portfolio_positions.avg_cost) "
                 f"RETURNING {_POSITION_COLS}"
                 ") SELECT up.id, up.portfolio_id, up.stock_id, up.weight, up.target_weight, "
                 "up.shares, up.avg_cost, s.symbol "

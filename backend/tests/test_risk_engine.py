@@ -8,6 +8,7 @@ graceful-degradation contract (thin/degenerate series → ``None``, never inf/Na
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -38,6 +39,13 @@ def _positions(
 
 def _returns(values: np.ndarray, ids: tuple[UUID, ...] = (_A, _B)) -> ReturnsMatrix:
     return ReturnsMatrix(values=values, stock_ids=ids, dates=(), dropped=())
+
+
+def _dated_returns(values: np.ndarray, ids: tuple[UUID, ...] = (_A, _B)) -> ReturnsMatrix:
+    """A ReturnsMatrix with real row dates (one trading day per return row)."""
+    start = date(2026, 1, 1)
+    dates = tuple(start + timedelta(days=i) for i in range(values.shape[0]))
+    return ReturnsMatrix(values=values, stock_ids=ids, dates=dates, dropped=())
 
 
 # Market value: A = 10×100 = 1000, B = 10×300 = 3000 → weights 0.25 / 0.75.
@@ -140,3 +148,36 @@ def test_equal_weight_degenerate_guard() -> None:
     m = RiskEngine().metrics(pos, _returns(_R), {}, _SECTORS, {})
     assert m.hhi == Decimal("0.500000")  # 0.5² + 0.5²
     assert isinstance(m, RiskMetrics)
+
+
+# ---------------------------------------------------------------------------
+# QV-060 — dated drawdown series
+# ---------------------------------------------------------------------------
+
+
+def test_drawdown_series_dated_and_matches_max_drawdown() -> None:
+    m = RiskEngine().metrics(_MV_POS, _dated_returns(_R), {_A: Decimal("1.0")}, _SECTORS, _CLOSES)
+    series = m.drawdown_series
+    assert series is not None
+    # One dated point per return row (the seed NAV=1 point is dropped so every point has a date).
+    assert len(series) == _R.shape[0]
+    expected_dates = [date(2026, 1, 1) + timedelta(days=i) for i in range(_R.shape[0])]
+    assert [d for d, _ in series] == expected_dates
+    # Drawdowns are ≤ 0, and the trough equals −max_drawdown (positive magnitude).
+    values = [v for _, v in series]
+    assert all(v <= Decimal(0) for v in values)
+    assert m.max_drawdown is not None
+    assert min(values) == -m.max_drawdown
+
+
+def test_drawdown_series_none_when_dates_absent() -> None:
+    # The legacy helper builds dates=() → the engine can't date the series → None (graceful).
+    m = RiskEngine().metrics(_MV_POS, _returns(_R), {_A: Decimal("1.0")}, _SECTORS, _CLOSES)
+    assert m.drawdown_series is None
+    assert m.max_drawdown is not None  # scalar still computed
+
+
+def test_drawdown_series_none_on_thin_history() -> None:
+    thin = _dated_returns(np.array([[0.01, 0.02]], dtype=np.float64))  # < 2 rows
+    m = RiskEngine().metrics(_MV_POS, thin, {_A: Decimal("1.0")}, _SECTORS, _CLOSES)
+    assert m.drawdown_series is None

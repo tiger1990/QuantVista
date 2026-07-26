@@ -15,28 +15,37 @@ import { cn } from "@/lib/utils";
 
 const EPSILON = 0.0001;
 
-/** Trim a Decimal-string weight for display: "0.200000" → "0.2"; zero/unset → "". */
-function fmtWeight(v: string | null | undefined): string {
+type EditableField = "shares" | "target_weight";
+
+/** Trim a Decimal-string for display: "0.200000" → "0.2"; zero/unset → "". */
+function fmtNum(v: string | null | undefined): string {
   const n = Number(v ?? 0);
   return Number.isFinite(n) && n > 0 ? String(n) : "";
 }
 
-/** A holding's target-weight input. Auto-saves (debounced) as you type AND on blur, so a quick
- * page refresh doesn't lose the edit.
+/** One editable numeric field of a holding (`shares` or `target_weight`). Auto-saves (debounced)
+ * as you type AND on blur, so a quick page refresh doesn't lose the edit. The partial upsert
+ * preserves the OTHER fields server-side (COALESCE), so editing shares never clears the target.
  *
  * Depends only on the STABLE `mutate` (not the whole mutation object) and compares against the
  * persisted value via a ref — so a field's debounce timer resets only when its OWN value changes,
  * never on the re-render churn from a sibling field's save. */
-function WeightInput({
+function PositionField({
   portfolioId,
   position,
+  field,
+  label,
+  placeholder,
 }: {
   portfolioId: string;
   position: Position;
+  field: EditableField;
+  label: string;
+  placeholder: string;
 }) {
   const { mutate } = useUpsertPosition(portfolioId); // stable reference
   const stockId = position.stock_id;
-  const persisted = fmtWeight(position.target_weight);
+  const persisted = fmtNum(position[field]);
   const [value, setValue] = useState(persisted);
 
   const persistedRef = useRef(persisted);
@@ -46,21 +55,21 @@ function WeightInput({
 
   const save = (next: string) => {
     if (next.trim() === persistedRef.current) return; // no change vs. persisted
-    mutate({ stockId, body: { target_weight: next.trim() || "0" } });
+    mutate({ stockId, body: { [field]: next.trim() || "0" } });
   };
 
   useEffect(() => {
     if (value.trim() === persistedRef.current) return;
-    const t = setTimeout(() => mutate({ stockId, body: { target_weight: value.trim() || "0" } }), 500);
+    const t = setTimeout(() => mutate({ stockId, body: { [field]: value.trim() || "0" } }), 500);
     return () => clearTimeout(t);
-  }, [value, mutate, stockId]);
+  }, [value, mutate, stockId, field]);
 
   return (
     <Input
-      aria-label="Target weight"
+      aria-label={label}
       value={value}
       inputMode="decimal"
-      placeholder="0.00"
+      placeholder={placeholder}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => save(value)}
       className="h-8 w-20 text-right tabular-nums"
@@ -130,31 +139,55 @@ export function PositionsEditor({
           No holdings yet — search above to add stocks.
         </p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-          {positions.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-              <span className="min-w-0 truncate font-medium">{p.symbol}</span>
-              <div className="flex shrink-0 items-center gap-3">
-                <WeightInput portfolioId={portfolioId} position={p} />
-                <button
-                  type="button"
-                  onClick={() => del.mutate(p.stock_id)}
-                  disabled={del.isPending}
-                  aria-label={`Remove ${p.symbol}`}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-1.5 text-xs text-muted-foreground">
+            <span>Holding</span>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className="w-20 text-right">Shares</span>
+              <span className="w-20 text-right">Target wt</span>
+              <span className="w-4" />
+            </div>
+          </div>
+          <ul className="divide-y divide-border">
+            {positions.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                <span className="min-w-0 truncate font-medium">{p.symbol}</span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <PositionField
+                    portfolioId={portfolioId}
+                    position={p}
+                    field="shares"
+                    label={`Shares held of ${p.symbol}`}
+                    placeholder="0"
+                  />
+                  <PositionField
+                    portfolioId={portfolioId}
+                    position={p}
+                    field="target_weight"
+                    label={`Target weight of ${p.symbol}`}
+                    placeholder="0.00"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => del.mutate(p.stock_id)}
+                    disabled={del.isPending}
+                    aria-label={`Remove ${p.symbol}`}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {positions.length > 0 ? (
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">
-            Weights are optional — used only as your “current” baseline; the optimizer sets its own.
+            Enter <strong>shares</strong> you actually hold so drift compares real vs. target;
+            <strong> target wt</strong> is your desired allocation.
           </span>
           <span
             className={cn(

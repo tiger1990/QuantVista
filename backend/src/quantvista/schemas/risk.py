@@ -18,6 +18,13 @@ class BetaCoverageDTO(BaseModel):
     ratio: str
 
 
+class DrawdownPointDTO(BaseModel):
+    """One point on the portfolio drawdown-over-time series (QV-060)."""
+
+    date: str  # ISO date of the return row
+    value: str  # Decimal-as-string drawdown, ≤ 0 (0 at a new equity high)
+
+
 class RiskResponse(BaseModel):
     as_of_date: str
     beta: str | None
@@ -28,6 +35,7 @@ class RiskResponse(BaseModel):
     hhi: str
     sector_exposure: dict[str, str]  # sector → Decimal-as-string weight
     beta_coverage: BetaCoverageDTO
+    drawdown_series: list[DrawdownPointDTO]  # dated; empty when history is too thin (QV-060)
 
 
-__all__ = ["BetaCoverageDTO", "RiskResponse"]
+__all__ = ["BetaCoverageDTO", "DrawdownPointDTO", "RiskResponse"]

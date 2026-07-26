@@ -82,8 +82,20 @@ export function WeightsChart({
             formatter={(v) => `${v}%`}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="current" name={currentLabel} fill="var(--color-muted-foreground)" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="optimized" name="Optimized" fill="var(--color-primary)" radius={[2, 2, 0, 0]} />
+          <Bar
+            dataKey="current"
+            name={currentLabel}
+            fill="var(--color-muted-foreground)"
+            radius={[2, 2, 0, 0]}
+            isAnimationActive={false}
+          />
+          <Bar
+            dataKey="optimized"
+            name="Optimized"
+            fill="var(--color-primary)"
+            radius={[2, 2, 0, 0]}
+            isAnimationActive={false}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

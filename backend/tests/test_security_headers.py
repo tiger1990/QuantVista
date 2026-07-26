@@ -18,6 +18,7 @@ _EXPECTED = {
     "referrer-policy": "strict-origin-when-cross-origin",
     "permissions-policy": "camera=(), microphone=(), geolocation=()",
     "x-xss-protection": "0",
+    "cache-control": "no-store",  # dynamic JSON is never cached (QV-060 stale-read fix)
 }
 
 

@@ -14,7 +14,10 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
-export const api = createClient<paths>({ baseUrl: "" });
+// `cache: "no-store"` bypasses the browser HTTP cache: our GETs (positions, risk, …) carry no
+// Cache-Control, so a refetch after a mutation could otherwise be served a stale cached body
+// (e.g. a deleted holding lingering). React Query is the single source of caching truth.
+export const api = createClient<paths>({ baseUrl: "", cache: "no-store" });
 
 api.use({
   onRequest({ request }) {

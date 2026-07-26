@@ -62,7 +62,7 @@ from quantvista.schemas.portfolios import (
     UpsertPositionRequest,
 )
 from quantvista.schemas.rebalance import RebalanceRequest, RebalanceResponse, TradeSuggestionDTO
-from quantvista.schemas.risk import BetaCoverageDTO, RiskResponse
+from quantvista.schemas.risk import BetaCoverageDTO, DrawdownPointDTO, RiskResponse
 
 router = APIRouter(prefix="/api/v1", tags=["portfolios"])
 
@@ -379,6 +379,10 @@ def portfolio_risk_endpoint(
             total=metrics.beta_coverage.total,
             ratio=str(metrics.beta_coverage.ratio),
         ),
+        drawdown_series=[
+            DrawdownPointDTO(date=d.isoformat(), value=str(v))
+            for d, v in (metrics.drawdown_series or ())
+        ],
     ).model_dump()
     _with_disclaimer(response)
     return Envelope.ok(payload, meta={"disclaimer": DISCLAIMER})
