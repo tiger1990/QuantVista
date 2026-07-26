@@ -17,6 +17,7 @@ NaN) on thin history or a degenerate series; beta/HHI/sector still compute from 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
@@ -55,6 +56,9 @@ class RiskMetrics:
     hhi: Decimal
     sector_exposure: dict[str, Decimal]
     beta_coverage: BetaCoverage
+    # Dated drawdown series (QV-060): one point per return date, value ≤ 0 (0 at new highs).
+    # ``None`` when history is too thin OR the returns matrix carries no aligned dates.
+    drawdown_series: tuple[tuple[date, Decimal], ...] | None = None
 
 
 def compute_portfolio_weights(
@@ -115,14 +119,15 @@ class RiskEngine:
         sector_exposure = {s: _q(w) for s, w in sector_exposure.items()}
 
         beta, coverage = self._beta(weights, betas)
-        series = self._series_metrics(weights, returns, risk_free_rate)
+        scalars, drawdown_series = self._series_metrics(weights, returns, risk_free_rate)
 
         return RiskMetrics(
             beta=beta,
             hhi=hhi,
             sector_exposure=sector_exposure,
             beta_coverage=coverage,
-            **series,
+            drawdown_series=drawdown_series,
+            **scalars,
         )
 
     def _beta(
@@ -146,23 +151,24 @@ class RiskEngine:
 
     def _series_metrics(
         self, weights: dict[UUID, Decimal], returns: ReturnsMatrix, risk_free_rate: Decimal
-    ) -> dict[str, Decimal | None]:
-        """Volatility / max drawdown / Sharpe / Sortino from the portfolio daily return series.
+    ) -> tuple[dict[str, Decimal | None], tuple[tuple[date, Decimal], ...] | None]:
+        """Volatility / max drawdown / Sharpe / Sortino + the dated drawdown series (QV-060).
 
         Weights are aligned to the returns matrix's surviving columns (thin names are dropped by the
-        PIT reader) and renormalized over survivors. ``None`` for every metric when history is too
-        thin or the sub-portfolio has no weight."""
+        PIT reader) and renormalized over survivors. Every scalar is ``None`` (and the series too)
+        when history is too thin or the sub-portfolio has no weight. The drawdown series is also
+        ``None`` when the matrix carries no aligned row dates (e.g. unit tests that omit them)."""
         none: dict[str, Decimal | None] = dict.fromkeys(
             ("volatility", "max_drawdown", "sharpe", "sortino")
         )
         ids = returns.stock_ids
         if len(ids) == 0 or returns.values.shape[0] < 2:
-            return none
+            return none, None
 
         w_sub = np.array([float(weights.get(sid, Decimal(0))) for sid in ids], dtype=np.float64)
         w_total = w_sub.sum()
         if w_total <= _VOL_EPSILON:
-            return none
+            return none, None
         w_sub = w_sub / w_total
 
         r_p = returns.values @ w_sub  # portfolio daily return series
@@ -173,8 +179,16 @@ class RiskEngine:
 
         # Max drawdown of the equity curve (starting NAV = 1), as a positive magnitude.
         equity = np.concatenate([[1.0], np.cumprod(1.0 + r_p)])
-        drawdowns = equity / np.maximum.accumulate(equity) - 1.0
+        drawdowns = equity / np.maximum.accumulate(equity) - 1.0  # ≤ 0; drawdowns[0] == 0 (seed)
         max_dd = float(-drawdowns.min())
+
+        # Dated series: drop the seed point so each of the T points maps to a real return date, only
+        # when the matrix supplies aligned dates (len == T); else leave None. Trough == -max_dd.
+        drawdown_series: tuple[tuple[date, Decimal], ...] | None = None
+        if len(returns.dates) == r_p.shape[0]:
+            drawdown_series = tuple(
+                (d, _q(float(dd))) for d, dd in zip(returns.dates, drawdowns[1:], strict=True)
+            )
 
         downside = np.sqrt(float(np.mean(np.minimum(r_p, 0.0) ** 2))) * np.sqrt(_TRADING_DAYS)
 
@@ -183,7 +197,7 @@ class RiskEngine:
             "max_drawdown": _q(max_dd),
             "sharpe": _q((ann_return - rf) / ann_vol) if ann_vol > _VOL_EPSILON else None,
             "sortino": _q((ann_return - rf) / downside) if downside > _VOL_EPSILON else None,
-        }
+        }, drawdown_series
 
 
 __all__ = ["BetaCoverage", "RiskEngine", "RiskMetrics", "compute_portfolio_weights"]

@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-26  # QV-079 review (security hardening — PR-ready)
+last_updated: 2026-07-26  # QV-060 review (FE risk dashboard + rebalancing UI + BE drawdown_series)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -53,7 +53,7 @@ development_status:
   1-4-qv-008-iac-bootstrap-aws-staging: done  # merged PR #11 (fcaa2a8); Terraform VPC/EKS/RDS/Redis/S3/IAM/Secrets (ap-south-1) + remote state/locking + per-env workspaces; offline validation 8/8; live apply deferred → PV-002 (no AWS creds here)
   1-5-qv-009-observability-baseline: done  # merged PR #12 (9d3354b); OTel tracing + structlog JSON + /metrics RED + Sentry, all env-driven/no-op-safe; 91 tests, cov 93%; security-review applied (C-1+4×HIGH fixed); live staging backends deferred → PV-003 (blocked on PV-002)
   1-6-qv-020-job-observability-dashboard: done  # freshness gauge (data_latest_ingest_timestamp_seconds) + queue-depth gauge + refresh_ops_metrics beat task; Prometheus alert rules (freshness/failure/backlog) w. deterministic promtool test rules; Grafana dashboard JSON; extends QV-009 metrics; local-native verify (brew prometheus/grafana), live render+notify+prod-scrape → PV-003; no migration
-  1-7-qv-079-security-hardening-pass-owasp-asvs-l2: review  # PR-ready; ASVS-L2 pass: security headers + CSP(/docs-exempt) + auth rate limiting (slowapi, off-by-default) + SSRF allow-list + extra=forbid input audit + CSRF-safe doc + bandit/pip-audit CI (caught+fixed pydantic-settings CVE) + prod docs off; 657 passed/5 skipped; no migration; FE-CSP→PV-008, XFF→PV-003, Trivy→PV-002
+  1-7-qv-079-security-hardening-pass-owasp-asvs-l2: done  # merged PR #68 (66667dd); ASVS-L2 pass: security headers + CSP(/docs-exempt) + auth rate limiting (slowapi, off-by-default) + SSRF allow-list + extra=forbid input audit + CSRF-safe doc + bandit/pip-audit CI (caught+fixed pydantic-settings CVE GHSA-4xgf-cpjx-pc3j) + prod docs off; 657 passed/5 skipped; no migration; FE-CSP→PV-008, XFF→PV-003, Trivy→PV-002
   1-8-qv-082-observability-slos-alerting-finalized: backlog
   1-9-qv-083-backup-pitr-restore-drill: backlog
   1-10-qv-084-production-cd-pipeline-staging-gates: backlog
@@ -144,7 +144,7 @@ development_status:
   7-7-qv-057-risk-parity-optimizer: done  # merged PR #65 (9cef731). RiskParityOptimizer — equal-risk-contribution via convex log-barrier min ½wᵀΣw−(1/N)Σln(wᵢ) (Clarabel; cp.log not a QP), normalized to Σw=1; max_weight/sector_caps as homogeneous linear constraints, long_only inherent, target_return/vol/turnover/cardinality ignored; infeasible→binding via base feasibility (US-03). Extracted the QV-054-deferred solver framework: BaseCvxpyOptimizer (template-method: execution engine vs _solve formulation), MeanVariance refactored onto it behavior-preserving; optimizer.py → portfolio/optimization/ subpackage. Multi-backend OptimizationSolver protocol STILL deferred (one backend). API dispatch method=risk_parity (Pro, `optimization` flag; BL/HRP still 422/advanced-403) + FE OptimizePanel method selector. No new dep (Clarabel bundled). 96% new-package cov; 593 passed/5 skipped BE + 59 FE.
   7-8-qv-058-riskengine-metrics: done  # merged PR #66 (300b5f6). RiskEngine — pure-numpy portfolio risk metrics: market-value weights (shares×close, fallback target_weight), annualized vol/Sharpe/Sortino/max-drawdown, beta (Σwᵢ·βᵢ renormalized over covered names + BetaCoverage), HHI, sector exposure; Decimal↔float boundary. GET /portfolios/{id}/risk — bulk PIT reads (latest_closes+latest_betas, DISTINCT ON), upsert_risk_snapshot (UNIQUE ON CONFLICT idempotent), research-only disclaimer header+meta. No paid entitlement gate. 10 unit tests + 4 integration tests + 3 bulk-PIT reader tests; full-tree mypy/ruff/lint-imports green.
   7-9-qv-059-rebalancing-drift-alerts: done  # PR ready; all ACs met: rebalance endpoint + drift alert wired; 634 passed
-  7-10-qv-060-frontend-risk-dashboard-rebalancing-ui: backlog
+  7-10-qv-060-frontend-risk-dashboard-rebalancing-ui: review  # PR-ready; FE+small-BE: additive drawdown_series on /risk + risk dashboard (tiles+sector+REAL drawdown chart) + rebalance panel + apply-to-targets BOTH surfaces; regen typed client; BE 661 passed / FE 76 vitest + build green; no migration
   7-11-qv-061-portfolio-multi-tenancy-isolation-tests: backlog
   epic-7-retrospective: optional
 

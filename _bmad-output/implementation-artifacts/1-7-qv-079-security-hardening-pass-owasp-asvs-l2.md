@@ -4,7 +4,7 @@ baseline_commit: a25f4e3
 
 # Story 1.7: QV-079 — Security hardening pass (OWASP ASVS L2)
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PLAT (Epic 1) · **Points:** 8 · **Depends:** QV-009 (observability baseline), QV-006 (AuthN), QV-038 (screener/DSL allow-list)
 **Note on stated dependency QV-076:** QV-076 (entitlement enforcement pass) is in Epic 2 backlog. This story implements the security baseline independently — no QV-076 code is needed.

@@ -30,6 +30,11 @@ export type OptimizeRequest = components["schemas"]["OptimizeRequest"];
 export type OptimizeConstraints = components["schemas"]["OptimizeConstraints"];
 export type OptimizeResponse = components["schemas"]["OptimizeResponse"];
 export type ConstraintStatusDTO = components["schemas"]["ConstraintStatusDTO"];
+export type RiskResponse = components["schemas"]["RiskResponse"];
+export type BetaCoverageDTO = components["schemas"]["BetaCoverageDTO"];
+export type DrawdownPointDTO = components["schemas"]["DrawdownPointDTO"];
+export type RebalanceResponse = components["schemas"]["RebalanceResponse"];
+export type TradeSuggestionDTO = components["schemas"]["TradeSuggestionDTO"];
 
 const PAGE_SIZE = 50;
 const SCREENER_PAGE_SIZE = 100;
@@ -478,6 +483,108 @@ export function useOptimize(portfolioId: string) {
         throw new OptimizeError(kind, message);
       }
       return data.data;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Risk + rebalancing (QV-060)
+// ---------------------------------------------------------------------------
+
+export type RiskErrorKind = "no_data" | "not_found" | "unknown";
+
+/** Portfolio risk metrics. 422 (no positions / no prices) → `no_data`; 404 → `not_found`. */
+export function useRisk(portfolioId: string) {
+  return useQuery({
+    queryKey: ["risk", portfolioId],
+    queryFn: async (): Promise<RiskResponse> => {
+      const { data, error, response } = await api.GET(
+        "/api/v1/portfolios/{portfolio_id}/risk",
+        { params: { path: { portfolio_id: portfolioId } } },
+      );
+      if (error || !data?.data) {
+        const kind: RiskErrorKind =
+          response.status === 404 ? "not_found" : response.status === 422 ? "no_data" : "unknown";
+        throw new RiskError(kind, envelopeMessage(error));
+      }
+      return data.data;
+    },
+    enabled: Boolean(portfolioId),
+    retry: false, // 404/422 are terminal states, not transient — don't hammer
+  });
+}
+
+export class RiskError extends Error {
+  readonly kind: RiskErrorKind;
+  constructor(kind: RiskErrorKind, detail?: string) {
+    super(detail ?? kind);
+    this.name = "RiskError";
+    this.kind = kind;
+  }
+}
+
+export type RebalanceErrorKind = "no_targets" | "no_data" | "not_found" | "unknown";
+
+/** Typed rebalance failure: 422 mentioning targets → `no_targets` ("run optimize first"), other
+ * 422 → `no_data`, 404 → `not_found`. */
+export class RebalanceError extends Error {
+  readonly kind: RebalanceErrorKind;
+  readonly detail?: string;
+  constructor(kind: RebalanceErrorKind, detail?: string) {
+    super(detail ?? kind);
+    this.name = "RebalanceError";
+    this.kind = kind;
+    this.detail = detail;
+  }
+}
+
+/** Suggested trades to reach target weights within a drift threshold. */
+export function useRebalance(portfolioId: string) {
+  return useMutation({
+    mutationFn: async (driftThreshold: string): Promise<RebalanceResponse> => {
+      const { data, error, response } = await api.POST(
+        "/api/v1/portfolios/{portfolio_id}/rebalance",
+        { params: { path: { portfolio_id: portfolioId } }, body: { drift_threshold: driftThreshold } },
+      );
+      if (error || !data?.data) {
+        const message = envelopeMessage(error);
+        const kind: RebalanceErrorKind =
+          response.status === 404
+            ? "not_found"
+            : response.status === 422
+              ? /target/i.test(message ?? "")
+                ? "no_targets"
+                : "no_data"
+              : "unknown";
+        throw new RebalanceError(kind, message);
+      }
+      return data.data;
+    },
+  });
+}
+
+/** Write a set of `{ stock_id, target_weight }` as each position's target_weight (bulk PUT), then
+ * invalidate positions + risk. Used by BOTH apply-to-targets surfaces (optimizer & rebalance). */
+export function useApplyTargets(portfolioId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (targets: { stock_id: string; target_weight: string }[]) => {
+      await Promise.all(
+        targets.map(async (t) => {
+          const { error } = await api.PUT(
+            "/api/v1/portfolios/{portfolio_id}/positions/{stock_id}",
+            {
+              params: { path: { portfolio_id: portfolioId, stock_id: t.stock_id } },
+              body: { target_weight: t.target_weight },
+            },
+          );
+          if (error) throw new Error("Failed to apply targets.");
+        }),
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["positions", portfolioId] });
+      qc.invalidateQueries({ queryKey: ["risk", portfolioId] });
     },
   });
 }

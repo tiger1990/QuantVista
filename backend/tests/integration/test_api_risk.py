@@ -146,6 +146,21 @@ def test_risk_returns_metrics_and_persists(api: dict[str, Any], admin_engine: En
     assert n == 1
 
 
+def test_risk_includes_drawdown_series(api: dict[str, Any]) -> None:
+    """QV-060: /risk returns a dated drawdown series whose trough equals −max_drawdown."""
+    client, token, stocks = api["client"], api["token"], api["stocks"]
+    pid = _portfolio_with_holdings(client, token, stocks)
+    data = client.get(f"/api/v1/portfolios/{pid}/risk", headers=_h(token)).json()["data"]
+    series = data["drawdown_series"]
+    assert isinstance(series, list) and len(series) > 0
+    for point in series:
+        assert set(point) == {"date", "value"}
+        assert isinstance(point["date"], str) and isinstance(point["value"], str)
+        assert float(point["value"]) <= 0.0
+    trough = min(float(p["value"]) for p in series)
+    assert abs(trough - (-float(data["max_drawdown"]))) < 1e-9
+
+
 def test_risk_is_idempotent_per_day(api: dict[str, Any], admin_engine: Engine) -> None:
     client, token, stocks = api["client"], api["token"], api["stocks"]
     pid = _portfolio_with_holdings(client, token, stocks)
