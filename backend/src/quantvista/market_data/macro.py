@@ -31,6 +31,8 @@ from typing import Any, Protocol, runtime_checkable
 
 import certifi
 
+from quantvista.core.http import assert_allowed_host
+
 _FRED_URL = "https://api.stlouisfed.org/fred/series/observations"
 _WORLDBANK_URL = "https://api.worldbank.org/v2"
 _RETRY_BACKOFF_S = 1.5
@@ -98,9 +100,10 @@ class _HttpJsonProvider:
         self._urlopen = urlopen or self._default_urlopen
 
     def _default_urlopen(self, url: str, timeout: float | None = None) -> Any:
-        return urllib.request.urlopen(url, timeout=timeout, context=self._ctx)
+        return urllib.request.urlopen(url, timeout=timeout, context=self._ctx)  # nosec B310
 
     def _get_json(self, url: str, *, retries: int = 1) -> Any:
+        assert_allowed_host(url)  # SSRF guard (QV-079) — fixed vendor host only
         for attempt in range(1, retries + 1):
             try:
                 with self._urlopen(url, timeout=30) as resp:

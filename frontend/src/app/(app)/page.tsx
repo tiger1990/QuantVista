@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth-provider";
-import { MarketOverview, SectorHeatmap, TopRanked } from "@/components/dashboard";
+import { SectorHeatmap, TopRanked } from "@/components/dashboard";
 import { Disclaimer } from "@/components/disclaimer";
 import { NewsTicker } from "@/features/news/NewsTicker";
 import { useLatestNews, useRankings, useStocks } from "@/lib/api/queries";
@@ -13,7 +13,6 @@ export default function OverviewPage() {
   const news = useLatestNews(20);
 
   const items = rankings.data?.data ?? [];
-  const asOf = (rankings.data?.meta as { as_of?: string | null } | undefined)?.as_of;
   const allStocks = stocks.data?.pages.flatMap((p) => p.data ?? []) ?? [];
   const firstName = user?.name?.split(" ")[0] ?? "there";
 
@@ -28,8 +27,6 @@ export default function OverviewPage() {
         </div>
         <NewsTicker items={news.data ?? []} />
       </section>
-
-      <MarketOverview items={items} asOf={asOf} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <TopRanked items={items} />

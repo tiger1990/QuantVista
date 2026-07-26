@@ -1,4 +1,12 @@
-"""Auth + profile routes (QV-006). All responses use the standard envelope."""
+"""Auth + profile routes (QV-006). All responses use the standard envelope.
+
+CSRF-SAFE (QV-079): every state-changing endpoint authenticates via ``Authorization: Bearer <jwt>``
+— a header the browser never auto-attaches cross-origin, so classic cookie-CSRF does not apply. The
+only cookie is the httpOnly, ``SameSite=lax`` refresh token, read solely by ``POST /auth/refresh``
+(SameSite=lax withholds cookies on cross-site POSTs) and by ``POST /auth/logout`` (which only
+deletes it — no state at risk). No CSRF token layer is therefore required. Auth endpoints are
+additionally per-IP rate limited (see ``api.ratelimit``).
+"""
 
 from __future__ import annotations
 
@@ -7,6 +15,7 @@ from typing import Any, Literal, cast
 from fastapi import APIRouter, Depends, Request, Response
 
 from quantvista.api.deps import get_auth_service, get_current_principal
+from quantvista.api.ratelimit import RATE_LIMITS, limiter
 from quantvista.core.config import get_settings
 from quantvista.identity.models import InvalidRefreshToken, Principal
 from quantvista.identity.services import AuthService
@@ -34,8 +43,12 @@ def _tokens(access_token: str) -> dict[str, Any]:
 
 
 @router.post("/auth/register", response_model=Envelope[TokenResponse], status_code=201)
+@limiter.limit(RATE_LIMITS["register"])
 def register(
-    body: RegisterRequest, response: Response, svc: AuthService = Depends(get_auth_service)
+    request: Request,
+    body: RegisterRequest,
+    response: Response,
+    svc: AuthService = Depends(get_auth_service),
 ) -> Envelope[dict[str, Any]]:
     principal = svc.register(body.email, body.password, body.name)
     tokens = svc.issue_tokens(principal)
@@ -44,8 +57,12 @@ def register(
 
 
 @router.post("/auth/login", response_model=Envelope[TokenResponse])
+@limiter.limit(RATE_LIMITS["login"])
 def login(
-    body: LoginRequest, response: Response, svc: AuthService = Depends(get_auth_service)
+    request: Request,
+    body: LoginRequest,
+    response: Response,
+    svc: AuthService = Depends(get_auth_service),
 ) -> Envelope[dict[str, Any]]:
     principal = svc.authenticate(body.email, body.password)
     tokens = svc.issue_tokens(principal)
@@ -54,6 +71,7 @@ def login(
 
 
 @router.post("/auth/refresh", response_model=Envelope[TokenResponse])
+@limiter.limit(RATE_LIMITS["refresh"])
 def refresh(
     request: Request, response: Response, svc: AuthService = Depends(get_auth_service)
 ) -> Envelope[dict[str, Any]]:

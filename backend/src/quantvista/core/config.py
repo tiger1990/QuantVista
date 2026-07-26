@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     refresh_cookie_name: str = "qv_refresh"
 
+    # Security hardening (QV-079). HSTS is opt-in: OFF in local/CI (no TLS), ON in staging/prod.
+    # Rate limiting is OFF by default so the test suite (TestClient shares one limiter key) is
+    # unaffected; enabled via env in real environments. Backend: memory (dev) | redis (prod).
+    hsts_enabled: bool = False
+    rate_limit_enabled: bool = False
+    rate_limit_backend: str = "memory"  # memory | redis
+
     # Observability (QV-009). All backend-optional: unset endpoint/DSN means the
     # corresponding exporter/SDK is never wired, so api/worker boot cleanly with no
     # collector, Sentry, or Grafana present (local, CI, and the no-creds dev box).

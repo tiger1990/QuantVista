@@ -19,6 +19,7 @@ import certifi
 import structlog
 
 from quantvista.core.config import Settings, get_settings
+from quantvista.core.http import assert_allowed_host
 
 _log = structlog.get_logger()
 _BREVO_URL = "https://api.brevo.com/v3/smtp/email"
@@ -62,7 +63,8 @@ class BrevoEmailSender:
                 "htmlContent": body,
             }
         ).encode()
-        request = urllib.request.Request(  # noqa: S310 - fixed https Brevo endpoint
+        assert_allowed_host(_BREVO_URL)  # SSRF guard (QV-079) — fixed vendor host only
+        request = urllib.request.Request(  # nosec B310
             _BREVO_URL,
             data=payload,
             method="POST",
@@ -73,7 +75,7 @@ class BrevoEmailSender:
             },
         )
         try:
-            with urllib.request.urlopen(  # noqa: S310
+            with urllib.request.urlopen(  # nosec B310
                 request, timeout=self._timeout, context=_SSL_CONTEXT
             ) as resp:
                 if resp.status not in (200, 201):

@@ -14,7 +14,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Method = Literal["mean_variance", "risk_parity", "black_litterman", "hrp"]
 ObjectiveName = Literal["max_sharpe", "min_vol", "target_return"]
@@ -23,6 +23,7 @@ ObjectiveName = Literal["max_sharpe", "min_vol", "target_return"]
 class OptimizeConstraints(BaseModel):
     """Wire form of ``portfolio.Constraints`` (mapped to the domain object in the api layer)."""
 
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     max_weight: Decimal | None = Field(default=None, gt=0, le=1)
     min_weight: Decimal | None = Field(default=None, ge=0, le=1)
     long_only: bool = True
@@ -54,6 +55,7 @@ class OptimizeConstraints(BaseModel):
 
 
 class OptimizeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     method: Method
     objective: ObjectiveName
     constraints: OptimizeConstraints = Field(default_factory=OptimizeConstraints)

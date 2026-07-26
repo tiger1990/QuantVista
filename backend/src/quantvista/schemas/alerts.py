@@ -9,16 +9,18 @@ from __future__ import annotations
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AlertConditionSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     metric: str = Field(min_length=1, max_length=40)
     op: Literal["gte", "lte", "gt", "lt", "eq"]
     value: float
 
 
 class CreateAlertRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     scope: Literal["stock", "portfolio"]
     target_id: UUID
     condition: AlertConditionSchema

@@ -65,6 +65,10 @@ jobs:
         run: ruff format --check .
       - name: Mypy (strict)
         run: mypy
+      - name: SAST (bandit)
+        run: bandit -c pyproject.toml -r src/ -ll -q
+      - name: SCA (pip-audit — known CVEs in deps)
+        run: pip-audit --skip-editable
       - name: Import-linter (bounded-context DAG)
         run: lint-imports
 
