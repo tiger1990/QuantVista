@@ -4,7 +4,7 @@ baseline_commit: 66667ddfa31ee7bcd22e391dc409c0702cdf2eaa
 
 # Story 7.10: QV-060 — Frontend: Risk dashboard + rebalancing UI
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 8 · **Depends:** QV-058 (RiskEngine + `GET /portfolios/{id}/risk`), QV-059 (`POST /portfolios/{id}/rebalance`), QV-056 (FE portfolio builder + optimize UI)
 
