@@ -261,11 +261,14 @@ def optimize_portfolio_endpoint(
     infeasible problem surfaces as ``infeasible`` (422) with the binding constraint. cvxpy is
     imported lazily so ``create_app()`` stays importable without the ``portfolio`` extra.
     """
+    # Resolve ownership FIRST (before the entitlement gate) so a foreign/absent portfolio is a 404
+    # for everyone — a Free-tier caller must not get a 403 that would leak the portfolio's existence
+    # (QV-061). Matches the /risk and /rebalance ordering.
+    if get_portfolio(session, portfolio_id) is None:  # RLS-invisible / absent → 404
+        raise PortfolioNotFound(portfolio_id)
     entitlements.check(ctx.tenant_id, _OPTIMIZE_KEY)
     if body.method in _ADVANCED_METHODS:
         entitlements.check(ctx.tenant_id, _ADVANCED_KEY)
-    if get_portfolio(session, portfolio_id) is None:  # RLS-invisible / absent → 404
-        raise PortfolioNotFound(portfolio_id)
     if body.method not in _IMPLEMENTED_METHODS:  # BL/HRP → later
         raise OptimizeError(f"method '{body.method}' is not yet available")
 
