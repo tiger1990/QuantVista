@@ -20,6 +20,8 @@ from quantvista.api.ratelimit import limiter, rate_limit_exceeded_handler
 from quantvista.api.routes import router as auth_router
 from quantvista.api.routes_alerts import AlertNotFound
 from quantvista.api.routes_alerts import router as alerts_router
+from quantvista.api.routes_backtests import BacktestNotFound
+from quantvista.api.routes_backtests import router as backtests_router
 from quantvista.api.routes_news import router as news_router
 from quantvista.api.routes_notifications import router as notifications_router
 from quantvista.api.routes_portfolios import OptimizeError, PortfolioNotFound, PositionNotFound
@@ -114,6 +116,10 @@ def _register_error_handlers(app: FastAPI) -> None:
     async def _alert_missing(_req: Request, _exc: AlertNotFound) -> JSONResponse:
         return _fail("not_found", "alert rule not found")
 
+    @app.exception_handler(BacktestNotFound)
+    async def _backtest_missing(_req: Request, _exc: BacktestNotFound) -> JSONResponse:
+        return _fail("not_found", "backtest not found")
+
     @app.exception_handler(PortfolioNotFound)
     async def _portfolio_missing(_req: Request, _exc: PortfolioNotFound) -> JSONResponse:
         return _fail("not_found", "portfolio not found")
@@ -185,6 +191,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts_router)
     app.include_router(notifications_router)
     app.include_router(news_router)
+    app.include_router(backtests_router)
     _register_error_handlers(app)
     return app
 

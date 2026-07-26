@@ -183,6 +183,7 @@ module = [
     "quantvista.jobs.news",
     "quantvista.jobs.sentiment",
     "quantvista.jobs.alerts",
+    "quantvista.jobs.backtest",
 ]
 disallow_untyped_decorators = false
 
