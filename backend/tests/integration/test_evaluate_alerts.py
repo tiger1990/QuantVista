@@ -135,16 +135,23 @@ def _events(admin_engine: Engine, rule_id: str) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def test_matching_rules_fire_and_dedup(world: _World) -> None:
-    _rule(world.client, world.token_a, world.stock_id, "composite_score", "lt", 50)  # 40<50 → fires
-    _rule(world.client, world.token_a, world.stock_id, "pe", "lt", 50)  # pe=100 → no fire
-    _rule(world.client, world.token_b, world.stock_id, "composite_score", "lt", 50)  # fires
+def test_matching_rules_fire_and_dedup(world: _World, admin_engine: Engine) -> None:
+    a_hit = _rule(world.client, world.token_a, world.stock_id, "composite_score", "lt", 50)  # fires
+    a_miss = _rule(world.client, world.token_a, world.stock_id, "pe", "lt", 50)  # pe=100 → no fire
+    b_hit = _rule(world.client, world.token_b, world.stock_id, "composite_score", "lt", 50)  # fires
 
     fired = AlertEvaluationService().evaluate(_AS_OF, "scores")
-    assert fired == 2  # both composite rules; the pe rule does not match
+    # `evaluate` is a cross-tenant privileged job (all tenants' rules), so assert THIS test's rules
+    # by id — robust to any other alert rows in the shared DB. (A global `fired == 2` was flaky when
+    # other alert data existed, e.g. orphaned by an interrupted run.)
+    assert fired >= 2
+    assert len(_events(admin_engine, a_hit)) == 1
+    assert len(_events(admin_engine, b_hit)) == 1
+    assert len(_events(admin_engine, a_miss)) == 0  # pe=100 does not match `< 50`
 
-    again = AlertEvaluationService().evaluate(_AS_OF, "scores")
-    assert again == 0  # dedup: same cycle date → no new events
+    AlertEvaluationService().evaluate(_AS_OF, "scores")  # dedup: same cycle → no duplicate events
+    assert len(_events(admin_engine, a_hit)) == 1
+    assert len(_events(admin_engine, b_hit)) == 1
 
 
 def test_events_persisted_with_tenant_and_payload(world: _World, admin_engine: Engine) -> None:
