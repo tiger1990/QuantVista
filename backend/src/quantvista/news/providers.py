@@ -30,6 +30,7 @@ from typing import Any
 
 import certifi
 
+from quantvista.core.http import assert_allowed_host
 from quantvista.news.models import NewsArticle
 
 _NEWSAPI_URL = "https://newsapi.org/v2/everything"
@@ -68,9 +69,10 @@ class _HttpJsonProvider:
 
     def _default_urlopen(self, url: str, timeout: float | None = None) -> Any:
         req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
-        return urllib.request.urlopen(req, timeout=timeout, context=self._ctx)
+        return urllib.request.urlopen(req, timeout=timeout, context=self._ctx)  # nosec B310
 
     def _get_json(self, url: str, *, retries: int = 2) -> Any:
+        assert_allowed_host(url)  # SSRF guard (QV-079) — fixed vendor host only
         for attempt in range(1, retries + 1):
             try:
                 with self._urlopen(url, timeout=30) as resp:

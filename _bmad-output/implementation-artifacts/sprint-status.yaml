@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-26
+last_updated: 2026-07-26  # QV-079 review (security hardening — PR-ready)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -53,7 +53,7 @@ development_status:
   1-4-qv-008-iac-bootstrap-aws-staging: done  # merged PR #11 (fcaa2a8); Terraform VPC/EKS/RDS/Redis/S3/IAM/Secrets (ap-south-1) + remote state/locking + per-env workspaces; offline validation 8/8; live apply deferred → PV-002 (no AWS creds here)
   1-5-qv-009-observability-baseline: done  # merged PR #12 (9d3354b); OTel tracing + structlog JSON + /metrics RED + Sentry, all env-driven/no-op-safe; 91 tests, cov 93%; security-review applied (C-1+4×HIGH fixed); live staging backends deferred → PV-003 (blocked on PV-002)
   1-6-qv-020-job-observability-dashboard: done  # freshness gauge (data_latest_ingest_timestamp_seconds) + queue-depth gauge + refresh_ops_metrics beat task; Prometheus alert rules (freshness/failure/backlog) w. deterministic promtool test rules; Grafana dashboard JSON; extends QV-009 metrics; local-native verify (brew prometheus/grafana), live render+notify+prod-scrape → PV-003; no migration
-  1-7-qv-079-security-hardening-pass-owasp-asvs-l2: backlog
+  1-7-qv-079-security-hardening-pass-owasp-asvs-l2: review  # PR-ready; ASVS-L2 pass: security headers + CSP(/docs-exempt) + auth rate limiting (slowapi, off-by-default) + SSRF allow-list + extra=forbid input audit + CSRF-safe doc + bandit/pip-audit CI (caught+fixed pydantic-settings CVE) + prod docs off; 657 passed/5 skipped; no migration; FE-CSP→PV-008, XFF→PV-003, Trivy→PV-002
   1-8-qv-082-observability-slos-alerting-finalized: backlog
   1-9-qv-083-backup-pitr-restore-drill: backlog
   1-10-qv-084-production-cd-pipeline-staging-gates: backlog

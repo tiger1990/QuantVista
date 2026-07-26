@@ -137,6 +137,30 @@ What still needs the running staging stack (add to the PV-003 verify run):
 4. **Production scrape:** confirm Prometheus scrapes the deployed api (`/metrics`) + worker port and the
    freshness/queue gauges reflect the live pipeline.
 
+### PV-003 — QV-079 rate-limiting real-client-IP behind the proxy
+
+QV-079 rate-limits auth endpoints per client IP via `get_remote_address` (= `request.client.host`).
+Behind the prod ALB / k8s ingress that host is the **proxy**, so all clients collapse into one bucket
+(over-blocking) unless the real client IP is recovered from a **trusted** `X-Forwarded-For`. Deferred
+because staging infra is not live (blocked on PV-002). When the proxy stack exists: front the limiter
+key func with a trusted-XFF parser (left-most hop past the known proxy CIDRs — never the raw header,
+which is client-spoofable), and confirm per-IP limits isolate distinct clients through the LB.
+Also enable `RATE_LIMIT_ENABLED=true` + `RATE_LIMIT_BACKEND=redis` in staging/prod env so the window is
+shared across api replicas. Status: ⏳ deferred (needs live proxy).
+
+### PV-008 — QV-079 frontend nonce-based CSP
+
+The **backend** API ships a strict `default-src 'none'; frame-ancestors 'none'` CSP (JSON-only surface).
+The **frontend** (Next.js) still needs its own nonce-based CSP for the rendered app: a per-request nonce
+in middleware + `next.config.ts` `headers()` emitting `script-src 'self' 'nonce-…'` (per the web
+security rules), replacing any `'unsafe-inline'`. Deferred to a frontend pass — no backend dependency.
+Also fold in the remaining response headers on the Next tier (HSTS at the edge/CDN, `X-Content-Type-Options`,
+`Referrer-Policy`, `Permissions-Policy`). Status: ⏳ OPEN (frontend work).
+
+> **Container image scan (Trivy) → PV-002.** QV-079's SAST (bandit) + SCA (pip-audit) run in CI now.
+> Trivy image scanning is deferred to PV-002 (no Docker image is built in CI yet — it lands with the
+> container/CD work).
+
 ## How to close an item
 
 1. Run the verification on a capable machine.

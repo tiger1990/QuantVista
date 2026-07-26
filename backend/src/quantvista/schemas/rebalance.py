@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RebalanceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     drift_threshold: Decimal = Field(default=Decimal("0.05"), ge=0, le=1)
 
 

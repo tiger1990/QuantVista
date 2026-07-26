@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FilterClause(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     field: str
     op: str
     value: float | str
 
 
 class ScreenRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     universe: str = "NIFTY200"  # informational; dev universe = the market's constituents
     market: str = "NSE"
     filters: list[FilterClause] = Field(default_factory=list)

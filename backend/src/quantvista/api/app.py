@@ -10,11 +10,13 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from slowapi.errors import RateLimitExceeded
 
 from quantvista.alerts.rules import AlertRuleError
 from quantvista.api.idempotency import IdempotencyConflict
 from quantvista.api.middleware import RequestContextMiddleware
 from quantvista.api.pagination import InvalidCursor
+from quantvista.api.ratelimit import limiter, rate_limit_exceeded_handler
 from quantvista.api.routes import router as auth_router
 from quantvista.api.routes_alerts import AlertNotFound
 from quantvista.api.routes_alerts import router as alerts_router
@@ -29,6 +31,7 @@ from quantvista.api.routes_screens import ScreenNameTaken, ScreenNotFound
 from quantvista.api.routes_screens import router as screens_router
 from quantvista.api.routes_stocks import StockNotFound
 from quantvista.api.routes_stocks import router as stocks_router
+from quantvista.api.security_headers import SecurityHeadersMiddleware
 from quantvista.core.config import get_settings
 from quantvista.core.observability import configure_observability
 from quantvista.core.observability.metrics import (
@@ -147,14 +150,31 @@ def _register_metrics(app: FastAPI) -> None:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="QuantVista API", version="0.1.0")
+    settings = get_settings()
+    # Docs hardening (QV-079): the interactive schema/docs are dev conveniences — disable them in
+    # production to reduce public API-surface exposure (ASVS). Kept on in local/staging.
+    is_prod = settings.app_env == "production"
+    app = FastAPI(
+        title="QuantVista API",
+        version="0.1.0",
+        docs_url=None if is_prod else "/docs",
+        redoc_url=None if is_prod else "/redoc",
+        openapi_url=None if is_prod else "/openapi.json",
+    )
     # Observability first so tracing/logging/Sentry wrap everything below. Middleware is
-    # applied outermost-last, so RequestContext (added last) is the outermost layer:
-    # it binds correlation before the metrics layer measures the request.
+    # applied outermost-last, so SecurityHeaders (added last) is the outermost layer, then
+    # RequestContext binds correlation before the metrics layer measures the request.
     configure_observability("api", app=app)
-    if get_settings().metrics_enabled:
+    if settings.metrics_enabled:
         _register_metrics(app)
     app.add_middleware(RequestContextMiddleware)
+    # Outermost: stamp OWASP-baseline security headers on the FINAL response (after the
+    # RequestContext rebuild), so they survive on every path incl. rebuilt JSON envelopes.
+    app.add_middleware(SecurityHeadersMiddleware, hsts_enabled=settings.hsts_enabled)
+    # Rate limiting (QV-079): decorated per-route via `@limiter.limit(...)` in routes.py. Only the
+    # limiter reference + a 429 handler are needed (no SlowAPIMiddleware). OFF unless enabled.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(stocks_router)

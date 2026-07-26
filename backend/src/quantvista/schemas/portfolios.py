@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CreatePortfolioRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     name: str = Field(min_length=1, max_length=120)
     benchmark: str = Field(default="NIFTY200_TRI", min_length=1, max_length=40)
     base_currency: str = Field(default="INR", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
@@ -32,6 +33,7 @@ class Portfolio(BaseModel):
 class UpsertPositionRequest(BaseModel):
     """``stock_id`` comes from the path, not the body. All fields optional (partial curation)."""
 
+    model_config = ConfigDict(extra="forbid")  # reject unknown fields (QV-079)
     weight: Decimal | None = Field(default=None, ge=0, le=1)
     target_weight: Decimal | None = Field(default=None, ge=0, le=1)
     shares: Decimal | None = Field(default=None, ge=0)
