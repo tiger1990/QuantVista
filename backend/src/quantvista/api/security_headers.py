@@ -28,6 +28,10 @@ _BASE_HEADERS: dict[str, str] = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     # Disabled intentionally: modern browsers rely on CSP; the legacy filter causes bugs.
     "X-XSS-Protection": "0",
+    # Dynamic, tenant-scoped JSON — never cache. Prevents a client's HTTP cache from serving a
+    # stale body after a mutation (e.g. a deleted holding lingering). `setdefault` lets a specific
+    # endpoint opt into caching later if ever needed.
+    "Cache-Control": "no-store",
 }
 _CSP = "default-src 'none'; frame-ancestors 'none'"
 # Paths whose HTML/JS/CSS load from a CDN — the strict CSP would blank them.
