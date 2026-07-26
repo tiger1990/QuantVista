@@ -47,7 +47,7 @@ export function MarketOverview({ items, asOf }: { items: RankingItem[]; asOf?: s
 const TOP_RANKED_COLS = "grid grid-cols-[1.25rem_1fr_auto_3rem] items-center gap-x-3";
 
 export function TopRanked({ items }: { items: RankingItem[] }) {
-  const top = items.slice(0, 6);
+  const top = items.slice(0, 15);
   return (
     <Card className="h-full">
       <CardContent className="space-y-2">

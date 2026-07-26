@@ -12,8 +12,7 @@ test("dashboard + stocks + rankings render live data", async ({ page }) => {
   await page.getByLabel("Password").fill("correct-horse-battery-staple");
   await page.getByRole("button", { name: /create account/i }).click();
 
-  // Dashboard bento: market-overview strip + top-ranked tile.
-  await expect(page.getByText(/avg composite/i)).toBeVisible();
+  // Dashboard bento: top-ranked tile (market-overview strip retired).
   await expect(page.getByText(/top ranked/i)).toBeVisible();
 
   // Stocks list: table renders real rows.
