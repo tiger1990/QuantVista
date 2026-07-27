@@ -165,6 +165,11 @@ jobs:
         run: psql -h localhost -U quantvista -d quantvista -v ON_ERROR_STOP=1 -f src/quantvista/db/seeds/seed_reference.sql
       - name: Integration tests — RLS denial + seed idempotency (as app/admin roles)
         run: pytest -m integration
+      - name: Bias regression guards — mandatory, non-skippable (QV-066; 08 §5)
+        # The two cardinal sins (look-ahead, survivorship) can never silently regress: these
+        # engine-level counterfactuals fail iff the backtest leaks future data or drops delisted
+        # names. Live Postgres here → they always execute (the integration auto-skip never fires).
+        run: pytest -m bias
 
   # Real FinBERT verification (QV-044). Linux HAS torch/py3.13 wheels (the x86 macOS dev box does
   # not), so this exercises the ACTUAL ProsusAI/finbert model behind `-m finbert`. Intentionally

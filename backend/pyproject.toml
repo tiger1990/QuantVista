@@ -196,6 +196,7 @@ pythonpath = ["."]
 markers = [
     "integration: requires a reachable PostgreSQL database (skipped when none is reachable)",
     "finbert: exercises the real ProsusAI/finbert model (needs the [finbert] extra; auto-skips without torch)",
+    "bias: permanent backtest bias-regression guards (QV-066); mandatory + non-skippable in CI (08 §5)",
 ]
 
 [tool.coverage.run]

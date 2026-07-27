@@ -4,7 +4,7 @@ baseline_commit: fc0ff2ca47627438beecaaf53e37d2c03dfba11f
 
 # Story 8.4: QV-065 — Backtest engine core (rebalance loop + frictions)
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 8 · **Depends:** QV-063 (`BacktestDataAccess` PIT seam), QV-064 (survivorship-free `universe_as_of` + forced-exit `last_price_as_of`), QV-053 (constraints concept — see DAG note; **not** a code import)
 
