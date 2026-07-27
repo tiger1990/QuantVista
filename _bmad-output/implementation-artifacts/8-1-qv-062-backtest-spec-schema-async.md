@@ -4,7 +4,7 @@ baseline_commit: e7c1eadfbf1342b6589d639a1c4d5bcaf6233c09
 
 # Story 8.1: QV-062 — Backtest spec + schema (async)
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 5 · **Depends:** QV-007 (tenant context + EntitlementService), QV-015 (job framework), QV-005 (entitlement seed)
 
