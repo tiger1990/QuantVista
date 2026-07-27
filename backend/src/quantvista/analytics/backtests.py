@@ -99,14 +99,27 @@ def mark_running(session: Session, backtest_id: UUID) -> bool:
 
 
 def mark_succeeded(
-    session: Session, backtest_id: UUID, *, metrics: dict[str, object], result_ref: str | None
+    session: Session,
+    backtest_id: UUID,
+    *,
+    metrics: dict[str, object],
+    result_ref: str | None,
+    model_version: str | None = None,
+    weights_version: str | None = None,
 ) -> None:
     session.execute(
         text(
             "UPDATE backtests SET status = 'succeeded', finished_at = now(), "
-            "metrics = CAST(:m AS jsonb), result_ref = :r WHERE id = :id"
+            "metrics = CAST(:m AS jsonb), result_ref = :r, "
+            "model_version = :mv, weights_version = :wv WHERE id = :id"
         ),
-        {"id": backtest_id, "m": json.dumps(metrics), "r": result_ref},
+        {
+            "id": backtest_id,
+            "m": json.dumps(metrics),
+            "r": result_ref,
+            "mv": model_version,
+            "wv": weights_version,
+        },
     )
 
 

@@ -24,7 +24,11 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from quantvista.analytics.scoring import compute_universe
-from quantvista.market_data.repositories import historical_universe, last_adjusted_close_as_of
+from quantvista.market_data.repositories import (
+    adjusted_close_panel,
+    historical_universe,
+    last_adjusted_close_as_of,
+)
 from quantvista.market_data.returns import ReturnsMatrix, returns_matrix_as_of
 
 # The score fields a backtest may rank by (mirrors BacktestSpec.rank_by / StockScore attributes).
@@ -77,6 +81,13 @@ class BacktestDataAccess:
         """Per stock, the last adjusted-close bar with ``date <= as_of`` — the forced-exit price for
         a delisted holding (QV-064). Names with no prior bar are absent from the map."""
         return last_adjusted_close_as_of(self._session, stock_ids, as_of)
+
+    def price_panel(
+        self, start: date, end: date, stock_ids: Sequence[UUID]
+    ) -> dict[UUID, dict[date, Decimal]]:
+        """Per-stock ``{date: adj_close}`` over ``[start, end]`` (PIT-bounded) — the return source
+        the engine (QV-065) walks. Non-intersecting: a delisted name keeps its own coverage."""
+        return adjusted_close_panel(self._session, stock_ids, start, end)
 
     def returns_as_of(
         self,

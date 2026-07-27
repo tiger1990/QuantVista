@@ -12,6 +12,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from quantvista.analytics.backtest import BacktestEngine
+from quantvista.analytics.backtest_data import BacktestDataAccess
 from quantvista.analytics.backtests import (
     get_backtest,
     mark_failed,
@@ -33,9 +34,15 @@ def _run(backtest_id: UUID) -> JobResult:
         assert row is not None  # mark_running succeeded ⇒ the row exists
         try:
             spec = BacktestSpec.model_validate(row["spec"])
-            result = BacktestEngine().run(spec)  # QV-065 fills the real compute
+            result = BacktestEngine(BacktestDataAccess(session)).run(spec)  # QV-065 real compute
+            metrics = dict(result.metrics)
             mark_succeeded(
-                session, backtest_id, metrics=result.metrics, result_ref=result.result_ref
+                session,
+                backtest_id,
+                metrics=metrics,
+                result_ref=result.result_ref,
+                model_version=metrics.get("model_version"),
+                weights_version=metrics.get("weights_version"),
             )
         except Exception as exc:  # a bad spec / engine error marks the backtest failed (no retry)
             mark_failed(session, backtest_id, error=str(exc))
