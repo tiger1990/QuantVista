@@ -95,6 +95,69 @@ def active_universe(session: Session, index_code: str, market_code: str) -> list
     return [UniverseStock(stock_id=r[0], symbol=r[1], market=r[2]) for r in rows]
 
 
+# --- survivorship-free historical membership (QV-064) ------------------------
+# Membership is the half-open interval [effective_from, effective_to): a name is a member on
+# effective_from and NOT on its effective_to (drop) date. Deliberately NO `is_active` /
+# `delisted_on` filter — a name that was a member on `as_of` but delisted afterward is still in
+# the universe at `as_of`. That omission is exactly the survivorship bias this read exists to kill
+# (05 §4.2, cardinal sin #2). Contrast `active_universe`, which sees only open + active members.
+_HISTORICAL_UNIVERSE_SQL = text(
+    """
+    SELECT s.id
+    FROM index_constituents ic
+    JOIN stocks s  ON s.id = ic.stock_id
+    JOIN markets m ON m.id = s.market_id
+    WHERE ic.index_code = :index_code
+      AND m.code = :market_code
+      AND ic.effective_from <= :as_of
+      AND (ic.effective_to IS NULL OR ic.effective_to > :as_of)
+    ORDER BY s.symbol
+    """
+)
+
+
+def historical_universe(
+    session: Session, index_code: str, market_code: str, as_of: date
+) -> list[UUID]:
+    """Survivorship-free membership of ``index_code`` on ``market_code`` **as of** ``as_of``.
+
+    Returns every constituent whose range ``[effective_from, effective_to)`` contains ``as_of`` —
+    including names later delisted or dropped — so backtests aren't survivorship-biased (05 §4.2).
+    Deterministic order (by symbol).
+    """
+    rows = session.execute(
+        _HISTORICAL_UNIVERSE_SQL,
+        {"index_code": index_code, "market_code": market_code, "as_of": as_of},
+    ).all()
+    return [r[0] for r in rows]
+
+
+# Last adjusted-close bar on or before `as_of` per stock — the price the engine (QV-065) uses to
+# force-exit a holding that delisted mid-hold ("forced exit at last valid price", 05 §4.2).
+_LAST_ADJ_CLOSE_SQL = text(
+    """
+    SELECT DISTINCT ON (stock_id) stock_id, date, adj_close
+    FROM daily_prices
+    WHERE stock_id = ANY(:ids) AND date <= :as_of
+    ORDER BY stock_id, date DESC
+    """
+)
+
+
+def last_adjusted_close_as_of(
+    session: Session, stock_ids: Sequence[UUID], as_of: date
+) -> dict[UUID, tuple[date, Decimal]]:
+    """Per stock, the last adjusted-close bar with ``date <= as_of`` as ``(date, adj_close)``.
+
+    Names with no bar on or before ``as_of`` are absent from the map (the caller decides what to do
+    with an unpriceable forced exit). Empty ``stock_ids`` → empty map.
+    """
+    if not stock_ids:
+        return {}
+    rows = session.execute(_LAST_ADJ_CLOSE_SQL, {"ids": list(stock_ids), "as_of": as_of}).all()
+    return {r[0]: (r[1], r[2]) for r in rows}
+
+
 _LATEST_PRICE_DATE_SQL = text("SELECT max(date) FROM daily_prices")
 
 

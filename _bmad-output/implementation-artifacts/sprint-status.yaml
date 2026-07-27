@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-27  # QV-063 review (PIT data access for backtests — look-ahead firewall)
+last_updated: 2026-07-27  # QV-064 review (survivorship-free historical universe)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -151,8 +151,8 @@ development_status:
   # ---- Epic 8: Backtesting (EPIC-BT) ----
   epic-8: in-progress
   8-1-qv-062-backtest-spec-schema-async: done  # merged PR #71 (541b4e1); async submit/poll: VERIFY backtests schema (0011, no migration) + BacktestSpec allow-list + POST 202/GET poll/list + entitlement (backtest + backtest_full >1y) + run_backtest Celery task w/ PLACEHOLDER engine seam (real engine=QV-065) + core.tasks.enqueue send-by-name seam (api↔jobs DAG-independent); 26 tests, 96% cov; +de-flake evaluate_alerts (assert own rules not global count)
-  8-2-qv-063-pit-data-access-for-backtests: review  # PR-ready; QUANT: BacktestDataAccess PIT read seam (ranked_universe via compute_universe/ScoringContext + returns_as_of), structural no-look-ahead proven by QV-037-style leakage regression; 701 passed, 100% new-module cov; no API/schema/migration; membership=QV-064
-  8-3-qv-064-survivorship-free-historical-universe: backlog
+  8-2-qv-063-pit-data-access-for-backtests: done  # QUANT: BacktestDataAccess PIT read seam (look-ahead firewall) merged PR #72; scripts made an importable package en route
+  8-3-qv-064-survivorship-free-historical-universe: review  # QUANT: survivorship-free as-of index membership (incl. later-delisted) + forced-exit last-price primitive on the QV-063 seam; 10-test real-PG regression; 711 passed; no new table/migration/API; loop=QV-065
   8-4-qv-065-backtest-engine-core-rebalance-loop-frictions: backlog
   8-5-qv-066-bias-regression-test-suite-ci-non-skippable: backlog
   8-6-qv-067-parquet-offload-duckdb-polars-read-path: backlog
