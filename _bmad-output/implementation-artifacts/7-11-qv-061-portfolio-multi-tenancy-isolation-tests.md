@@ -4,7 +4,7 @@ baseline_commit: 49664f39826c9a89417902215a3bbecdc8af9ce1
 
 # Story 7.11: QV-061 — Portfolio multi-tenancy isolation tests
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PORT (Epic 7) · **Points:** 3 · **Depends:** QV-051 (portfolios/positions + RLS), QV-058 (risk), and by extension QV-055 (optimize) + QV-059 (rebalance)
 

@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-26  # QV-061 review (portfolio multi-tenancy isolation tests — closes Epic 7)
+last_updated: 2026-07-27  # QV-062 review (Epic 8 backtesting — async spec/schema/submit/poll)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -134,7 +134,7 @@ development_status:
   epic-6-retrospective: optional
 
   # ---- Epic 7: Portfolio & Risk (EPIC-PORT) ----
-  epic-7: in-progress
+  epic-7: done  # EPIC-PORT complete: QV-051..061 (schema/RLS → CRUD → constraints → MV+risk-parity optimizers → optimize API → FE builder → RiskEngine → rebalance+drift → FE risk dashboard → isolation proof)
   7-1-qv-051-schema-portfolios-portfolio-positions-rls: done  # MERGED PR #58. schema already in 0008 (forward-declared, NO migration); portfolio.repositories (CRUD, RLS) + services.enforce_portfolio_limit (pure guard) + RLS cross-tenant tests. 474 passed, coverage 98%. entitlement key = portfolios (Free1/Pro5/∞)
   7-2-qv-052-portfolio-crud-api: done  # merged PR #59; review patches: IntegrityError branch tests, json.loads guard, base_currency ISO pattern, UpsertPositionRequest at-least-one validator. 310 unit tests pass.
   7-3-qv-053-constraints-engine: done  # merged PR #60 (560f610). portfolio/constraints.py — Constraints value object + check()/feasibility() → per-constraint ConstraintReport, deterministic binding constraint on infeasible (US-03), InfeasibleConstraints exc. 49 unit tests, 100% module cov; lint-imports 3/3; 357 passed. NO db/api/migration/dependency (numpy → QV-054).
@@ -145,12 +145,12 @@ development_status:
   7-8-qv-058-riskengine-metrics: done  # merged PR #66 (300b5f6). RiskEngine — pure-numpy portfolio risk metrics: market-value weights (shares×close, fallback target_weight), annualized vol/Sharpe/Sortino/max-drawdown, beta (Σwᵢ·βᵢ renormalized over covered names + BetaCoverage), HHI, sector exposure; Decimal↔float boundary. GET /portfolios/{id}/risk — bulk PIT reads (latest_closes+latest_betas, DISTINCT ON), upsert_risk_snapshot (UNIQUE ON CONFLICT idempotent), research-only disclaimer header+meta. No paid entitlement gate. 10 unit tests + 4 integration tests + 3 bulk-PIT reader tests; full-tree mypy/ruff/lint-imports green.
   7-9-qv-059-rebalancing-drift-alerts: done  # PR ready; all ACs met: rebalance endpoint + drift alert wired; 634 passed
   7-10-qv-060-frontend-risk-dashboard-rebalancing-ui: done  # merged PR #69 (49664f3); FE+small-BE: additive drawdown_series on /risk + risk dashboard (tiles+sector+REAL drawdown chart) + rebalance panel + apply-to-targets BOTH surfaces; regen typed client; +fixes: chart flicker, stale-read (Cache-Control no-store), shares input + non-destructive COALESCE upsert (meaningful drift); live-verified 20/20; BE 662 / FE 78 green; no migration
-  7-11-qv-061-portfolio-multi-tenancy-isolation-tests: review  # PR-ready; SEC: 6 cross-tenant isolation tests (real foreign portfolio 404 across /risk /rebalance /optimize /positions + RLS repo WITH CHECK denial + risk-snapshot isolation); +1 fix: /optimize resolves 404 before entitlement (no 403 existence leak); 668 passed/5 skipped; backend-rls CI-gated; no migration; CLOSES EPIC 7
+  7-11-qv-061-portfolio-multi-tenancy-isolation-tests: done  # merged PR #70 (e7c1ead); SEC: 6 cross-tenant isolation tests (real foreign portfolio 404 across /risk /rebalance /optimize /positions + RLS repo WITH CHECK denial + risk-snapshot isolation); +1 fix: /optimize resolves 404 before entitlement (no 403 existence leak); 668 passed/5 skipped; backend-rls CI-gated; no migration; CLOSES EPIC 7
   epic-7-retrospective: optional
 
   # ---- Epic 8: Backtesting (EPIC-BT) ----
-  epic-8: backlog
-  8-1-qv-062-backtest-spec-schema-async: backlog
+  epic-8: in-progress
+  8-1-qv-062-backtest-spec-schema-async: review  # PR-ready; async submit/poll plumbing: VERIFY backtests schema (0011, RLS, no migration) + BacktestSpec allow-list + POST 202 queued/GET poll/list + entitlement (backtest + backtest_full for >1y) + run_backtest Celery task w/ PLACEHOLDER engine seam (real engine = QV-065); cross-tenant 404 test
   8-2-qv-063-pit-data-access-for-backtests: backlog
   8-3-qv-064-survivorship-free-historical-universe: backlog
   8-4-qv-065-backtest-engine-core-rebalance-loop-frictions: backlog

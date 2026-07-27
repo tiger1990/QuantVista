@@ -53,6 +53,7 @@ def create_celery() -> Celery:
             "quantvista.jobs.ops_metrics",
             "quantvista.jobs.news",
             "quantvista.jobs.sentiment",
+            "quantvista.jobs.backtest",
         ],
     )
     celery.conf.task_default_queue = "default"
