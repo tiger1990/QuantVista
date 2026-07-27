@@ -4,7 +4,7 @@ baseline_commit: 3517e40f34cffd371c3c092d3480da9f13b54772
 
 # Story 8.3: QV-064 — Survivorship-free historical universe
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 5 · **Depends:** QV-013 (schema: `stocks.delisted_on`, `index_constituents` PIT membership), QV-019 (`sync_index_constituents` / `reconcile_constituents` — the writer that keeps membership survivorship-free)
 

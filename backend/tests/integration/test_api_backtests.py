@@ -1,6 +1,6 @@
 """Backtest async API end-to-end (QV-062) — real app + PG + auth + the run_backtest task.
 
-Covers: submit → 202 queued, poll, the runner transitioning queued→succeeded (placeholder engine),
+Covers: submit → 202 queued, poll, the runner transitioning queued→succeeded (QV-065 engine),
 idempotent re-run, the two-tier entitlement (Free 403, Pro ≤1y 202 / >1y 403, Quant full 202), a bad
 spec → 422, and cross-tenant / unknown → 404. The ``enqueue`` seam is patched to a no-op so the API
 test needs no broker; the runner is then invoked directly (the worker's job).
@@ -140,10 +140,11 @@ def test_submit_poll_run_lifecycle(api: dict[str, Any]) -> None:
     poll = client.get(f"/api/v1/backtests/{bid}", headers=_h(pro)).json()["data"]
     assert poll["status"] == "queued" and poll["metrics"] is None
 
-    run_backtest(bid)  # the worker's job (placeholder engine → succeeded)
+    run_backtest(bid)  # the worker's job (QV-065 engine → succeeded with real metrics)
     done = client.get(f"/api/v1/backtests/{bid}", headers=_h(pro)).json()["data"]
-    assert done["status"] == "succeeded"
-    assert done["metrics"] == {} and done["finished_at"] is not None
+    assert done["status"] == "succeeded" and done["finished_at"] is not None
+    # QV-065: the real engine populates the core metric set (not the old empty placeholder dict).
+    assert {"total_return", "n_rebalances"} <= set(done["metrics"])
 
     run_backtest(bid)  # idempotent: a non-queued row is a no-op (still succeeded)
     assert (

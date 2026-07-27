@@ -132,6 +132,36 @@ def historical_universe(
     return [r[0] for r in rows]
 
 
+# Per-stock adjusted-close series over [start, end] — the price panel the backtest engine (QV-065)
+# walks to compute period returns. PIT-bounded by `end`; a delisted name simply has no bars past its
+# last trading day (the engine force-exits it). Unlike `returns_matrix_as_of`, this does NOT
+# intersect dates across names — each keeps its own coverage, so a mid-run delisting doesn't trim
+# the whole panel.
+_ADJ_CLOSE_PANEL_SQL = text(
+    """
+    SELECT stock_id, date, adj_close
+    FROM daily_prices
+    WHERE stock_id = ANY(:ids) AND date >= :start AND date <= :end AND adj_close IS NOT NULL
+    ORDER BY stock_id, date
+    """
+)
+
+
+def adjusted_close_panel(
+    session: Session, stock_ids: Sequence[UUID], start: date, end: date
+) -> dict[UUID, dict[date, Decimal]]:
+    """Per stock, ``{date: adj_close}`` for ``start <= date <= end`` (empty ids → ``{}``)."""
+    if not stock_ids:
+        return {}
+    rows = session.execute(
+        _ADJ_CLOSE_PANEL_SQL, {"ids": list(stock_ids), "start": start, "end": end}
+    ).all()
+    panel: dict[UUID, dict[date, Decimal]] = {}
+    for stock_id, bar_date, adj_close in rows:
+        panel.setdefault(stock_id, {})[bar_date] = adj_close
+    return panel
+
+
 # Last adjusted-close bar on or before `as_of` per stock — the price the engine (QV-065) uses to
 # force-exit a holding that delisted mid-hold ("forced exit at last valid price", 05 §4.2).
 _LAST_ADJ_CLOSE_SQL = text(
