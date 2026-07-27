@@ -18,11 +18,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from quantvista.analytics.scoring import compute_universe
+from quantvista.market_data.repositories import historical_universe, last_adjusted_close_as_of
 from quantvista.market_data.returns import ReturnsMatrix, returns_matrix_as_of
 
 # The score fields a backtest may rank by (mirrors BacktestSpec.rank_by / StockScore attributes).
@@ -58,6 +60,23 @@ class BacktestDataAccess:
         ]
         scored.sort(key=lambda t: (-t[0], t[1]))  # score desc, then stock_id asc (deterministic)
         return [stock_id for _, stock_id in scored[:top_n]]
+
+    def universe_as_of(
+        self, as_of: date, *, index_code: str = "NIFTY200", market: str = "NSE"
+    ) -> list[UUID]:
+        """Survivorship-free index membership at ``as_of`` — includes names later delisted (QV-064).
+
+        The universe the engine ranks/holds at a rebalance date. Bounded by ``as_of``: a name is a
+        member iff ``effective_from <= as_of < effective_to`` (open ranges never end).
+        """
+        return historical_universe(self._session, index_code, market, as_of)
+
+    def last_price_as_of(
+        self, as_of: date, stock_ids: Sequence[UUID]
+    ) -> dict[UUID, tuple[date, Decimal]]:
+        """Per stock, the last adjusted-close bar with ``date <= as_of`` — the forced-exit price for
+        a delisted holding (QV-064). Names with no prior bar are absent from the map."""
+        return last_adjusted_close_as_of(self._session, stock_ids, as_of)
 
     def returns_as_of(
         self,

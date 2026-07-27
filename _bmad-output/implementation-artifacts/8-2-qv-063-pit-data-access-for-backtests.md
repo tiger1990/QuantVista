@@ -4,7 +4,7 @@ baseline_commit: 541b4e11cf6ee191c845d14b2958e80ce84437a3
 
 # Story 8.2: QV-063 — PIT data access for backtests
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 8 · **Depends:** QV-021 (bitemporal fundamentals), QV-030 (compute factors/scores), QV-028/029 (Factor/ScoreEngine + `ScoringContext`)
 
