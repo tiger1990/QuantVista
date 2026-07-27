@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from load_nifty200_universe import DATA_FILE, ConstituentRow, parse_nifty200_csv
+from scripts.load_nifty200_universe import DATA_FILE, ConstituentRow, parse_nifty200_csv
 
 SAMPLE = (
     "Company Name,Industry,Symbol,Series,ISIN Code\n"
