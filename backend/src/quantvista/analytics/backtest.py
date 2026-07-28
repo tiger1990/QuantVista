@@ -20,8 +20,7 @@ from decimal import Decimal
 from typing import Any, Protocol
 from uuid import UUID
 
-import numpy as np
-
+from quantvista.analytics.backtest_metrics import compute_metrics, empty_metrics
 from quantvista.analytics.scoring import MODEL_VERSION  # ranking methodology fingerprint
 from quantvista.market_data.trading_calendar import sessions_in_range
 from quantvista.schemas.backtest import BacktestSpec
@@ -29,7 +28,6 @@ from quantvista.schemas.backtest import BacktestSpec
 # A fixed slippage assumption (bps), added to the spec's commission on each traded unit of turnover.
 SLIPPAGE_BPS = 5
 WEIGHTS_VERSION = "equal-weight-v1"
-_TRADING_DAYS = 252  # annualisation factor for vol/Sharpe
 
 
 class BacktestData(Protocol):
@@ -98,11 +96,6 @@ def _turnover(target: dict[UUID, float], held: dict[UUID, float]) -> float:
     return 0.5 * sum(abs(target.get(n, 0.0) - held.get(n, 0.0)) for n in names)
 
 
-def _s(x: float) -> str:
-    """Serialise a float metric as a Decimal string (never a raw float on the wire)."""
-    return str(Decimal(str(round(float(x), 8))))
-
-
 class BacktestEngine:
     """Runs a validated ``BacktestSpec`` into a ``BacktestResult`` via the ``BacktestData`` seam."""
 
@@ -112,7 +105,7 @@ class BacktestEngine:
     def run(self, spec: BacktestSpec) -> BacktestResult:
         sessions = sessions_in_range(spec.start, spec.end)
         if len(sessions) < 2:
-            return BacktestResult(metrics=_empty_metrics(), result_ref=None)
+            return BacktestResult(metrics=self._stamp(empty_metrics()), result_ref=None)
 
         rebal_dates = _rebalance_dates(sessions, spec.rules.rebalance)
         picks = {
@@ -136,19 +129,34 @@ class BacktestEngine:
             d: _equal_weight([p for p in picks[d] if panel.get(p, {}).get(d) is not None])
             for d in rebal_dates
         }
-        curve, period_returns, turnovers = self._simulate(sessions, panel, strat_targets, cost_rate)
+        curve, returns, turnovers, exposures = self._simulate(
+            sessions, panel, strat_targets, cost_rate
+        )
 
         bench_targets = {
             sessions[0]: _equal_weight([b for b in bench_ids if panel.get(b, {}).get(sessions[0])])
         }
-        bench_curve, _, _ = self._simulate(sessions, panel, bench_targets, 0.0)
+        bench_curve, bench_returns, _, _ = self._simulate(sessions, panel, bench_targets, 0.0)
 
-        metrics = _metrics(
-            sessions, curve, period_returns, turnovers, bench_curve, len(rebal_dates)
+        metrics = compute_metrics(
+            sessions=sessions,
+            curve=curve,
+            period_returns=returns,
+            turnovers=turnovers,
+            exposures=exposures,
+            bench_curve=bench_curve,
+            bench_returns=bench_returns,
+            rebalance_dates=rebal_dates,
+            n_rebalances=len(rebal_dates),
         )
+        return BacktestResult(metrics=self._stamp(metrics), result_ref=None)
+
+    @staticmethod
+    def _stamp(metrics: dict[str, Any]) -> dict[str, Any]:
+        """Record the reproducibility fingerprints on every result (QV-069)."""
         metrics["model_version"] = MODEL_VERSION
         metrics["weights_version"] = WEIGHTS_VERSION
-        return BacktestResult(metrics=metrics, result_ref=None)
+        return metrics
 
     def _simulate(
         self,
@@ -156,16 +164,18 @@ class BacktestEngine:
         panel: dict[UUID, dict[date, Decimal]],
         targets_by_date: dict[date, dict[UUID, float]],
         cost_rate: float,
-    ) -> tuple[list[float], list[float], list[float]]:
+    ) -> tuple[list[float], list[float], list[float], list[float]]:
         """Walk the sessions: realise weighted daily returns, force-exit gaps, rebalance on cadence.
 
-        Returns ``(equity_curve, period_returns, turnovers)``. Cash (unallocated weight) earns 0.
+        Returns ``(equity_curve, period_returns, turnovers, exposures)`` — ``exposures[i]`` is the
+        invested fraction (sum of held weights) into session ``i``; cash (the remainder) earns 0.
         """
         equity = 1.0
         held: dict[UUID, float] = {}
         curve: list[float] = []
         period_returns: list[float] = []
         turnovers: list[float] = []
+        exposures: list[float] = []
         prev: date | None = None
 
         for cur in sessions:
@@ -193,58 +203,9 @@ class BacktestEngine:
                 held = dict(target)
 
             curve.append(equity)
+            exposures.append(sum(held.values()))  # invested fraction held into `cur`
             prev = cur
-        return curve, period_returns, turnovers
-
-
-def _metrics(
-    sessions: Sequence[date],
-    curve: Sequence[float],
-    period_returns: Sequence[float],
-    turnovers: Sequence[float],
-    bench_curve: Sequence[float],
-    n_rebalances: int,
-) -> dict[str, Any]:
-    total = curve[-1] - 1.0
-    bench = bench_curve[-1] - 1.0
-    years = max((sessions[-1] - sessions[0]).days / 365.25, 1e-9)
-    cagr = curve[-1] ** (1.0 / years) - 1.0 if curve[-1] > 0 else -1.0
-    r = np.asarray(period_returns, dtype=np.float64)
-    std = float(r.std(ddof=1)) if r.size > 1 else 0.0
-    vol = std * float(np.sqrt(_TRADING_DAYS))
-    sharpe = float(r.mean()) / std * float(np.sqrt(_TRADING_DAYS)) if std > 0 else 0.0
-    c = np.asarray(curve, dtype=np.float64)
-    max_dd = float((c / np.maximum.accumulate(c) - 1.0).min()) if c.size else 0.0
-    avg_turnover = float(np.mean(turnovers)) if turnovers else 0.0
-    return {
-        "total_return": _s(total),
-        "cagr": _s(cagr),
-        "ann_vol": _s(vol),
-        "sharpe": _s(sharpe),
-        "max_drawdown": _s(max_dd),
-        "avg_turnover": _s(avg_turnover),
-        "n_rebalances": n_rebalances,
-        "benchmark_return": _s(bench),
-        "excess_return": _s(total - bench),
-    }
-
-
-def _empty_metrics() -> dict[str, Any]:
-    """A valid, all-zero metrics dict for a degenerate range (fewer than two sessions)."""
-    zero = _s(0.0)
-    return {
-        "total_return": zero,
-        "cagr": zero,
-        "ann_vol": zero,
-        "sharpe": zero,
-        "max_drawdown": zero,
-        "avg_turnover": zero,
-        "n_rebalances": 0,
-        "benchmark_return": zero,
-        "excess_return": zero,
-        "model_version": MODEL_VERSION,
-        "weights_version": WEIGHTS_VERSION,
-    }
+        return curve, period_returns, turnovers, exposures
 
 
 __all__ = ["BacktestData", "BacktestEngine", "BacktestResult", "SLIPPAGE_BPS", "WEIGHTS_VERSION"]
