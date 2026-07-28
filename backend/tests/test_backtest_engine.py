@@ -107,11 +107,18 @@ _METRIC_KEYS = {
     "cagr",
     "ann_vol",
     "sharpe",
+    "sortino",
     "max_drawdown",
+    "hit_rate",
     "avg_turnover",
+    "avg_exposure",
     "n_rebalances",
     "benchmark_return",
     "excess_return",
+    "tracking_error",
+    "information_ratio",
+    "beta",
+    "exposure_series",
 }
 
 
@@ -119,10 +126,11 @@ def test_engine_produces_typed_core_metrics() -> None:
     result = BacktestEngine(FakeData()).run(_spec())
     assert isinstance(result, BacktestResult)
     assert set(result.metrics) >= _METRIC_KEYS
-    # Money/ratio values serialised as strings (never float); n_rebalances is an int count.
-    for k in _METRIC_KEYS - {"n_rebalances"}:
+    # Scalar metrics are Decimal strings; n_rebalances is an int; exposure_series is a list.
+    for k in _METRIC_KEYS - {"n_rebalances", "exposure_series"}:
         assert isinstance(result.metrics[k], str)
     assert result.metrics["n_rebalances"] == 3  # Jan/Feb/Mar monthly buckets
+    assert isinstance(result.metrics["exposure_series"], list)
     assert result.result_ref is None  # artifact offload is QV-067
 
 

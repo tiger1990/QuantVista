@@ -4,7 +4,7 @@ baseline_commit: 8c4afbf97b8b72bf37397264a137828002c63dc8
 
 # Story 8.6: QV-067 — Parquet offload + DuckDB/Polars read path
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 8 · **Depends:** QV-065 (`BacktestEngine` + `price_panel` seam)
 
