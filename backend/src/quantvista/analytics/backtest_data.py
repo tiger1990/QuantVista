@@ -24,6 +24,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from quantvista.analytics.scoring import compute_universe
+from quantvista.market_data.lake import PriceSource
 from quantvista.market_data.repositories import (
     adjusted_close_panel,
     historical_universe,
@@ -36,10 +37,15 @@ _RANK_FIELDS = frozenset({"composite", "fundamental", "momentum", "quality", "se
 
 
 class BacktestDataAccess:
-    """Point-in-time reads for one backtest. All methods are bounded by knowledge ≤ ``as_of``."""
+    """Point-in-time reads for one backtest. All methods are bounded by knowledge ≤ ``as_of``.
 
-    def __init__(self, session: Session) -> None:
+    ``price_source`` (QV-067) swaps the price panel between Postgres (default) and a Parquet/DuckDB
+    source without touching the engine; every other read stays on Postgres.
+    """
+
+    def __init__(self, session: Session, *, price_source: PriceSource | None = None) -> None:
         self._session = session
+        self._price_source = price_source
 
     def ranked_universe(
         self,
@@ -86,7 +92,11 @@ class BacktestDataAccess:
         self, start: date, end: date, stock_ids: Sequence[UUID]
     ) -> dict[UUID, dict[date, Decimal]]:
         """Per-stock ``{date: adj_close}`` over ``[start, end]`` (PIT-bounded) — the return source
-        the engine (QV-065) walks. Non-intersecting: a delisted name keeps its own coverage."""
+        the engine (QV-065) walks. Non-intersecting: a delisted name keeps its own coverage.
+
+        Reads the Parquet/DuckDB source (QV-067) when one was injected, else Postgres."""
+        if self._price_source is not None:
+            return self._price_source.panel(stock_ids, start, end)
         return adjusted_close_panel(self._session, stock_ids, start, end)
 
     def returns_as_of(
