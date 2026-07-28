@@ -54,6 +54,7 @@ def create_celery() -> Celery:
             "quantvista.jobs.news",
             "quantvista.jobs.sentiment",
             "quantvista.jobs.backtest",
+            "quantvista.jobs.lake",
         ],
     )
     celery.conf.task_default_queue = "default"
@@ -65,6 +66,7 @@ def create_celery() -> Celery:
     celery.conf.task_routes = {
         "quantvista.score_news": {"queue": "nlp"},
         "quantvista.run_backtest": {"queue": "user"},
+        "quantvista.export_prices_parquet": {"queue": "compute"},
     }
     celery.conf.timezone = "UTC"
     celery.conf.beat_schedule = BEAT_SCHEDULE

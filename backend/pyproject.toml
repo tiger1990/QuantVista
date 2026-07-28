@@ -95,6 +95,16 @@ portfolio = [
     "cvxpy>=1.5",
     "osqp>=0.6",
 ]
+# Data-lake read path (QV-067). Historical price partitions → Parquet; DuckDB scans them far faster
+# than a multi-year Postgres row scan for analytical sweeps (03 §7). pyarrow gives both the Parquet
+# writer and the LocalFileSystem/S3FileSystem object store (native S3, no boto3). Both ship cp313
+# wheels for macOS 12 x86_64 + CI-Linux (verified), so the read path is locally testable — the object
+# STORE's live MinIO/S3 round-trip is what's deferred (Docker/AWS). `pip install -e .[lake]`.
+# (polars is already a base dep — not re-listed here.)
+lake = [
+    "pyarrow>=17",
+    "duckdb>=1.1",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -160,6 +170,15 @@ ignore_missing_imports = true
 # = skip` makes mypy treat them as Any whether or not the extra is installed — so the strict run is
 # identical on the dev box (extra present) and in the backend-quality CI job (extra absent).
 [[tool.mypy.overrides]]
+# Data-lake stack (QV-067), an optional [lake] extra. `follow_imports = skip` makes mypy treat them
+# as Any whether or not the extra is installed — so the strict run is identical on the dev box (extra
+# present) and in the backend-quality CI job (extra absent), same as the [portfolio] stack below.
+# NB: polars ships py.typed and is a base dep (test_indicators/factors use its types) — NOT listed.
+module = ["pyarrow", "pyarrow.*", "duckdb", "duckdb.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
 module = ["cvxpy", "cvxpy.*", "osqp", "osqp.*"]
 ignore_missing_imports = true
 follow_imports = "skip"
@@ -184,6 +203,7 @@ module = [
     "quantvista.jobs.sentiment",
     "quantvista.jobs.alerts",
     "quantvista.jobs.backtest",
+    "quantvista.jobs.lake",
 ]
 disallow_untyped_decorators = false
 

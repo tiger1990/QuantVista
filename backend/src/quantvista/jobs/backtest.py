@@ -19,11 +19,26 @@ from quantvista.analytics.backtests import (
     mark_running,
     mark_succeeded,
 )
+from quantvista.core.config import get_settings
 from quantvista.core.db import privileged_session_scope
+from quantvista.core.objectstore import get_object_store
 from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
+from quantvista.market_data.lake import ParquetPriceSource, PriceSource
 from quantvista.schemas.backtest import BacktestSpec
+
+# A backtest is single-market; the engine reads NSE via `universe_as_of`'s default.
+_MARKET = "NSE"
+
+
+def _price_source() -> PriceSource | None:
+    """The Parquet/DuckDB price source when ``backtest_price_source=parquet`` (QV-067), else None
+    (Postgres). Building the store requires the [lake] extra — only touched in parquet mode."""
+    settings = get_settings()
+    if settings.backtest_price_source == "parquet":
+        return ParquetPriceSource(get_object_store(settings), _MARKET)
+    return None
 
 
 def _run(backtest_id: UUID) -> JobResult:
@@ -34,7 +49,10 @@ def _run(backtest_id: UUID) -> JobResult:
         assert row is not None  # mark_running succeeded ⇒ the row exists
         try:
             spec = BacktestSpec.model_validate(row["spec"])
-            result = BacktestEngine(BacktestDataAccess(session)).run(spec)  # QV-065 real compute
+            data = BacktestDataAccess(
+                session, price_source=_price_source()
+            )  # QV-067 opt-in Parquet
+            result = BacktestEngine(data).run(spec)  # QV-065 real compute
             metrics = dict(result.metrics)
             mark_succeeded(
                 session,

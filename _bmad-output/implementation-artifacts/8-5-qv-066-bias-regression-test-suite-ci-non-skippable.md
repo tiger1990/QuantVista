@@ -4,7 +4,7 @@ baseline_commit: 5a12fdf27d24fc628d382dc1a5ed333277120e14
 
 # Story 8.5: QV-066 — Bias regression test suite (CI, non-skippable)
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 5 · **Depends:** QV-063 (`ranked_universe`/`price_panel` PIT reads), QV-064 (survivorship-free `universe_as_of`), QV-065 (`BacktestEngine` loop)
 

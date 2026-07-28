@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     # Macro data (QV-026): FRED API key (free, redistributable). Unset → macro sync can't run.
     fred_api_key: str | None = None
 
+    # Data lake (QV-067): historical price partitions offloaded to Parquet for fast backtest reads.
+    # `object_store_backend`: local (dev/CI — a filesystem root) | s3 (MinIO/S3 via the s3_*
+    # above; authored + offline-validated, live round-trip deferred with Docker/AWS). The backtest
+    # engine reads Postgres by default; `backtest_price_source=parquet` opts into the DuckDB path
+    # once `export_prices_parquet` has run.
+    object_store_backend: str = "local"  # local | s3
+    object_store_root: str = ".data/lake"  # local backend root (gitignored)
+    backtest_price_source: str = "postgres"  # postgres | parquet
+
     # News (QV-041): provider-agnostic multi-source ingestion. `news_providers` is the enabled set
     # (comma-separated); the service fans out over those that have a key configured. All free tiers
     # are dev-grade (NewsAPI is development-only) — production needs paid tiers, like yfinance.

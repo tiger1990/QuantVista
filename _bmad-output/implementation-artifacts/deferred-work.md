@@ -39,3 +39,27 @@ Reviewed a ChatGPT critique of the ingestion/scoring pipeline. Most suggestions 
 - **Optional `--via-events` dev mode for `dev_backfill.py`.** The sync in-process path is a deliberate zero-infra dev convenience (and already calls the SAME stage functions the consumers `.delay()`). Add an opt-in flag that publishes only the root event and relies on a running worker, so a dev can smoke-test the real consumer chain. Keep sync as default.
 
 **REJECTED (do not resurface):** adding an Airflow-operator-style `Pipeline`/`Stage` orchestration interface. It is a **paradigm mismatch** — this platform deliberately uses event-driven **choreography** (the Redis Streams bus is the orchestrator). Layering stage-orchestration on top would create the exact "second orchestration mechanism" the same review flagged as the problem. Only revisit if we make a strategic pivot to Temporal/Airflow (a decision, not a refactor).
+
+## Deferred from: QV-067 (Parquet offload + DuckDB read path) — DATA/INFRA (needs Docker/AWS)
+
+The QV-067 object store is built **properly** with a real `S3FileSystem` backend selected by
+`object_store_backend=s3` (wired to the `s3_*` settings). Dev/CI exercise only the **local-fs**
+backend; the S3 path is authored + **offline-validated** (a test constructs `S3FileSystem` from
+settings + asserts its paths without connecting — like the QV-008 Terraform). Deferred, gated before
+any prod rollout:
+
+- **Live MinIO/S3 round-trip** — actually write+read Parquet partitions to a running MinIO (Docker)
+  or real S3 bucket; verify DuckDB reads `s3://` via its `httpfs` extension (endpoint/keys from
+  settings). Blocked on Docker/AWS on this box (see `[[aws-infra-deferred]]`, `[[docker-local-env-deferred]]`).
+- **Partition-detach retention automation** (`03` §6) — schedule the export + drop hot Postgres
+  partitions past the retention window. QV-067 ships the export + read path; the lifecycle job is later.
+- **Offload `technical_indicators`/`factor_values`/`scores`** — reuse the same `export_*_parquet`
+  shape once a reader needs them (QV-067 ships `daily_prices`, what the engine reads).
+- **Backtest result artifact** (`backtests.result_ref`) — write metrics+curve to the store per run;
+  the object store now exists, so this is a small follow-up.
+
+Note: the measurable speedup is on **analytical full scans** (multi-factor sweeps, `03` §7) —
+benchmarked ~7x on the dev universe (`scripts/bench_parquet_read.py`). The engine's **selective**
+per-backtest panel read (`stock_id = ANY + date BETWEEN`) is an indexed point-range lookup where
+Postgres is faster; the Parquet source's value there is history **offload** off Postgres, not
+per-call latency. The read path is correct either way (byte-identical panel, proven).

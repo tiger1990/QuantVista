@@ -140,8 +140,10 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
           cache-dependency-path: backend/pyproject.toml
-      - name: Install backend (with dev tooling)
-        run: python -m pip install -e ".[dev]"
+      - name: Install backend (with dev tooling + data-lake extra)
+        # [lake] (pyarrow/duckdb/polars) so the QV-067 Parquet offload + DuckDB read-path tests run
+        # here (the light unit job stays lake-free; those tests importorskip).
+        run: python -m pip install -e ".[dev,lake]"
       - name: Create non-superuser app role
         env:
           PGPASSWORD: quantvista
