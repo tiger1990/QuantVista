@@ -4,7 +4,7 @@ baseline_commit: 4cc77aeb8d5511ddf3433a01794c018bfe712df3
 
 # Story 8.7: QV-068 — Performance & risk metrics suite
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 5 · **Depends:** QV-065 (`BacktestEngine` equity curve + benchmark)
 

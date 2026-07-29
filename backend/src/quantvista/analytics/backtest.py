@@ -13,6 +13,8 @@ suite is QV-068, the Parquet artifact QV-067, and the permanent bias-regression 
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -28,6 +30,17 @@ from quantvista.schemas.backtest import BacktestSpec
 # A fixed slippage assumption (bps), added to the spec's commission on each traded unit of turnover.
 SLIPPAGE_BPS = 5
 WEIGHTS_VERSION = "equal-weight-v1"
+
+
+def _reproducibility_hash(spec: BacktestSpec) -> str:
+    """A stable fingerprint of the *recipe* — the canonical spec + methodology versions (QV-069).
+
+    Same spec + versions ⇒ same hash; any spec-field or ``MODEL_VERSION``/``WEIGHTS_VERSION`` change
+    ⇒ a different hash. Canonical JSON (sorted keys) matches the stored JSONB, so it's stable across
+    store/reload.
+    """
+    canonical = json.dumps(spec.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(f"{canonical}|{MODEL_VERSION}|{WEIGHTS_VERSION}".encode()).hexdigest()
 
 
 class BacktestData(Protocol):
@@ -105,7 +118,7 @@ class BacktestEngine:
     def run(self, spec: BacktestSpec) -> BacktestResult:
         sessions = sessions_in_range(spec.start, spec.end)
         if len(sessions) < 2:
-            return BacktestResult(metrics=self._stamp(empty_metrics()), result_ref=None)
+            return BacktestResult(metrics=self._stamp(empty_metrics(), spec), result_ref=None)
 
         rebal_dates = _rebalance_dates(sessions, spec.rules.rebalance)
         picks = {
@@ -149,13 +162,14 @@ class BacktestEngine:
             rebalance_dates=rebal_dates,
             n_rebalances=len(rebal_dates),
         )
-        return BacktestResult(metrics=self._stamp(metrics), result_ref=None)
+        return BacktestResult(metrics=self._stamp(metrics, spec), result_ref=None)
 
     @staticmethod
-    def _stamp(metrics: dict[str, Any]) -> dict[str, Any]:
+    def _stamp(metrics: dict[str, Any], spec: BacktestSpec) -> dict[str, Any]:
         """Record the reproducibility fingerprints on every result (QV-069)."""
         metrics["model_version"] = MODEL_VERSION
         metrics["weights_version"] = WEIGHTS_VERSION
+        metrics["reproducibility_hash"] = _reproducibility_hash(spec)
         return metrics
 
     def _simulate(

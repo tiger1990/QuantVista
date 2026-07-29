@@ -153,6 +153,27 @@ def test_submit_poll_run_lifecycle(api: dict[str, Any]) -> None:
     )
 
 
+def test_reproducibility_persisted(api: dict[str, Any], admin_engine: Engine) -> None:
+    """QV-069: the succeeded row stores the full spec + both methodology version columns, and the
+    metrics carry the reproducibility fingerprint."""
+    client, pro = api["client"], api["pro"]
+    bid = _submit(client, pro).json()["data"]["id"]
+    run_backtest(bid)
+
+    done = client.get(f"/api/v1/backtests/{bid}", headers=_h(pro)).json()["data"]
+    assert {"reproducibility_hash", "model_version", "weights_version"} <= set(done["metrics"])
+
+    with admin_engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT model_version, weights_version, spec FROM backtests WHERE id = :id"),
+            {"id": bid},
+        ).one()
+    assert row.model_version and row.weights_version == "equal-weight-v1"  # columns populated
+    assert (
+        row.spec["rules"]["top_n"] == 20 and row.spec["start"] == "2020-01-01"
+    )  # spec round-trips
+
+
 def test_engine_error_marks_failed(api: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     """An engine exception is captured as status='failed' + error — the task never crashes."""
     client, pro = api["client"], api["pro"]

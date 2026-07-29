@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-28  # QV-068 review (performance & risk metrics suite)
+last_updated: 2026-07-28  # QV-069 review (reproducibility guarantee)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -156,8 +156,8 @@ development_status:
   8-4-qv-065-backtest-engine-core-rebalance-loop-frictions: done  # QUANT: deterministic rebalance loop + frictions + delisting forced-exit + benchmark + core metrics (merged PR #74)
   8-5-qv-066-bias-regression-test-suite-ci-non-skippable: done  # QUANT: engine-level no-look-ahead + no-survivorship counterfactual guards; required non-skippable pytest -m bias CI step (merged PR #75)
   8-6-qv-067-parquet-offload-duckdb-polars-read-path: done  # DATA: Parquet export + DuckDB read path (opt-in engine price source) + pluggable object store (local-fs + offline-validated S3); merged PR #76
-  8-7-qv-068-performance-risk-metrics-suite: review  # QUANT: full perf/risk suite in analytics/backtest_metrics.py (Sortino, hit rate, exposure-over-time, TE/IR/beta); pure numpy, no new deps/API/schema; 11 exact-value tests, 100% cov; unblocks QV-071
-  8-8-qv-069-reproducibility-guarantee: backlog
+  8-7-qv-068-performance-risk-metrics-suite: done  # QUANT: full perf/risk suite in analytics/backtest_metrics.py (Sortino, hit rate, exposure-over-time, TE/IR/beta); merged PR #77
+  8-8-qv-069-reproducibility-guarantee: review  # QUANT: reproducibility_hash (sha256 canonical spec + versions) in metrics + permanent real-PG determinism guard + persistence proof; no schema/API change; backtest.py 100% cov
   8-9-qv-071-frontend-backtest-setup-results: backlog
   epic-8-retrospective: optional
 
