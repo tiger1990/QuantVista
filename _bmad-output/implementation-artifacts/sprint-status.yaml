@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-31  # QV-071 done (Epic 8 complete); QV-070 ready-for-dev (methodology & disclaimer page)
+last_updated: 2026-08-01  # QV-070 review (methodology & disclaimer page)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -174,7 +174,7 @@ development_status:
   epic-10: in-progress  # first story file created (QV-070); QV-010/QV-011 remain backlog
   10-1-qv-010-spike-m-data-india-data-vendor-evaluation: backlog
   10-2-qv-011-compliance-content-draft-methodology-non-advice-disclaimer: backlog
-  10-3-qv-070-methodology-disclaimer-page: ready-for-dev  # COMPLIANCE: public /methodology page (scoring pipeline+weights, PIT/survivorship, backtest cost assumptions, non-advice posture); restores the link QV-071 removed (it 404'd). NOTE: depends on QV-011 which is still backlog — QV-011's API disclaimer-constant AC is already shipped
+  10-3-qv-070-methodology-disclaimer-page: review  # COMPLIANCE: public /methodology page (scoring pipeline+weights, PIT/survivorship, backtest cost assumptions incl. benchmark-proxy + data-coverage caveats, reproducibility scope) + non-advice posture from the shared DISCLAIMER constant; Methodology link restored on every score surface + tearsheet; cross-language drift guard. NOTE: QV-011 still backlog but its API-constant AC is already shipped
   10-4-qv-080-dpdp-data-subject-flows-consent-access-erasure: backlog
   10-5-qv-081-audit-logging-complete: backlog
   10-6-qv-086-launch-compliance-content-finalized: backlog

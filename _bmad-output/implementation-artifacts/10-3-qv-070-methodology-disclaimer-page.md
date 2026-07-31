@@ -4,7 +4,7 @@ baseline_commit: 9c6f07b2c2a60234f861b944f7c8a482d3851584
 
 # Story 10.3: QV-070 — Methodology & Disclaimer page
 
-Status: ready-for-dev
+Status: review
 
 **Epic:** EPIC-COMP (Epic 10) · **Points:** 3 · **Depends:** QV-011 (compliance content draft — **still `backlog`, see the blocker below**)
 
@@ -112,12 +112,54 @@ The value of this page is that it is *true*. Three statements are easy to quietl
 
 `_bmad-output/project-context.md` · `plans/05-domain-and-quant.md` §1.2 (scoring) · `plans/07-security-and-compliance.md` §1 (posture) · frontend-architecture memory (Next.js client of the FastAPI system-of-record).
 
+## Tasks — completed
+
+- [x] **Task 1** — QV-011 posture confirmed with the user: proceed with factual content + the existing constants.
+- [x] **Task 2** — public `src/app/methodology/page.tsx` outside `(app)`; server component; verified logged-out.
+- [x] **Task 3** — scoring pipeline + weights table, PIT/survivorship, backtest assumptions (both caveats), reproducibility.
+- [x] **Task 4** — `lib/disclaimer.ts` single source + cross-language drift test.
+- [x] **Task 5** — QV-071 tripwire test inverted; link added to the shared `Disclaimer` (covers every score surface) and the tearsheet.
+- [x] **Task 6** — colocated tests incl. caveat assertions + logged-out render; all four frontend gates green.
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
-### Debug Log References
+claude-opus-5
+
+### Debug Log
+
+- **One link change covered all score surfaces.** Every score page already renders a shared `components/disclaimer.tsx`, so the Methodology link went there rather than into eight page files. Verified each of the seven surfaces actually *renders* `<Disclaimer>` (not merely imports it), plus the tearsheet's own link.
+- **Constants can't cross the language boundary, so a test does.** The page states weights/versions/slippage as fact; TypeScript can't import Python. Values are mirrored in `lib/methodology.ts` and `backend/tests/test_methodology_constants.py` compares each against `DEFAULT_WEIGHTS` / `MODEL_VERSION` / `SLIPPAGE_BPS` / `_WINSOR_*` / `BacktestSpec.costs_bps`'s `le`. **Negative-controlled:** changing a published weight to 0.25 fails the suite naming the mismatch.
+- **Two sources of the disclaimer existed already** — `components/disclaimer.tsx` hardcoded the same string the API constant holds. Collapsed to `lib/disclaimer.ts`, pinned by the same drift test.
+- **Browser check found nothing, which is the point.** `/methodology` returns **200 with no cookies and no redirect** (the `(app)` guard would have sent it to `/login`), renders all five weights, and stays statically prerendered (`○ /methodology`). This is the check QV-071's unit tests couldn't do — its dead link 404'd unnoticed.
+- **False alarm in my own verification:** an initial curl check reported the weights table missing. React SSR separates adjacent text nodes with `<!-- -->`, so `40<!-- -->%` defeated a naive `40%` match. The page was correct; the check was wrong.
+- **Unrelated failure investigated, not dismissed:** `test_row_routes_to_existing_month_partition` failed on the date rolling to 2026-08-01 — the dev DB had only June/July partitions, so an August row fell to `daily_prices_default`. **Local-only** (CI migrates fresh, and the migration creates current + next month), fixed by creating Aug/Sep partitions for all four partitioned tables. **But it exposed a real gap — see below.**
+
+### ⚠️ Gap found outside this story's scope — partition maintenance is documented but not implemented
+
+`0004_prices_partitioned.py` creates only the **current and next** month at migration time, and `src/quantvista/db/README.md` §"Partition maintenance" says to *schedule* `create_month_partition(...)`. **Nothing does.** No job, beat entry, or cron calls it outside migrations.
+
+Consequence in a long-running environment: from the second month after deploy, every `daily_prices` / `technical_indicators` / `scores` / `factor_values` row silently lands in the `_default` partition. No error is raised — partition pruning is quietly lost and the default partition grows without bound. This is exactly how it presented locally.
+
+Recommend a small `[PLAT]` story: a Beat-scheduled monthly task calling `create_month_partition` for the next N months across all four parents, plus a test that fails when a partitioned parent has no partition covering "today + 1 month".
 
 ### Completion Notes List
 
+- The page is **public by design** — `(app)/layout.tsx` redirects anonymous users to `/login`, so a trust page placed there would be invisible to prospects and to anyone opening a shared link. It uses the root layout with its own minimal header.
+- **The three honesty requirements are all rendered and test-pinned:** the benchmark is an internal equal-weight proxy and *not* the licensed Nifty 200 TRI; the reproducibility hash covers the recipe, not the data; out-of-coverage ranges return zeroed results rather than errors. Each has a dedicated test because they are the statements most likely to be quietly dropped in a later edit.
+- **Legal wording was not invented.** The non-advice copy renders `07` §1's existing rules and reuses the shipped `DISCLAIMER` constant. Final launch copy remains QV-011 → QV-086.
+- **QV-011's status looks wrong:** its second AC (`disclaimer` field + `X-QuantVista-Disclaimer` header) is already implemented and in use across stocks/screener/alert-emails. Worth correcting when QV-011 is picked up.
+
 ### File List
+
+- `frontend/src/app/methodology/page.tsx` + `page.test.tsx` (new — the public page)
+- `frontend/src/lib/methodology.ts` (new — mirrored engine constants)
+- `frontend/src/lib/disclaimer.ts` (new — single source for the non-advice line)
+- `frontend/src/components/disclaimer.tsx` + `disclaimer.test.tsx` (modified/new — shared constant + Methodology link on every score surface)
+- `frontend/src/features/backtests/BacktestResults.tsx` + `.test.tsx` (modified — link restored, QV-071 tripwire test inverted)
+- `backend/tests/test_methodology_constants.py` (new — cross-language drift guard)
+
+### Change Log
+
+- 2026-08-01 — QV-070: public `/methodology` page (scoring pipeline + published weights, PIT/survivorship controls, backtest cost assumptions with the benchmark-proxy and data-coverage caveats, reproducibility scope), non-advice posture from the shared constant, Methodology link restored across score surfaces and the tearsheet. Cross-language drift guard added. Gates: backend 796 passed/5 skipped, frontend 137 tests, `next build` green with `/methodology` prerendered.

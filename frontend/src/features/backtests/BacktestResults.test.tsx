@@ -74,9 +74,12 @@ describe("BacktestResults tearsheet", () => {
     expect(screen.queryByText(/recipe/i)).not.toBeInTheDocument();
   });
 
-  it("links nowhere until the Methodology page exists (QV-070)", () => {
-    // regression: /methodology 404'd, so the link rendered as a dead end in a shipped tearsheet
+  it("links to the Methodology page now that it exists (QV-070)", () => {
+    // was inverted from "links nowhere": QV-071 pulled this link because /methodology 404'd
     render(<BacktestResults backtest={backtest} />);
-    expect(screen.queryByRole("link", { name: /methodology/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /methodology/i })).toHaveAttribute(
+      "href",
+      "/methodology",
+    );
   });
 });
