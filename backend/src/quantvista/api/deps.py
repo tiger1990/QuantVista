@@ -15,6 +15,7 @@ import jwt
 from fastapi import Depends, Request, params
 from sqlalchemy.orm import Session
 
+from quantvista.api.route_class import SESSION_STATE_ATTR
 from quantvista.core.db import privileged_session_scope, session_scope
 from quantvista.identity.entitlements import EntitlementService
 from quantvista.identity.models import InvalidCredentials, Principal, TenantContext
@@ -61,14 +62,20 @@ def get_tenant_context(principal: Principal = Depends(get_current_principal)) ->
 
 
 def get_tenant_session(
+    request: Request,
     ctx: TenantContext = Depends(get_tenant_context),
 ) -> Iterator[Session]:
     """Yield a DB session bound to the caller's tenant (`SET LOCAL app.tenant_id`).
 
     Every query in the request unit of work runs under RLS for this tenant only. The
     binding lives exactly one transaction (committed/rolled back by ``session_scope``).
+
+    The session is also parked on ``request.state`` so ``CommitBeforeResponseRoute`` can commit it
+    *before* the response is sent — this dependency's own exit code runs after, which would let a
+    client re-read stale state (see ``api.route_class``).
     """
     with session_scope(ctx.tenant_id) as session:
+        setattr(request.state, SESSION_STATE_ATTR, session)
         yield session
 
 

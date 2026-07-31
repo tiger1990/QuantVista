@@ -713,3 +713,17 @@ _STOCK_MARKET_SQL = text(
 def stock_market(session: Session, stock_id: UUID) -> str | None:
     """The market code a stock trades on (QV-030 self-heal → recompute that market's snapshot)."""
     return session.execute(_STOCK_MARKET_SQL, {"sid": stock_id}).scalar_one_or_none()
+
+
+def stock_ids_by_symbol(
+    session: Session, symbols: Sequence[str], market_code: str = "NSE"
+) -> dict[str, UUID]:
+    """``{symbol: stock_id}`` on ``market_code``. Unknown symbols are simply absent — the caller
+    decides whether that is fatal (a custom-basket backtest fails rather than quietly holding less
+    than the user asked for)."""
+    if not symbols:
+        return {}
+    rows = session.execute(
+        _RESOLVE_STOCKS_SQL, {"market_code": market_code, "symbols": list(symbols)}
+    )
+    return {r.symbol: r.id for r in rows}

@@ -22,12 +22,13 @@ from quantvista.analytics.saved_screens import (
 )
 from quantvista.analytics.screener import build_order, build_where
 from quantvista.api.deps import get_entitlement_service, get_tenant_context, get_tenant_session
+from quantvista.api.route_class import CommitBeforeResponseRoute
 from quantvista.identity.entitlements import EntitlementService
 from quantvista.identity.models import EntitlementExceeded, TenantContext
 from quantvista.schemas.envelope import Envelope
 from quantvista.schemas.screens import SavedScreen, SaveScreenRequest
 
-router = APIRouter(prefix="/api/v1", tags=["screens"])
+router = APIRouter(prefix="/api/v1", tags=["screens"], route_class=CommitBeforeResponseRoute)
 
 _LIMIT_KEY = "saved_screens"
 

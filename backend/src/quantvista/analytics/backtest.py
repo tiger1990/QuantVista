@@ -54,6 +54,8 @@ class BacktestData(Protocol):
         self, as_of: date, universe: Sequence[UUID], *, rank_by: str = ..., top_n: int
     ) -> list[UUID]: ...
 
+    def basket_ids(self, symbols: Sequence[str], *, market: str = ...) -> list[UUID]: ...
+
     def price_panel(
         self, start: date, end: date, stock_ids: Sequence[UUID]
     ) -> dict[UUID, dict[date, Decimal]]: ...
@@ -121,15 +123,7 @@ class BacktestEngine:
             return BacktestResult(metrics=self._stamp(empty_metrics(), spec), result_ref=None)
 
         rebal_dates = _rebalance_dates(sessions, spec.rules.rebalance)
-        picks = {
-            d: self._data.ranked_universe(
-                d,
-                self._data.universe_as_of(d, index_code=spec.universe),
-                rank_by=spec.rules.rank_by,
-                top_n=spec.rules.top_n,
-            )
-            for d in rebal_dates
-        }
+        picks = self._picks(spec, rebal_dates)
         bench_ids = self._data.universe_as_of(sessions[0], index_code=spec.universe)
 
         all_ids = sorted(
@@ -163,6 +157,27 @@ class BacktestEngine:
             n_rebalances=len(rebal_dates),
         )
         return BacktestResult(metrics=self._stamp(metrics, spec), result_ref=None)
+
+    def _picks(self, spec: BacktestSpec, rebal_dates: Sequence[date]) -> dict[date, Sequence[UUID]]:
+        """What the strategy holds at each rebalance date.
+
+        ``custom_basket`` holds the same user-chosen names throughout — the selection is fixed, so
+        it is resolved once. Point-in-time still applies: the caller only weights names that have a
+        price on the date, so a pick not yet listed is simply not held (and turnover reflects it
+        entering later). ``factor_strategy`` re-ranks the survivorship-free universe each time.
+        """
+        if spec.type == "custom_basket":
+            basket = self._data.basket_ids(spec.symbols or [])
+            return {d: basket for d in rebal_dates}
+        return {
+            d: self._data.ranked_universe(
+                d,
+                self._data.universe_as_of(d, index_code=spec.universe),
+                rank_by=spec.rules.rank_by,
+                top_n=spec.rules.top_n,
+            )
+            for d in rebal_dates
+        }
 
     @staticmethod
     def _stamp(metrics: dict[str, Any], spec: BacktestSpec) -> dict[str, Any]:

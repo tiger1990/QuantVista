@@ -72,6 +72,10 @@ class _SyntheticSeam:
     ) -> list[UUID]:
         return self._d.ranked_universe(as_of, universe, rank_by=rank_by, top_n=top_n)
 
+    def basket_ids(self, symbols: Sequence[str], *, market: str = "NSE") -> list[UUID]:
+        """Delegated for protocol completeness — these guards exercise the ranked path only."""
+        return self._d.basket_ids(symbols, market=self._market)
+
     def price_panel(
         self, start: date, end: date, stock_ids: Sequence[UUID]
     ) -> dict[UUID, dict[date, Decimal]]:

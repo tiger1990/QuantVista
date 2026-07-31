@@ -29,6 +29,7 @@ from quantvista.market_data.repositories import (
     adjusted_close_panel,
     historical_universe,
     last_adjusted_close_as_of,
+    stock_ids_by_symbol,
 )
 from quantvista.market_data.returns import ReturnsMatrix, returns_matrix_as_of
 
@@ -70,6 +71,19 @@ class BacktestDataAccess:
         ]
         scored.sort(key=lambda t: (-t[0], t[1]))  # score desc, then stock_id asc (deterministic)
         return [stock_id for _, stock_id in scored[:top_n]]
+
+    def basket_ids(self, symbols: Sequence[str], *, market: str = "NSE") -> list[UUID]:
+        """Resolve a custom basket's tickers to stock ids, **in the order given**.
+
+        Raises on any unknown symbol: silently holding fewer names than the user picked would
+        misstate the strategy. Point-in-time is preserved downstream — the engine only weights a
+        name on dates where it actually has a price, so a not-yet-listed pick simply is not held.
+        """
+        found = stock_ids_by_symbol(self._session, symbols, market)
+        missing = [s for s in symbols if s not in found]
+        if missing:
+            raise ValueError(f"unknown symbols for {market}: {', '.join(missing)}")
+        return [found[s] for s in symbols]
 
     def universe_as_of(
         self, as_of: date, *, index_code: str = "NIFTY200", market: str = "NSE"

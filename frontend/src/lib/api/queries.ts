@@ -588,3 +588,85 @@ export function useApplyTargets(portfolioId: string) {
     },
   });
 }
+
+// --- Backtests (QV-071): async factor-strategy backtests --------------------------------------
+export type Backtest = components["schemas"]["BacktestResponse"];
+export type BacktestListItem = components["schemas"]["BacktestListItem"];
+export type BacktestSpec = components["schemas"]["BacktestSpec"];
+
+export type SubmitBacktestErrorKind = "entitlement" | "invalid" | "unknown";
+
+/** Typed submit failure: 403 → `entitlement` (upgrade needed), 422 → `invalid`. */
+export class SubmitBacktestError extends Error {
+  readonly kind: SubmitBacktestErrorKind;
+  constructor(kind: SubmitBacktestErrorKind) {
+    super(kind);
+    this.name = "SubmitBacktestError";
+    this.kind = kind;
+  }
+}
+
+/** Submit a backtest spec; returns the queued row. Surfaces the entitlement 403 as a typed error. */
+export function useSubmitBacktest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (spec: BacktestSpec) => {
+      const { data, error, response } = await api.POST("/api/v1/backtests", { body: { spec } });
+      if (error || !data?.data) {
+        const kind: SubmitBacktestErrorKind =
+          response.status === 403 ? "entitlement" : response.status === 422 ? "invalid" : "unknown";
+        throw new SubmitBacktestError(kind);
+      }
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["backtests"] }),
+  });
+}
+
+const RUNNING = new Set(["queued", "running"]);
+
+/** Poll one backtest; refetches only while queued/running, then stops on a terminal status. */
+export function useBacktest(id: string | null) {
+  return useQuery({
+    queryKey: ["backtest", id],
+    enabled: id != null,
+    refetchInterval: (query) => (RUNNING.has(query.state.data?.status ?? "") ? 1500 : false),
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/backtests/{backtest_id}", {
+        params: { path: { backtest_id: id as string } },
+      });
+      if (error || !data?.data) throw new Error("Failed to load the backtest.");
+      return data.data;
+    },
+  });
+}
+
+/** Remove one run from the history. Invalidates the list; the caller clears the open run. */
+export function useDeleteBacktest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE("/api/v1/backtests/{backtest_id}", {
+        params: { path: { backtest_id: id } },
+      });
+      if (error) throw new Error("Failed to delete the backtest.");
+      return id;
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ["backtests"] });
+      qc.removeQueries({ queryKey: ["backtest", id] });
+    },
+  });
+}
+
+/** The user's past backtests (most recent first). */
+export function useBacktests() {
+  return useQuery({
+    queryKey: ["backtests"],
+    queryFn: async () => {
+      const { data, error } = await api.GET("/api/v1/backtests");
+      if (error || !data?.data) throw new Error("Failed to load backtests.");
+      return data.data;
+    },
+  });
+}

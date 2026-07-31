@@ -25,6 +25,11 @@ class _SpySender:
     def send(self, *, to: str, subject: str, body: str) -> None:
         self.sent.append(to)
 
+    def sent_to(self, emails: list[str]) -> list[str]:
+        """Only this test's seeded recipients — `deliver_pending` is deliberately cross-tenant,
+        so any other pending event in the (shared dev) DB would otherwise leak into the assert."""
+        return [to for to in self.sent if to in emails]
+
 
 class _FailSender:
     def send(self, *, to: str, subject: str, body: str) -> None:
@@ -136,7 +141,7 @@ def test_email_channel_uses_sender_and_is_honored(admin_engine: Engine, emails: 
     spy = _SpySender()
     NotificationDeliveryService(email_sender=spy).deliver_pending()
 
-    assert spy.sent == [emails[0]]  # only the email-channel rule hit the sender
+    assert spy.sent_to(emails) == [emails[0]]  # only the email-channel rule hit the sender
     assert _status(admin_engine, email_event)[0] == "delivered"
     assert _status(admin_engine, inapp_event)[0] == "delivered"
     with admin_engine.connect() as conn:  # in-app went to the notifications table, not email
@@ -159,5 +164,5 @@ def test_failed_delivery_is_marked_and_retried(admin_engine: Engine, emails: lis
     # a later run re-attempts failed events (the retry) with a working sender
     spy = _SpySender()
     assert NotificationDeliveryService(email_sender=spy).deliver_pending() >= 1
-    assert spy.sent == [emails[0]]
+    assert spy.sent_to(emails) == [emails[0]]
     assert _status(admin_engine, event_id) == ("delivered", True)

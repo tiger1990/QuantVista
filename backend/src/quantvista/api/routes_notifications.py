@@ -13,11 +13,12 @@ from sqlalchemy.orm import Session
 
 from quantvista.alerts.repositories import list_notifications, mark_all_notifications_read
 from quantvista.api.deps import get_tenant_context, get_tenant_session
+from quantvista.api.route_class import CommitBeforeResponseRoute
 from quantvista.identity.models import TenantContext
 from quantvista.schemas.envelope import Envelope
 from quantvista.schemas.notifications import Notification
 
-router = APIRouter(prefix="/api/v1", tags=["notifications"])
+router = APIRouter(prefix="/api/v1", tags=["notifications"], route_class=CommitBeforeResponseRoute)
 
 _MAX_LIMIT = 100
 

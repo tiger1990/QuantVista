@@ -21,6 +21,7 @@ from quantvista.core.observability.metrics import (
     install_worker_metrics,
     start_worker_metrics_server,
 )
+from quantvista.core.tasks import TASK_DEFAULT_QUEUE, TASK_ROUTES
 from quantvista.jobs.framework import JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
 
@@ -57,17 +58,15 @@ def create_celery() -> Celery:
             "quantvista.jobs.lake",
         ],
     )
-    celery.conf.task_default_queue = "default"
     # Sentiment inference is heavy and pluggable (QV-044): its own `nlp` queue lets a capable
     # host run `celery worker -Q nlp` with the [finbert] extra, off the default worker pool.
     # Backtests are interactive + long-running (QV-065): the `user` queue keeps them off the data
     # pipeline so one tenant's backtest can't starve ingest/compute. Per-tenant concurrency caps are
     # a worker-deploy concern (06 §4) — `celery worker -Q user --concurrency=N` / rate limits.
-    celery.conf.task_routes = {
-        "quantvista.score_news": {"queue": "nlp"},
-        "quantvista.run_backtest": {"queue": "user"},
-        "quantvista.export_prices_parquet": {"queue": "compute"},
-    }
+    # The table is shared with the API's producer seam (`core.tasks`) because Celery routes in the
+    # PRODUCER — a worker-only table silently strands API-published tasks on the default queue.
+    celery.conf.task_default_queue = TASK_DEFAULT_QUEUE
+    celery.conf.task_routes = TASK_ROUTES
     celery.conf.timezone = "UTC"
     celery.conf.beat_schedule = BEAT_SCHEDULE
     # Fail-loud / retry-smart defaults (06 §1.4): re-deliver on worker loss; per-task

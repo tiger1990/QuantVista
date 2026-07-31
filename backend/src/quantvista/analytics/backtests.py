@@ -85,6 +85,17 @@ def list_backtests(session: Session) -> list[dict[str, object]]:
     return [_row(r) for r in rows]
 
 
+def delete_backtest(session: Session, backtest_id: UUID) -> bool:
+    """Delete one backtest; True if a row went. RLS-scoped, so another tenant's id deletes nothing
+    and reads as "not found". Safe at any status: the job's ``mark_running`` guard already no-ops
+    when the row is gone, and a terminal update on a deleted row touches zero rows."""
+    row = session.execute(
+        text("DELETE FROM backtests WHERE id = :id RETURNING id"),
+        {"id": backtest_id},
+    ).one_or_none()
+    return row is not None
+
+
 def mark_running(session: Session, backtest_id: UUID) -> bool:
     """queued → running (+ started_at). Returns True if this call made the transition (idempotent
     guard against Celery at-least-once re-delivery). ``RETURNING`` keeps it typed (no rowcount)."""
@@ -134,6 +145,7 @@ def mark_failed(session: Session, backtest_id: UUID, *, error: str) -> None:
 
 __all__ = [
     "create_backtest",
+    "delete_backtest",
     "get_backtest",
     "list_backtests",
     "mark_failed",

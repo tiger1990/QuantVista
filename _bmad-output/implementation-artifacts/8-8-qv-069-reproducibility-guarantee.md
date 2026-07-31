@@ -4,7 +4,7 @@ baseline_commit: 00e08e0415b7819ec0d20ca6038741b0c50cc232
 
 # Story 8.8: QV-069 — Reproducibility guarantee
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 3 · **Depends:** QV-065 (`BacktestEngine`, `model_version`/`weights_version` stamping), QV-068 (metrics suite)
 
