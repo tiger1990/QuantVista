@@ -64,26 +64,17 @@ export function BacktestResults({ backtest }: { backtest: Backtest }) {
         <MetricsTable metrics={m} />
       </div>
 
-      {/* Footer: reproducibility + disclaimer */}
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3">
-        {/* Provenance (QV-069). A bare hex string means nothing on its own, so it says what it is
-            and what it does NOT cover — the recipe, not the underlying market data. */}
-        {typeof m.reproducibility_hash === "string" ? (
-          <p
-            className="font-mono text-[11px] text-muted-foreground"
-            title={
-              "Reproducibility fingerprint — SHA-256 of this run's settings plus the scoring model " +
-              `(${String(m.model_version ?? "?")}) and weighting (${String(m.weights_version ?? "?")}) ` +
-              "versions. Two runs sharing it used an identical recipe. It does not fingerprint the " +
-              "underlying price or score data, which can change between runs."
-            }
-          >
-            recipe {m.reproducibility_hash.slice(0, 12)}…
-          </p>
-        ) : null}
-        {/* No Methodology link until the page exists (QV-070): it 404'd, which reads as a broken
-            app. The disclaimer is deliberately self-contained so the tearsheet still ships whole. */}
-        <p className="text-xs text-muted-foreground">
+      {/* Footer: the disclaimer alone, centred as the tearsheet's closing rule.
+
+          The QV-069 `reproducibility_hash` is deliberately NOT rendered: it is an audit artifact
+          (it only means something when comparing two runs), and a bare hex string reads as noise
+          on a research surface. It is still computed, persisted and returned by the API, so
+          provenance and run-to-run comparison are unaffected.
+
+          No Methodology link until that page exists (QV-070) — it 404'd, which reads as a broken
+          app. The disclaimer is written to be self-contained so the tearsheet still ships whole. */}
+      <footer className="border-t border-border px-5 py-3">
+        <p className="text-center text-xs text-muted-foreground">
           Research tool, not investment advice — costs &amp; slippage are modelled assumptions and
           past performance does not indicate future results.
         </p>

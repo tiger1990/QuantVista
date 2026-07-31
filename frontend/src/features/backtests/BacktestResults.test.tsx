@@ -59,21 +59,19 @@ describe("BacktestResults tearsheet", () => {
     expect(screen.getByText("Information ratio")).toBeInTheDocument();
   });
 
-  it("shows the reproducibility fingerprint and a self-contained disclaimer", () => {
+  it("closes with a centred, self-contained disclaimer", () => {
     render(<BacktestResults backtest={backtest} />);
-    expect(screen.getByText(/recipe abcdef012345/i)).toBeInTheDocument();
-    expect(screen.getByText(/not investment advice/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/past performance does not indicate future results/i),
-    ).toBeInTheDocument();
+    const disclaimer = screen.getByText(/not investment advice/i);
+    expect(disclaimer).toBeInTheDocument();
+    expect(disclaimer).toHaveTextContent(/past performance does not indicate future results/i);
+    expect(disclaimer.className).toMatch(/text-center/);
   });
 
-  it("explains the fingerprint instead of showing a bare hex string", () => {
+  it("keeps the reproducibility fingerprint out of the UI", () => {
+    // it is an audit artifact, not a user-facing figure; still persisted and served by the API
     render(<BacktestResults backtest={backtest} />);
-    const el = screen.getByText(/recipe abcdef012345/i);
-    expect(el).toHaveAttribute("title", expect.stringMatching(/reproducibility fingerprint/i));
-    // it must be honest about what it does NOT cover
-    expect(el.getAttribute("title")).toMatch(/does not fingerprint the underlying price or score/i);
+    expect(screen.queryByText(/abcdef012345/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/recipe/i)).not.toBeInTheDocument();
   });
 
   it("links nowhere until the Methodology page exists (QV-070)", () => {
