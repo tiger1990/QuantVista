@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-07-31  # QV-071 review (frontend backtest setup + results)
+last_updated: 2026-07-31  # QV-071 done (Epic 8 complete); QV-070 ready-for-dev (methodology & disclaimer page)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -158,7 +158,7 @@ development_status:
   8-6-qv-067-parquet-offload-duckdb-polars-read-path: done  # DATA: Parquet export + DuckDB read path (opt-in engine price source) + pluggable object store (local-fs + offline-validated S3); merged PR #76
   8-7-qv-068-performance-risk-metrics-suite: done  # QUANT: full perf/risk suite in analytics/backtest_metrics.py (Sortino, hit rate, exposure-over-time, TE/IR/beta); merged PR #77
   8-8-qv-069-reproducibility-guarantee: done  # QUANT: reproducibility_hash + permanent real-PG determinism guard + persistence proof (merged PR #78)
-  8-9-qv-071-frontend-backtest-setup-results: review  # FE: editorial/dense-analyst backtest tearsheet (tier-gated form + async poll + equity-curve-vs-benchmark + metrics) + equity_curve backend enabler; finishes Epic 8
+  8-9-qv-071-frontend-backtest-setup-results: done  # FE: editorial/dense-analyst backtest tearsheet (tier-gated form + async poll + equity-curve-vs-benchmark + metrics) + equity_curve enabler, run delete, custom baskets, app-wide commit-before-response fix (merged PR #79); FINISHES EPIC 8
   epic-8-retrospective: optional
 
   # ---- Epic 9: ML Augmentation (EPIC-ML) ----
@@ -171,10 +171,10 @@ development_status:
   epic-9-retrospective: optional
 
   # ---- Epic 10: Compliance & Data Licensing (EPIC-COMP) ----
-  epic-10: backlog
+  epic-10: in-progress  # first story file created (QV-070); QV-010/QV-011 remain backlog
   10-1-qv-010-spike-m-data-india-data-vendor-evaluation: backlog
   10-2-qv-011-compliance-content-draft-methodology-non-advice-disclaimer: backlog
-  10-3-qv-070-methodology-disclaimer-page: backlog
+  10-3-qv-070-methodology-disclaimer-page: ready-for-dev  # COMPLIANCE: public /methodology page (scoring pipeline+weights, PIT/survivorship, backtest cost assumptions, non-advice posture); restores the link QV-071 removed (it 404'd). NOTE: depends on QV-011 which is still backlog — QV-011's API disclaimer-constant AC is already shipped
   10-4-qv-080-dpdp-data-subject-flows-consent-access-erasure: backlog
   10-5-qv-081-audit-logging-complete: backlog
   10-6-qv-086-launch-compliance-content-finalized: backlog

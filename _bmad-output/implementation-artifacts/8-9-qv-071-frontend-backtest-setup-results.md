@@ -4,7 +4,7 @@ baseline_commit: 0c99b695301103f0ca38e0c47cfd1f08715d83ef
 
 # Story 8.9: QV-071 — Frontend: Backtest setup + results
 
-Status: review
+Status: done
 
 **Epic:** EPIC-BT (Epic 8) · **Points:** 8 · **Depends:** QV-062 (backtest API), QV-068 (metrics), QV-056 (frontend shell/auth)
 
