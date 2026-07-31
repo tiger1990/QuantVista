@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from quantvista.api.deps import get_entitlement_service, get_tenant_context, get_tenant_session
 from quantvista.api.idempotency import idempotent
+from quantvista.api.route_class import CommitBeforeResponseRoute
 from quantvista.api.routes_stocks import DISCLAIMER, _with_disclaimer
 from quantvista.core.config import get_settings
 from quantvista.identity.entitlements import EntitlementService
@@ -64,7 +65,7 @@ from quantvista.schemas.portfolios import (
 from quantvista.schemas.rebalance import RebalanceRequest, RebalanceResponse, TradeSuggestionDTO
 from quantvista.schemas.risk import BetaCoverageDTO, DrawdownPointDTO, RiskResponse
 
-router = APIRouter(prefix="/api/v1", tags=["portfolios"])
+router = APIRouter(prefix="/api/v1", tags=["portfolios"], route_class=CommitBeforeResponseRoute)
 
 _CREATE_PATH = "/api/v1/portfolios"
 

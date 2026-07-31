@@ -20,6 +20,7 @@ from quantvista.analytics.backtests import (
     list_backtests,
 )
 from quantvista.api.deps import get_entitlement_service, get_tenant_context, get_tenant_session
+from quantvista.api.route_class import CommitBeforeResponseRoute
 from quantvista.core.tasks import enqueue
 from quantvista.identity.entitlements import EntitlementService
 from quantvista.identity.models import TenantContext
@@ -30,7 +31,7 @@ from quantvista.schemas.backtest import (
 )
 from quantvista.schemas.envelope import Envelope
 
-router = APIRouter(prefix="/api/v1", tags=["backtests"])
+router = APIRouter(prefix="/api/v1", tags=["backtests"], route_class=CommitBeforeResponseRoute)
 
 _SUBMIT_KEY = "backtest"
 _FULL_KEY = "backtest_full"
@@ -74,11 +75,10 @@ def submit_backtest_endpoint(
         user_id=ctx.user_id,
         spec=spec.model_dump(mode="json"),
     )
-    # COMMIT before enqueueing and before returning. FastAPI runs a yield-dependency's exit code
-    # (where `session_scope` commits) *after* the response is sent, which leaves two races: the
-    # worker could read the row by id before it exists, and the client polling the returned id
-    # could 404. Committing here closes both. Nothing below touches the session — note the RLS
-    # binding is `SET LOCAL`, so it does not outlive this transaction.
+    # Commit HERE, not just via CommitBeforeResponseRoute: the worker reads the row by id on its
+    # own connection, so the row must exist before the task is published — and publishing happens
+    # inside this handler, ahead of the route-level commit. (Nothing below touches the session; the
+    # RLS binding is `SET LOCAL` and does not outlive this transaction.)
     session.commit()
     # Enqueue AFTER the row is committed (the worker reads it by id on a privileged session). By
     # NAME via the core producer seam — `api` may not import `jobs` (sibling composition roots).
@@ -118,11 +118,7 @@ def delete_backtest_endpoint(
     """
     if not delete_backtest(session, backtest_id):
         raise BacktestNotFound(backtest_id)
-    # Commit before responding: the yield-dependency commits only after the response is sent, so a
-    # client that refetches its history the instant it sees 204 would still be shown the deleted
-    # row. See the note in `submit_backtest_endpoint`.
-    session.commit()
-    return Response(status_code=204)
+    return Response(status_code=204)  # committed before the response by CommitBeforeResponseRoute
 
 
 __all__ = ["BacktestNotFound", "router"]

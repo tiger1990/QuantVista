@@ -21,12 +21,13 @@ from quantvista.alerts.repositories import (
 )
 from quantvista.alerts.rules import validate_channel, validate_condition, validate_scope
 from quantvista.api.deps import get_entitlement_service, get_tenant_context, get_tenant_session
+from quantvista.api.route_class import CommitBeforeResponseRoute
 from quantvista.identity.entitlements import EntitlementService
 from quantvista.identity.models import EntitlementExceeded, TenantContext
 from quantvista.schemas.alerts import AlertRule, CreateAlertRequest
 from quantvista.schemas.envelope import Envelope
 
-router = APIRouter(prefix="/api/v1", tags=["alerts"])
+router = APIRouter(prefix="/api/v1", tags=["alerts"], route_class=CommitBeforeResponseRoute)
 
 _LIMIT_KEY = "alerts"
 
