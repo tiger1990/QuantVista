@@ -24,6 +24,7 @@ const LINKS = [
   { href: "/rankings", label: "Rankings" },
   { href: "/screener", label: "Screener" },
   { href: "/portfolios", label: "Portfolios" },
+  { href: "/backtests", label: "Backtests" },
   { href: "/news", label: "News" },
   { href: "/alerts", label: "Alerts" },
 ];

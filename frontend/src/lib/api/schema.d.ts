@@ -542,6 +542,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/backtests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Backtests Endpoint */
+        get: operations["list_backtests_endpoint_api_v1_backtests_get"];
+        put?: never;
+        /**
+         * Submit Backtest Endpoint
+         * @description Queue a backtest → 202 ``{id, status:"queued"}``. Entitlement is checked AFTER validation.
+         */
+        post: operations["submit_backtest_endpoint_api_v1_backtests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Backtest Endpoint */
+        get: operations["get_backtest_endpoint_api_v1_backtests__backtest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -578,6 +616,107 @@ export interface components {
             is_active: boolean;
             /** Created At */
             created_at: string;
+        };
+        /** BacktestListItem */
+        BacktestListItem: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Type */
+            type: string;
+            /** Universe */
+            universe: string;
+            /** Start */
+            start: string;
+            /** End */
+            end: string;
+            /** Created At */
+            created_at: string;
+        };
+        /**
+         * BacktestResponse
+         * @description Poll payload for one backtest.
+         */
+        BacktestResponse: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Spec */
+            spec: {
+                [key: string]: unknown;
+            };
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            } | null;
+            /** Result Ref */
+            result_ref: string | null;
+            /** Error */
+            error: string | null;
+            /** Created At */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /** BacktestRules */
+        BacktestRules: {
+            /**
+             * Rank By
+             * @default composite
+             * @enum {string}
+             */
+            rank_by: "composite" | "fundamental" | "momentum" | "quality" | "sentiment" | "risk";
+            /** Top N */
+            top_n: number;
+            /**
+             * Rebalance
+             * @default monthly
+             * @enum {string}
+             */
+            rebalance: "weekly" | "monthly" | "quarterly";
+        };
+        /**
+         * BacktestSpec
+         * @description A factor-strategy backtest specification (universe, rules, range, costs, benchmark).
+         */
+        BacktestSpec: {
+            /**
+             * Type
+             * @default factor_strategy
+             * @constant
+             */
+            type: "factor_strategy";
+            /**
+             * Universe
+             * @default NIFTY200
+             * @constant
+             */
+            universe: "NIFTY200";
+            rules: components["schemas"]["BacktestRules"];
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /**
+             * Costs Bps
+             * @default 0
+             */
+            costs_bps: number;
+            /**
+             * Benchmark
+             * @default NIFTY200_TRI
+             */
+            benchmark: string;
         };
         /** BetaCoverageDTO */
         BetaCoverageDTO: {
@@ -659,6 +798,17 @@ export interface components {
             /** Success */
             success: boolean;
             data?: components["schemas"]["AlertRule"] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[BacktestResponse] */
+        Envelope_BacktestResponse_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["BacktestResponse"] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -820,6 +970,18 @@ export interface components {
             success: boolean;
             /** Data */
             data?: components["schemas"]["AlertRule"][] | null;
+            error?: components["schemas"]["Error"] | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** Envelope[list[BacktestListItem]] */
+        Envelope_list_BacktestListItem__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["BacktestListItem"][] | null;
             error?: components["schemas"]["Error"] | null;
             /** Meta */
             meta?: {
@@ -1378,6 +1540,10 @@ export interface components {
             composite_score: number | null;
             /** Close */
             close: number | null;
+        };
+        /** SubmitBacktestRequest */
+        SubmitBacktestRequest: {
+            spec: components["schemas"]["BacktestSpec"];
         };
         /** TokenResponse */
         TokenResponse: {
@@ -2366,6 +2532,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_list_NewsItem__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_backtests_endpoint_api_v1_backtests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_BacktestListItem__"];
+                };
+            };
+        };
+    };
+    submit_backtest_endpoint_api_v1_backtests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitBacktestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_dict_str__str__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_backtest_endpoint_api_v1_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_BacktestResponse_"];
                 };
             };
             /** @description Validation Error */

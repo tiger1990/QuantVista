@@ -71,16 +71,19 @@ _KEYS = {
     "information_ratio",
     "beta",
     "exposure_series",
+    "equity_curve",
 }
+_NON_STR = {"n_rebalances", "exposure_series", "equity_curve"}
 
 
 def test_all_keys_present_and_typed() -> None:
     m = _metrics([0.01, 0.02, -0.01])
     assert set(m) >= _KEYS
-    for k in _KEYS - {"n_rebalances", "exposure_series"}:
+    for k in _KEYS - _NON_STR:
         assert isinstance(m[k], str)  # Decimal-as-string
     assert isinstance(m["n_rebalances"], int)
     assert isinstance(m["exposure_series"], list)
+    assert isinstance(m["equity_curve"], list)
 
 
 def test_total_return_and_max_drawdown_exact() -> None:
@@ -155,6 +158,25 @@ def test_avg_exposure_and_series() -> None:
     assert m["exposure_series"][1]["exposure"] == "0.5"  # exposure at sessions[2]
 
 
+def test_equity_curve_samples_strategy_and_benchmark_at_rebalances() -> None:
+    sessions = _dates(4)  # curve len 4
+    m = compute_metrics(
+        sessions=sessions,
+        curve=[1.0, 1.1, 1.2, 1.3],
+        period_returns=[0.1, 0.09, 0.08],
+        turnovers=[0.5, 0.5],
+        exposures=[1.0, 1.0, 1.0, 1.0],
+        bench_curve=[1.0, 1.05, 1.1, 1.15],
+        bench_returns=[0.05, 0.05, 0.05],
+        rebalance_dates=[sessions[0], sessions[2]],
+        n_rebalances=2,
+    )
+    curve = m["equity_curve"]
+    assert [e["as_of"] for e in curve] == [sessions[0].isoformat(), sessions[2].isoformat()]
+    assert curve[0]["strategy"] == "1.0" and curve[1]["strategy"] == "1.2"  # sampled at rebalances
+    assert curve[0]["benchmark"] == "1.0" and curve[1]["benchmark"] == "1.1"
+
+
 def test_avg_turnover() -> None:
     m = _metrics([0.01, 0.01], turnovers=[0.5, 0.3, 0.1])
     assert abs(Decimal(m["avg_turnover"]) - Decimal("0.3")) < Decimal("0.0000001")
@@ -164,5 +186,5 @@ def test_empty_metrics_is_valid_and_zeroed() -> None:
     m = empty_metrics()
     assert set(m) >= _KEYS
     assert m["n_rebalances"] == 0
-    assert m["exposure_series"] == []
+    assert m["exposure_series"] == [] and m["equity_curve"] == []
     assert Decimal(m["total_return"]) == Decimal("0")

@@ -55,3 +55,37 @@ def test_sample_scheduled_job_registered() -> None:
 
     # Assert
     assert "quantvista.sample_scheduled_job" in app.tasks
+
+
+def test_producer_and_worker_agree_on_task_routes() -> None:
+    """Regression: Celery routes in the PRODUCER, so a worker-only routing table strands
+    API-published tasks on the default queue (a submitted backtest sat in `celery` while
+    `worker -Q user` idled). Both ends must read the one shared table."""
+    # Arrange / Act
+    from quantvista.core.tasks import TASK_DEFAULT_QUEUE, TASK_ROUTES, _producer, queue_for
+    from quantvista.jobs.celery_app import create_celery
+
+    worker = create_celery()
+    producer = _producer()
+
+    # Assert — same table, same default, on both sides of the broker
+    assert producer.conf.task_routes == worker.conf.task_routes == TASK_ROUTES
+    assert producer.conf.task_default_queue == worker.conf.task_default_queue == TASK_DEFAULT_QUEUE
+    # the interactive backtest queue specifically (the one that broke)
+    assert queue_for("quantvista.run_backtest") == "user"
+    assert queue_for("quantvista.unrouted_task") == TASK_DEFAULT_QUEUE
+
+
+def test_producer_publishes_backtest_to_the_user_queue() -> None:
+    """The published message actually carries the `user` routing key — not just config equality."""
+    # Arrange
+    from quantvista.core.tasks import _producer
+
+    producer = _producer()
+
+    # Act — record the routing decision without touching a real broker
+    with producer.connection_for_write() as conn:
+        opts = producer.amqp.router.route({}, "quantvista.run_backtest", (), {}, conn)
+
+    # Assert
+    assert opts["queue"].name == "user"

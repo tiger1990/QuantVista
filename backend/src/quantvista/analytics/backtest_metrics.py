@@ -103,6 +103,7 @@ def compute_metrics(
         "information_ratio": _s(information_ratio),
         "beta": _s(beta),
         "exposure_series": _exposure_series(sessions, exposures, rebalance_dates),
+        "equity_curve": _equity_curve(sessions, curve, bench_curve, rebalance_dates),
     }
 
 
@@ -119,12 +120,32 @@ def _exposure_series(
     return out
 
 
+def _equity_curve(
+    sessions: Sequence[date],
+    curve: Sequence[float],
+    bench_curve: Sequence[float],
+    rebalance_dates: Sequence[date],
+) -> list[dict[str, str]]:
+    """Strategy + benchmark equity sampled at each rebalance date — the FE chart series (QV-071).
+    Compact by design (daily curve → the result artifact, QV-067)."""
+    index = {d: i for i, d in enumerate(sessions)}
+    out: list[dict[str, str]] = []
+    for d in rebalance_dates:
+        i = index.get(d)
+        if i is not None and i < len(curve) and i < len(bench_curve):
+            out.append(
+                {"as_of": d.isoformat(), "strategy": _s(curve[i]), "benchmark": _s(bench_curve[i])}
+            )
+    return out
+
+
 def empty_metrics() -> dict[str, Any]:
     """A valid, all-zero suite for a degenerate range (fewer than two sessions)."""
     zero = _s(0.0)
     metrics: dict[str, Any] = {k: zero for k in _SCALAR_KEYS}
     metrics["n_rebalances"] = 0
     metrics["exposure_series"] = []
+    metrics["equity_curve"] = []
     return metrics
 
 
