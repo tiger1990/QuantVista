@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SubmitBacktestError } from "@/lib/api/queries";
@@ -9,7 +9,30 @@ const submit = { mutate: vi.fn(), isPending: false };
 
 vi.mock("@/lib/api/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api/queries")>("@/lib/api/queries");
-  return { ...actual, useSubmitBacktest: () => submit };
+  return {
+    ...actual,
+    useSubmitBacktest: () => submit,
+    // the basket's SymbolPicker searches through this hook
+    useStocks: () => ({
+      isLoading: false,
+      data: {
+        pages: [
+          {
+            data: [
+              {
+                id: "1",
+                symbol: "TCS",
+                company_name: "Tata Consultancy",
+                sector: "IT",
+                market_cap_bucket: "large",
+                market: "NSE",
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  };
 });
 
 beforeEach(() => {
@@ -71,6 +94,57 @@ describe("BacktestSetupForm submit", () => {
     expect(Number(endInput.value.slice(0, 4))).toBe(thisYear);
     expect(Number(startInput.value.slice(0, 4))).toBe(thisYear - 1);
     expect(Date.parse(startInput.value)).toBeLessThan(Date.parse(endInput.value));
+  });
+});
+
+describe("BacktestSetupForm custom basket", () => {
+  it("defaults to the factor strategy", () => {
+    render(<BacktestSetupForm tier="quant" onQueued={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /factor strategy/i })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByText("Rank by")).toBeInTheDocument();
+  });
+
+  it("swaps ranking controls for a symbol picker in basket mode", () => {
+    render(<BacktestSetupForm tier="quant" onQueued={vi.fn()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /custom basket/i }));
+    // ranking is meaningless for an explicit basket, so it is not offered
+    expect(screen.queryByText("Rank by")).not.toBeInTheDocument();
+    expect(screen.queryByText("Top N")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/search symbols/i)).toBeInTheDocument();
+    expect(screen.getByText("Rebalance")).toBeInTheDocument(); // cadence still applies
+  });
+
+  it("refuses to submit an empty basket", () => {
+    render(<BacktestSetupForm tier="quant" onQueued={vi.fn()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /custom basket/i }));
+    fireEvent.click(screen.getByRole("button", { name: /run backtest/i }));
+    expect(submit.mutate).not.toHaveBeenCalled();
+    expect(screen.getByText(/add at least one symbol/i)).toBeInTheDocument();
+  });
+
+  it("submits a custom_basket spec carrying the picked symbols", async () => {
+    render(<BacktestSetupForm tier="quant" onQueued={vi.fn()} />);
+    fireEvent.click(screen.getByRole("radio", { name: /custom basket/i }));
+    fireEvent.change(screen.getByLabelText(/search symbols/i), { target: { value: "tcs" } });
+    // the search is debounced, so results appear on the next tick
+    await waitFor(() => expect(screen.getByText("Tata Consultancy")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Tata Consultancy"));
+    fireEvent.click(screen.getByRole("button", { name: /run backtest/i }));
+
+    const spec = submit.mutate.mock.calls[0][0];
+    expect(spec.type).toBe("custom_basket");
+    expect(spec.symbols).toEqual(["TCS"]);
+  });
+
+  it("sends no symbols for a factor strategy", () => {
+    render(<BacktestSetupForm tier="quant" onQueued={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /run backtest/i }));
+    const spec = submit.mutate.mock.calls[0][0];
+    expect(spec.type).toBe("factor_strategy");
+    expect(spec.symbols).toBeUndefined();
   });
 });
 

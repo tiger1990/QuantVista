@@ -10,6 +10,7 @@ import { type BacktestSpec, SubmitBacktestError, useSubmitBacktest } from "@/lib
 import { cn } from "@/lib/utils";
 
 import { PRESETS, presetRange, rangeDays, type Tier } from "./lib";
+import { SymbolPicker } from "./SymbolPicker";
 
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm " +
@@ -17,6 +18,9 @@ const selectClass =
 
 type RankBy = "composite" | "fundamental" | "momentum" | "quality" | "sentiment" | "risk";
 type Rebalance = "weekly" | "monthly" | "quarterly";
+type StrategyType = "factor_strategy" | "custom_basket";
+/** Mirrors `MAX_BASKET_SYMBOLS` in the backend spec — the server is still the backstop. */
+export const MAX_BASKET_SYMBOLS = 50;
 const RANK_BY: RankBy[] = ["composite", "fundamental", "momentum", "quality", "sentiment", "risk"];
 const REBALANCE: Rebalance[] = ["weekly", "monthly", "quarterly"];
 
@@ -41,6 +45,8 @@ export function BacktestSetupForm({
   onQueued: (id: string) => void;
 }) {
   const submit = useSubmitBacktest();
+  const [mode, setMode] = useState<StrategyType>("factor_strategy");
+  const [symbols, setSymbols] = useState<string[]>([]);
   const [rankBy, setRankBy] = useState<RankBy>("composite");
   const [topN, setTopN] = useState(20);
   const [rebalance, setRebalance] = useState<Rebalance>("monthly");
@@ -80,10 +86,18 @@ export function BacktestSetupForm({
       setErr("Pro backtests are limited to 1 year — upgrade to Quant for custom ranges.");
       return;
     }
+    const isBasket = mode === "custom_basket";
+    if (isBasket && symbols.length === 0) {
+      setErr("Add at least one symbol to backtest a custom basket.");
+      return;
+    }
     const spec: BacktestSpec = {
-      type: "factor_strategy",
+      type: mode,
       universe: "NIFTY200",
+      // rank_by/top_n are inert for a basket but always sent: the server fills its defaults into
+      // the stored spec regardless, so omitting them would change nothing except the wire shape.
       rules: { rank_by: rankBy, top_n: topN, rebalance },
+      ...(isBasket ? { symbols } : {}),
       start: range.start,
       end: range.end,
       costs_bps: costsBps,
@@ -103,29 +117,78 @@ export function BacktestSetupForm({
         run();
       }}
     >
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Field label="Rank by">
-          <select
-            className={selectClass}
-            value={rankBy}
-            onChange={(e) => setRankBy(e.target.value as RankBy)}
+      <div
+        role="radiogroup"
+        aria-label="Strategy"
+        className="mb-4 flex gap-1.5 border-b border-border pb-4"
+      >
+        {(
+          [
+            ["factor_strategy", "Factor strategy"],
+            ["custom_basket", "Custom basket"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={mode === value}
+            onClick={() => setMode(value)}
+            className={cn(
+              "rounded-sm border px-3 py-1 text-sm transition-colors",
+              mode === value
+                ? "border-primary bg-primary/10 font-medium text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
           >
-            {RANK_BY.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Top N">
-          <Input
-            type="number"
-            min={1}
-            max={200}
-            value={topN}
-            onChange={(e) => setTopN(Number(e.target.value))}
-          />
-        </Field>
+            {label}
+          </button>
+        ))}
+        <span className="ml-2 self-center text-xs text-muted-foreground">
+          {mode === "custom_basket"
+            ? "Your picks, equal-weighted, vs the index."
+            : "Rank the index and hold the top N."}
+        </span>
+      </div>
+
+      {mode === "custom_basket" ? (
+        <div className="mb-4">
+          <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+            Basket
+          </span>
+          <div className="mt-1">
+            <SymbolPicker selected={symbols} onChange={setSymbols} max={MAX_BASKET_SYMBOLS} />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {mode === "factor_strategy" ? (
+          <>
+            <Field label="Rank by">
+              <select
+                className={selectClass}
+                value={rankBy}
+                onChange={(e) => setRankBy(e.target.value as RankBy)}
+              >
+                {RANK_BY.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Top N">
+              <Input
+                type="number"
+                min={1}
+                max={200}
+                value={topN}
+                onChange={(e) => setTopN(Number(e.target.value))}
+              />
+            </Field>
+          </>
+        ) : null}
         <Field label="Rebalance">
           <select
             className={selectClass}

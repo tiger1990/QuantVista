@@ -1513,7 +1513,7 @@
           "backtests"
         ],
         "summary": "Delete Backtest Endpoint",
-        "description": "Remove one run from the history \u2192 204. RLS-scoped: foreign/unknown ids delete nothing \u2192 404.\nAllowed at any status \u2014 an in-flight job no-ops on the missing row rather than resurrecting it.",
+        "description": "Remove one run from the history \u2192 204. RLS-scoped: foreign/unknown ids delete nothing \u2192 404.\n\nAllowed at any status \u2014 an in-flight job no-ops on the missing row rather than resurrecting it.",
         "operationId": "delete_backtest_endpoint_api_v1_backtests__backtest_id__delete",
         "parameters": [
           {
@@ -1789,7 +1789,8 @@
             "type": "integer",
             "maximum": 200.0,
             "minimum": 1.0,
-            "title": "Top N"
+            "title": "Top N",
+            "default": 20
           },
           "rebalance": {
             "type": "string",
@@ -1804,16 +1805,16 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "top_n"
-        ],
         "title": "BacktestRules"
       },
       "BacktestSpec": {
         "properties": {
           "type": {
             "type": "string",
-            "const": "factor_strategy",
+            "enum": [
+              "factor_strategy",
+              "custom_basket"
+            ],
             "title": "Type",
             "default": "factor_strategy"
           },
@@ -1825,6 +1826,21 @@
           },
           "rules": {
             "$ref": "#/components/schemas/BacktestRules"
+          },
+          "symbols": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbols",
+            "description": "custom_basket only: 1\u201350 tickers, held equal-weighted"
           },
           "start": {
             "type": "string",
@@ -1859,7 +1875,7 @@
           "end"
         ],
         "title": "BacktestSpec",
-        "description": "A factor-strategy backtest specification (universe, rules, range, costs, benchmark)."
+        "description": "A backtest specification (universe, rules, range, costs, benchmark).\n\nTwo strategy types share one shape: ``factor_strategy`` ranks the universe by a score and holds\nthe top N, while ``custom_basket`` equal-weights an explicit, user-chosen ``symbols`` list\n(``rank_by``/``top_n`` are inert there). The benchmark stays the index either way."
       },
       "BetaCoverageDTO": {
         "properties": {

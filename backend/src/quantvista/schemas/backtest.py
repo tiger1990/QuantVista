@@ -17,20 +17,35 @@ RankBy = Literal["composite", "fundamental", "momentum", "quality", "sentiment",
 Rebalance = Literal["weekly", "monthly", "quarterly"]
 
 
+StrategyType = Literal["factor_strategy", "custom_basket"]
+
+MAX_BASKET_SYMBOLS = 50
+
+
 class BacktestRules(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rank_by: RankBy = "composite"
-    top_n: int = Field(ge=1, le=200)
+    # Defaulted so a ``custom_basket`` — which ranks nothing — need only supply ``rebalance``.
+    top_n: int = Field(default=20, ge=1, le=200)
     rebalance: Rebalance = "monthly"
 
 
 class BacktestSpec(BaseModel):
-    """A factor-strategy backtest specification (universe, rules, range, costs, benchmark)."""
+    """A backtest specification (universe, rules, range, costs, benchmark).
+
+    Two strategy types share one shape: ``factor_strategy`` ranks the universe by a score and holds
+    the top N, while ``custom_basket`` equal-weights an explicit, user-chosen ``symbols`` list
+    (``rank_by``/``top_n`` are inert there). The benchmark stays the index either way.
+    """
 
     model_config = ConfigDict(extra="forbid")
-    type: Literal["factor_strategy"] = "factor_strategy"
+    type: StrategyType = "factor_strategy"
     universe: Literal["NIFTY200"] = "NIFTY200"
     rules: BacktestRules
+    symbols: list[str] | None = Field(
+        default=None,
+        description=f"custom_basket only: 1–{MAX_BASKET_SYMBOLS} tickers, held equal-weighted",
+    )
     start: date
     end: date
     costs_bps: int = Field(default=0, ge=0, le=500)
@@ -40,6 +55,33 @@ class BacktestSpec(BaseModel):
     def _valid_range(self) -> BacktestSpec:
         if self.start >= self.end:
             raise ValueError("start must be before end")
+        return self
+
+    @model_validator(mode="after")
+    def _symbols_match_type(self) -> BacktestSpec:
+        """``symbols`` is required by — and exclusive to — ``custom_basket``.
+
+        Normalised in place (upper-cased, trimmed, de-duplicated keeping first-seen order) so the
+        canonical spec, and therefore the reproducibility hash, does not depend on how it was typed.
+        """
+        if self.type == "factor_strategy":
+            if self.symbols is not None:
+                raise ValueError("symbols is only valid for a custom_basket backtest")
+            return self
+
+        raw = self.symbols or []
+        cleaned: list[str] = []
+        for s in raw:
+            sym = s.strip().upper()
+            if not sym:
+                raise ValueError("symbols must not contain blank entries")
+            if sym not in cleaned:
+                cleaned.append(sym)
+        if not cleaned:
+            raise ValueError("custom_basket requires at least one symbol")
+        if len(cleaned) > MAX_BASKET_SYMBOLS:
+            raise ValueError(f"a custom_basket holds at most {MAX_BASKET_SYMBOLS} symbols")
+        object.__setattr__(self, "symbols", cleaned)
         return self
 
 
@@ -73,6 +115,7 @@ class BacktestListItem(BaseModel):
 
 
 __all__ = [
+    "MAX_BASKET_SYMBOLS",
     "BacktestListItem",
     "BacktestResponse",
     "BacktestRules",

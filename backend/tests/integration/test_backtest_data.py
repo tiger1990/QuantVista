@@ -187,3 +187,43 @@ def test_returns_as_of_has_no_future_bar(admin_engine: Engine, universe: list[UU
         rm = BacktestDataAccess(s).returns_as_of(EARLY, universe)
     assert len(rm.dates) > 0
     assert max(rm.dates) <= EARLY  # the post-EARLY bar (2026-02-15) is invisible
+
+
+# --- custom basket symbol resolution ----------------------------------------
+
+
+def _symbols_of(admin_engine: Engine, stock_ids: list[UUID]) -> tuple[str, list[str]]:
+    with admin_engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT s.symbol, m.code FROM stocks s JOIN markets m ON m.id = s.market_id "
+                "WHERE s.id = ANY(:ids) ORDER BY s.symbol"
+            ),
+            {"ids": stock_ids},
+        ).all()
+    return str(rows[0].code), [str(r.symbol) for r in rows]
+
+
+def test_basket_ids_resolves_symbols_in_the_order_given(
+    admin_engine: Engine, universe: list[UUID]
+) -> None:
+    market, symbols = _symbols_of(admin_engine, universe)
+    picked = [symbols[2], symbols[0]]  # deliberately not alphabetical
+    with Session(admin_engine) as session:
+        ids = BacktestDataAccess(session).basket_ids(picked, market=market)
+
+    with admin_engine.connect() as conn:
+        back = [
+            str(
+                conn.execute(text("SELECT symbol FROM stocks WHERE id = :i"), {"i": i}).scalar_one()
+            )
+            for i in ids
+        ]
+    assert back == picked
+
+
+def test_basket_ids_raises_on_an_unknown_symbol(admin_engine: Engine, universe: list[UUID]) -> None:
+    """Holding fewer names than the user picked would misstate the strategy — fail loudly."""
+    market, symbols = _symbols_of(admin_engine, universe)
+    with Session(admin_engine) as session, pytest.raises(ValueError, match="unknown symbols"):
+        BacktestDataAccess(session).basket_ids([symbols[0], "NOSUCH"], market=market)

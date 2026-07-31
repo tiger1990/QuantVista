@@ -577,6 +577,7 @@ export interface paths {
         /**
          * Delete Backtest Endpoint
          * @description Remove one run from the history → 204. RLS-scoped: foreign/unknown ids delete nothing → 404.
+         *
          *     Allowed at any status — an in-flight job no-ops on the missing row rather than resurrecting it.
          */
         delete: operations["delete_backtest_endpoint_api_v1_backtests__backtest_id__delete"];
@@ -675,7 +676,10 @@ export interface components {
              * @enum {string}
              */
             rank_by: "composite" | "fundamental" | "momentum" | "quality" | "sentiment" | "risk";
-            /** Top N */
+            /**
+             * Top N
+             * @default 20
+             */
             top_n: number;
             /**
              * Rebalance
@@ -686,15 +690,19 @@ export interface components {
         };
         /**
          * BacktestSpec
-         * @description A factor-strategy backtest specification (universe, rules, range, costs, benchmark).
+         * @description A backtest specification (universe, rules, range, costs, benchmark).
+         *
+         *     Two strategy types share one shape: ``factor_strategy`` ranks the universe by a score and holds
+         *     the top N, while ``custom_basket`` equal-weights an explicit, user-chosen ``symbols`` list
+         *     (``rank_by``/``top_n`` are inert there). The benchmark stays the index either way.
          */
         BacktestSpec: {
             /**
              * Type
              * @default factor_strategy
-             * @constant
+             * @enum {string}
              */
-            type: "factor_strategy";
+            type: "factor_strategy" | "custom_basket";
             /**
              * Universe
              * @default NIFTY200
@@ -702,6 +710,11 @@ export interface components {
              */
             universe: "NIFTY200";
             rules: components["schemas"]["BacktestRules"];
+            /**
+             * Symbols
+             * @description custom_basket only: 1–50 tickers, held equal-weighted
+             */
+            symbols?: string[] | null;
             /**
              * Start
              * Format: date

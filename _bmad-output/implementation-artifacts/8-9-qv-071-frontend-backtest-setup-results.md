@@ -165,8 +165,15 @@ Keep it **consistent enough** to live in the same app (same tokens, primitives, 
 - `backend/src/quantvista/api/routes_backtests.py` (modified — `DELETE /backtests/{id}` 204/404 + commit-before-response)
 - `backend/tests/integration/test_api_backtests.py` (modified — delete, isolation, commit-ordering)
 - `frontend/src/features/backtests/deleteBacktest.integration.test.tsx` (new — delete refreshes the list)
+- `backend/src/quantvista/schemas/backtest.py` (modified — `custom_basket` type + `symbols`)
+- `backend/src/quantvista/analytics/backtest.py` (modified — `_picks` selection seam)
+- `backend/src/quantvista/analytics/backtest_data.py` (modified — `basket_ids`)
+- `backend/src/quantvista/market_data/repositories.py` (modified — `stock_ids_by_symbol`)
+- `frontend/src/features/backtests/SymbolPicker.tsx` + `.test.tsx` (new — basket search/pick)
 
 ### Added after review (user-requested)
+
+- **Custom-basket backtests** — a second strategy type alongside the factor strategy, folded into this PR at the user's request (initially planned as a separate story). `BacktestSpec.type` opens to `factor_strategy | custom_basket`; a basket carries `symbols` (1–50, upper-cased/trimmed/de-duped in the validator so the reproducibility hash does not depend on typing), and `symbols` is required by — and exclusive to — a basket (a factor strategy that passed symbols would otherwise look honoured but be ignored). `rules.top_n` gained a default so a basket need only choose a cadence. The engine's selection is now one seam (`_picks`): a basket resolves its names **once** and holds them throughout; the ranker is never consulted. PIT survives untouched — the existing "only weight names priced on this date" filter means a not-yet-listed or delisted pick is simply not held. `BacktestDataAccess.basket_ids` raises on an unknown symbol rather than quietly holding fewer names than asked. UI: a strategy toggle that swaps rank_by/top_n for a debounced `SymbolPicker` (server-side search over the whole universe, chips for picks, capped at 50). Verified end-to-end on real data — a 3-name basket returned +51.97% vs the index's +4.77%, 100% exposure, 5% turnover, beta 1.35.
 
 - **Delete a run** — `DELETE /api/v1/backtests/{id}` (204; RLS makes a foreign id 404, and a second delete 404s) + an always-visible `Trash2` icon button per history row, matching the `PortfolioList` precedent, with an **inline confirm** (delete is irreversible). Deleting the open run closes the tearsheet first so the URL never points at a missing row. Allowed at any status — the job's `mark_running` guard already no-ops on a deleted row.
 
