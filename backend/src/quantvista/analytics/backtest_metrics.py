@@ -126,17 +126,28 @@ def _equity_curve(
     bench_curve: Sequence[float],
     rebalance_dates: Sequence[date],
 ) -> list[dict[str, str]]:
-    """Strategy + benchmark equity sampled at each rebalance date — the FE chart series (QV-071).
-    Compact by design (daily curve → the result artifact, QV-067)."""
+    """Strategy + benchmark equity sampled at each rebalance date, **plus the final session** —
+    the FE chart series (QV-071). Compact by design (daily curve → the result artifact, QV-067).
+
+    The terminal point matters: rebalance dates stop short of the range end, so a curve sampled at
+    them alone ends before the run does and the chart contradicts the headline `total_return`
+    (which is measured to the last session). Anchoring the last point makes them agree.
+    """
     index = {d: i for i, d in enumerate(sessions)}
-    out: list[dict[str, str]] = []
-    for d in rebalance_dates:
-        i = index.get(d)
-        if i is not None and i < len(curve) and i < len(bench_curve):
-            out.append(
-                {"as_of": d.isoformat(), "strategy": _s(curve[i]), "benchmark": _s(bench_curve[i])}
-            )
-    return out
+    last = min(len(sessions), len(curve), len(bench_curve)) - 1
+    if last < 0:
+        return []
+    points = [i for d in rebalance_dates if (i := index.get(d)) is not None and i <= last]
+    if last not in points:
+        points.append(last)
+    return [
+        {
+            "as_of": sessions[i].isoformat(),
+            "strategy": _s(curve[i]),
+            "benchmark": _s(bench_curve[i]),
+        }
+        for i in sorted(dict.fromkeys(points))
+    ]
 
 
 def empty_metrics() -> dict[str, Any]:
