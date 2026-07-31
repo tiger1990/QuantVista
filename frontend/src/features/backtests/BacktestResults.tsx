@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import type { Backtest } from "@/lib/api/queries";
 import { cn } from "@/lib/utils";
 
@@ -68,17 +66,26 @@ export function BacktestResults({ backtest }: { backtest: Backtest }) {
 
       {/* Footer: reproducibility + disclaimer */}
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3">
-        <p className="font-mono text-[11px] text-muted-foreground">
-          {typeof m.reproducibility_hash === "string"
-            ? `repro ${m.reproducibility_hash.slice(0, 12)}…`
-            : ""}
-        </p>
+        {/* Provenance (QV-069). A bare hex string means nothing on its own, so it says what it is
+            and what it does NOT cover — the recipe, not the underlying market data. */}
+        {typeof m.reproducibility_hash === "string" ? (
+          <p
+            className="font-mono text-[11px] text-muted-foreground"
+            title={
+              "Reproducibility fingerprint — SHA-256 of this run's settings plus the scoring model " +
+              `(${String(m.model_version ?? "?")}) and weighting (${String(m.weights_version ?? "?")}) ` +
+              "versions. Two runs sharing it used an identical recipe. It does not fingerprint the " +
+              "underlying price or score data, which can change between runs."
+            }
+          >
+            recipe {m.reproducibility_hash.slice(0, 12)}…
+          </p>
+        ) : null}
+        {/* No Methodology link until the page exists (QV-070): it 404'd, which reads as a broken
+            app. The disclaimer is deliberately self-contained so the tearsheet still ships whole. */}
         <p className="text-xs text-muted-foreground">
-          Research tool, not investment advice — costs & slippage are modelled assumptions and past
-          performance does not indicate future results.{" "}
-          <Link href="/methodology" className="underline underline-offset-2 hover:text-foreground">
-            Methodology
-          </Link>
+          Research tool, not investment advice — costs &amp; slippage are modelled assumptions and
+          past performance does not indicate future results.
         </p>
       </footer>
     </article>

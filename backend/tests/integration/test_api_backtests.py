@@ -209,3 +209,91 @@ def test_cross_tenant_get_404(api: dict[str, Any]) -> None:
 def test_unknown_backtest_404(api: dict[str, Any]) -> None:
     r = api["client"].get(f"/api/v1/backtests/{uuid4()}", headers=_h(api["pro"]))
     assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+
+
+# --- delete -----------------------------------------------------------------
+
+
+def test_delete_removes_the_run_from_history(api: dict[str, Any]) -> None:
+    client, pro = api["client"], api["pro"]
+    bid = _submit(client, pro).json()["data"]["id"]
+
+    assert client.delete(f"/api/v1/backtests/{bid}", headers=_h(pro)).status_code == 204
+
+    assert client.get(f"/api/v1/backtests/{bid}", headers=_h(pro)).status_code == 404
+    assert client.get("/api/v1/backtests", headers=_h(pro)).json()["data"] == []
+
+
+def test_delete_is_not_idempotent_second_call_404s(api: dict[str, Any]) -> None:
+    client, pro = api["client"], api["pro"]
+    bid = _submit(client, pro).json()["data"]["id"]
+    assert client.delete(f"/api/v1/backtests/{bid}", headers=_h(pro)).status_code == 204
+    r = client.delete(f"/api/v1/backtests/{bid}", headers=_h(pro))
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+
+
+def test_cross_tenant_delete_404_and_leaves_the_row(api: dict[str, Any]) -> None:
+    """RLS makes another tenant's id delete nothing — it must 404, not silently succeed."""
+    client = api["client"]
+    bid = _submit(client, api["pro"]).json()["data"]["id"]
+
+    assert client.delete(f"/api/v1/backtests/{bid}", headers=_h(api["other"])).status_code == 404
+
+    assert client.get(f"/api/v1/backtests/{bid}", headers=_h(api["pro"])).status_code == 200
+
+
+def test_unknown_delete_404(api: dict[str, Any]) -> None:
+    r = api["client"].delete(f"/api/v1/backtests/{uuid4()}", headers=_h(api["pro"]))
+    assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+
+
+def test_delete_requires_auth(api: dict[str, Any]) -> None:
+    bid = _submit(api["client"], api["pro"]).json()["data"]["id"]
+    assert api["client"].delete(f"/api/v1/backtests/{bid}").status_code == 401
+
+
+def test_deleting_a_queued_run_makes_the_job_a_no_op(api: dict[str, Any]) -> None:
+    """A run deleted before the worker picks it up must not resurrect the row or raise."""
+    client, pro = api["client"], api["pro"]
+    bid = _submit(client, pro).json()["data"]["id"]
+    assert client.delete(f"/api/v1/backtests/{bid}", headers=_h(pro)).status_code == 204
+
+    assert run_backtest(bid) == "succeeded"  # the job no-ops cleanly
+
+    assert client.get(f"/api/v1/backtests/{bid}", headers=_h(pro)).status_code == 404
+
+
+def test_row_is_committed_before_the_job_is_enqueued(
+    api: dict[str, Any], admin_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker reads the row by id on its own connection, so the INSERT must be committed before
+    the task is published — not left to the yield-dependency's exit, which runs after the response.
+    """
+    seen: list[int] = []
+
+    def _spy(_task: str, backtest_id: str) -> None:
+        # a *separate* connection: it can only see the row if the request already committed
+        with admin_engine.connect() as conn:
+            seen.append(
+                conn.execute(
+                    text("SELECT count(*) FROM backtests WHERE id = :id"), {"id": backtest_id}
+                ).scalar_one()
+            )
+
+    monkeypatch.setattr("quantvista.api.routes_backtests.enqueue", _spy)
+    assert _submit(api["client"], api["pro"]).status_code == 202
+    assert seen == [1]  # visible to another connection at publish time
+
+
+def test_delete_is_committed_before_the_response(api: dict[str, Any], admin_engine: Engine) -> None:
+    """A client refetching its history the instant it sees 204 must not be shown the deleted row."""
+    client, pro = api["client"], api["pro"]
+    bid = _submit(client, pro).json()["data"]["id"]
+
+    assert client.delete(f"/api/v1/backtests/{bid}", headers=_h(pro)).status_code == 204
+
+    with admin_engine.connect() as conn:  # independent connection = committed state
+        gone = conn.execute(
+            text("SELECT count(*) FROM backtests WHERE id = :id"), {"id": bid}
+        ).scalar_one()
+    assert gone == 0

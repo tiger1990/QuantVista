@@ -641,6 +641,24 @@ export function useBacktest(id: string | null) {
   });
 }
 
+/** Remove one run from the history. Invalidates the list; the caller clears the open run. */
+export function useDeleteBacktest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await api.DELETE("/api/v1/backtests/{backtest_id}", {
+        params: { path: { backtest_id: id } },
+      });
+      if (error) throw new Error("Failed to delete the backtest.");
+      return id;
+    },
+    onSuccess: (id) => {
+      qc.invalidateQueries({ queryKey: ["backtests"] });
+      qc.removeQueries({ queryKey: ["backtest", id] });
+    },
+  });
+}
+
 /** The user's past backtests (most recent first). */
 export function useBacktests() {
   return useQuery({

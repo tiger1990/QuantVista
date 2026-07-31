@@ -51,3 +51,54 @@ describe("BacktestList", () => {
     expect(screen.getByRole("button", { name: /succeeded/i })).not.toHaveAttribute("aria-current");
   });
 });
+
+describe("BacktestList delete", () => {
+  it("shows no delete control when the page passes no handler", () => {
+    render(<BacktestList items={items} onSelect={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /^delete backtest/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a delete control on every row without needing hover", () => {
+    // the control is always visible by request — no opacity-0/group-hover reveal
+    render(<BacktestList items={items} onSelect={vi.fn()} onDelete={vi.fn()} />);
+    const buttons = screen.getAllByRole("button", { name: /^delete backtest/i });
+    expect(buttons).toHaveLength(items.length);
+    for (const b of buttons) {
+      expect(b.className).not.toMatch(/opacity-0|group-hover/);
+    }
+  });
+
+  it("asks before deleting — one click does not destroy the run", () => {
+    const onDelete = vi.fn();
+    render(<BacktestList items={items} onSelect={vi.fn()} onDelete={onDelete} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /^delete backtest/i })[0]);
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByText("Delete?")).toBeInTheDocument();
+  });
+
+  it("deletes the right run once confirmed", () => {
+    const onDelete = vi.fn();
+    render(<BacktestList items={items} onSelect={vi.fn()} onDelete={onDelete} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /^delete backtest/i })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).toHaveBeenCalledWith("run-2");
+  });
+
+  it("cancel abandons the delete", () => {
+    const onDelete = vi.fn();
+    render(<BacktestList items={items} onSelect={vi.fn()} onDelete={onDelete} />);
+    fireEvent.click(screen.getAllByRole("button", { name: /^delete backtest/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.queryByText("Delete?")).not.toBeInTheDocument();
+  });
+
+  it("does not open a run while it is being deleted", () => {
+    const onSelect = vi.fn();
+    render(
+      <BacktestList items={items} onSelect={onSelect} onDelete={vi.fn()} deletingId="run-1" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /succeeded/i }));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});

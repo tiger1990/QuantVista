@@ -1507,6 +1507,41 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "backtests"
+        ],
+        "summary": "Delete Backtest Endpoint",
+        "description": "Remove one run from the history \u2192 204. RLS-scoped: foreign/unknown ids delete nothing \u2192 404.\nAllowed at any status \u2014 an in-flight job no-ops on the missing row rather than resurrecting it.",
+        "operationId": "delete_backtest_endpoint_api_v1_backtests__backtest_id__delete",
+        "parameters": [
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },

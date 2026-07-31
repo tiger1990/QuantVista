@@ -59,13 +59,26 @@ describe("BacktestResults tearsheet", () => {
     expect(screen.getByText("Information ratio")).toBeInTheDocument();
   });
 
-  it("shows the reproducibility fingerprint, disclaimer and methodology link", () => {
+  it("shows the reproducibility fingerprint and a self-contained disclaimer", () => {
     render(<BacktestResults backtest={backtest} />);
-    expect(screen.getByText(/repro abcdef012345/i)).toBeInTheDocument();
+    expect(screen.getByText(/recipe abcdef012345/i)).toBeInTheDocument();
     expect(screen.getByText(/not investment advice/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /methodology/i })).toHaveAttribute(
-      "href",
-      "/methodology",
-    );
+    expect(
+      screen.getByText(/past performance does not indicate future results/i),
+    ).toBeInTheDocument();
+  });
+
+  it("explains the fingerprint instead of showing a bare hex string", () => {
+    render(<BacktestResults backtest={backtest} />);
+    const el = screen.getByText(/recipe abcdef012345/i);
+    expect(el).toHaveAttribute("title", expect.stringMatching(/reproducibility fingerprint/i));
+    // it must be honest about what it does NOT cover
+    expect(el.getAttribute("title")).toMatch(/does not fingerprint the underlying price or score/i);
+  });
+
+  it("links nowhere until the Methodology page exists (QV-070)", () => {
+    // regression: /methodology 404'd, so the link rendered as a dead end in a shipped tearsheet
+    render(<BacktestResults backtest={backtest} />);
+    expect(screen.queryByRole("link", { name: /methodology/i })).not.toBeInTheDocument();
   });
 });

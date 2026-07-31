@@ -10,10 +10,15 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
-from quantvista.analytics.backtests import create_backtest, get_backtest, list_backtests
+from quantvista.analytics.backtests import (
+    create_backtest,
+    delete_backtest,
+    get_backtest,
+    list_backtests,
+)
 from quantvista.api.deps import get_entitlement_service, get_tenant_context, get_tenant_session
 from quantvista.core.tasks import enqueue
 from quantvista.identity.entitlements import EntitlementService
@@ -69,7 +74,13 @@ def submit_backtest_endpoint(
         user_id=ctx.user_id,
         spec=spec.model_dump(mode="json"),
     )
-    # Enqueue AFTER the row is persisted (the worker reads it by id on a privileged session). By
+    # COMMIT before enqueueing and before returning. FastAPI runs a yield-dependency's exit code
+    # (where `session_scope` commits) *after* the response is sent, which leaves two races: the
+    # worker could read the row by id before it exists, and the client polling the returned id
+    # could 404. Committing here closes both. Nothing below touches the session — note the RLS
+    # binding is `SET LOCAL`, so it does not outlive this transaction.
+    session.commit()
+    # Enqueue AFTER the row is committed (the worker reads it by id on a privileged session). By
     # NAME via the core producer seam — `api` may not import `jobs` (sibling composition roots).
     enqueue("quantvista.run_backtest", row["id"])
     return Envelope.ok({"id": str(row["id"]), "status": "queued"})
@@ -93,6 +104,25 @@ def get_backtest_endpoint(
     if row is None:
         raise BacktestNotFound(backtest_id)
     return Envelope.ok(BacktestResponse.model_validate(row).model_dump())
+
+
+@router.delete("/backtests/{backtest_id}", status_code=204)
+def delete_backtest_endpoint(
+    backtest_id: UUID,
+    _ctx: TenantContext = Depends(get_tenant_context),
+    session: Session = Depends(get_tenant_session),
+) -> Response:
+    """Remove one run from the history → 204. RLS-scoped: foreign/unknown ids delete nothing → 404.
+
+    Allowed at any status — an in-flight job no-ops on the missing row rather than resurrecting it.
+    """
+    if not delete_backtest(session, backtest_id):
+        raise BacktestNotFound(backtest_id)
+    # Commit before responding: the yield-dependency commits only after the response is sent, so a
+    # client that refetches its history the instant it sees 204 would still be shown the deleted
+    # row. See the note in `submit_backtest_endpoint`.
+    session.commit()
+    return Response(status_code=204)
 
 
 __all__ = ["BacktestNotFound", "router"]
