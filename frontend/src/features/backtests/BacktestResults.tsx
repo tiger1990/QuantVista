@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { Backtest } from "@/lib/api/queries";
 import { cn } from "@/lib/utils";
 
@@ -71,12 +73,16 @@ export function BacktestResults({ backtest }: { backtest: Backtest }) {
           on a research surface. It is still computed, persisted and returned by the API, so
           provenance and run-to-run comparison are unaffected.
 
-          No Methodology link until that page exists (QV-070) — it 404'd, which reads as a broken
-          app. The disclaimer is written to be self-contained so the tearsheet still ships whole. */}
+          The Methodology link is back now that the page exists (QV-070); it 404'd before, which
+          read as a broken app. The disclaimer stays self-contained so the tearsheet still says
+          what matters even if the reader never follows the link. */}
       <footer className="border-t border-border px-5 py-3">
         <p className="text-center text-xs text-muted-foreground">
           Research tool, not investment advice — costs &amp; slippage are modelled assumptions and
-          past performance does not indicate future results.
+          past performance does not indicate future results.{" "}
+          <Link href="/methodology" className="underline underline-offset-2 hover:text-foreground">
+            Methodology
+          </Link>
         </p>
       </footer>
     </article>

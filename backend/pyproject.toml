@@ -204,6 +204,7 @@ module = [
     "quantvista.jobs.alerts",
     "quantvista.jobs.backtest",
     "quantvista.jobs.lake",
+    "quantvista.jobs.maintenance",
 ]
 disallow_untyped_decorators = false
 

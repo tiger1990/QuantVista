@@ -40,6 +40,13 @@ BEAT_SCHEDULE = {
         "task": "quantvista.refresh_ops_metrics",
         "schedule": 60.0,  # seconds
     },
+    # Partition maintenance (QV-104). Migrations create only the current + next month; without a
+    # schedule, rows silently fall into each table's `_default` partition once those run out.
+    # Daily (not monthly) because the work is idempotent and cheap, so a missed run self-heals.
+    "ensure-partitions": {
+        "task": "quantvista.ensure_partitions",
+        "schedule": crontab(minute=30, hour=0),
+    },
 }
 
 
@@ -51,6 +58,7 @@ def create_celery() -> Celery:
         backend=settings.redis_url,
         # register Beat-scheduled + manually-triggerable tasks (news ingestion is off-beat, PV-007)
         include=[
+            "quantvista.jobs.maintenance",
             "quantvista.jobs.ops_metrics",
             "quantvista.jobs.news",
             "quantvista.jobs.sentiment",
