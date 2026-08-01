@@ -59,10 +59,11 @@ def priced_stock(admin_engine: Engine) -> Iterator[UUID]:
             ),
             [{"s": stock_id, "d": d} for d in _DAYS],
         )
-        # indicators for ONE session only — the rest of the window is genuinely uncovered
+        # indicators for the NEWEST session only: that makes max(price) == max(indicator)
+        # (so freshness reads healthy) while every earlier session stays uncovered
         conn.execute(
             text("INSERT INTO technical_indicators (stock_id, date, ret_6m) VALUES (:s, :d, 1)"),
-            {"s": stock_id, "d": _DAYS[0]},
+            {"s": stock_id, "d": _DAYS[-1]},
         )
     yield stock_id
     with admin_engine.begin() as conn:
@@ -86,7 +87,7 @@ def test_freshness_looks_healthy_while_coverage_is_missing(
         newest_indicator = session.execute(
             text("SELECT max(date) FROM technical_indicators")
         ).scalar_one()
-        gap = derived_coverage_gap(session, "technical_indicators", since=_DAYS[-1])
+        gap = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
 
     assert newest_price == newest_indicator, "freshness would report both datasets equally current"
     assert gap > 0, "…while the coverage gauge sees history that freshness cannot"
@@ -95,17 +96,17 @@ def test_freshness_looks_healthy_while_coverage_is_missing(
 def test_gap_shrinks_as_the_history_is_filled(admin_engine: Engine, priced_stock: UUID) -> None:
     """Filling the seeded stock's missing dates must strictly reduce the measured gap."""
     with Session(admin_engine) as session:
-        before = derived_coverage_gap(session, "technical_indicators", since=_DAYS[-1])
+        before = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
     assert before > 0
 
     with admin_engine.begin() as conn:  # simulate the backfill landing
         conn.execute(
             text("INSERT INTO technical_indicators (stock_id, date, ret_6m) VALUES (:s, :d, 1)"),
-            [{"s": priced_stock, "d": d} for d in _DAYS[1:]],
+            [{"s": priced_stock, "d": d} for d in _DAYS[:-1]],
         )
 
     with Session(admin_engine) as session:
-        after = derived_coverage_gap(session, "technical_indicators", since=_DAYS[-1])
+        after = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
     assert after < before, "filling the missing sessions must close the gap they caused"
 
 
