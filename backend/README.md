@@ -25,6 +25,14 @@ Each context exposes a published `interfaces.py` (`Protocol`/ABC) — **the only
 may import**. Layer concerns (`models.py`, `services.py`, `repositories.py`) live *inside* each
 context, never as top-level shared folders; that is what keeps the module DAG enforceable.
 
+Alongside `src/` and `tests/`, two dev-only directories sit at the backend root — neither is part of
+the shipped `quantvista` package:
+
+| Directory | Purpose |
+|---|---|
+| `scripts/` | Single-purpose dev utilities — `dev_backfill.py` (prices → indicators → factors → scores), `load_nifty200_universe.py`, `bench_parquet_read.py` |
+| `syncdatapipeline/` | `resync_all.py` — runs **every** pipeline stage in dependency order in one process. See [`syncdatapipeline/README.md`](syncdatapipeline/README.md), especially the ledger trap and `--force` |
+
 > **Naming:** the Platform/Core context is the package `core` (not `platform`/`platform_core`) to
 > avoid shadowing Python's stdlib `platform` module.
 
