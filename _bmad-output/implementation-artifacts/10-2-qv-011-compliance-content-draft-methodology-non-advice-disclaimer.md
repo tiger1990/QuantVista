@@ -4,7 +4,7 @@ baseline_commit: 492c77e058555706b4f3ce7e09ba657e0aec6de3
 
 # Story 10.2: QV-011 — Compliance content draft: methodology + non-advice disclaimer
 
-Status: review
+Status: done
 
 **Epic:** EPIC-COMP (Epic 10) · **Points:** 3 · **Depends:** —
 

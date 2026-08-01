@@ -22,7 +22,7 @@ from quantvista.jobs.celery_app import app
 from quantvista.jobs.framework import JobOutcome, JobResult, run_job, run_key
 from quantvista.jobs.ledger import JobRunLedger
 from quantvista.market_data.repositories import active_universe
-from quantvista.market_data.trading_calendar import last_completed_session
+from quantvista.market_data.trading_calendar import last_completed_session, sessions_in_range
 
 _INDEX = "NIFTY200"
 
@@ -98,3 +98,24 @@ def compute_scores(market: str = "NSE", date_iso: str | None = None) -> str:
     """Blend the persisted factor snapshot into scores for ``market`` on ``date``."""
     target = _default_date(date_iso)
     return _run_scores(market, target, run_key("score", market, target.isoformat())).status.value
+
+
+def backfill_factors_and_scores(
+    market: str = "NSE", *, start: date, end: date
+) -> list[tuple[JobOutcome, JobOutcome]]:
+    """Persist the factor snapshot **and** scores for every session in ``[start, end]`` (QV-105).
+
+    Factors must land before scores for the same date — scores blend the persisted snapshot — so
+    the two run paired per session rather than as two separate sweeps. Idempotent per date.
+
+    Note this populates the *stored* `factor_values`/`scores` that the rankings and score-history
+    surfaces read. The backtest engine does not depend on them: it recomputes scores point-in-time
+    from `technical_indicators`, which is why `backfill_indicators` is the one that unblocks it.
+    """
+    out: list[tuple[JobOutcome, JobOutcome]] = []
+    for session in sessions_in_range(start, end):
+        iso = session.isoformat()
+        factors = _run_factors(market, session, run_key("fac", market, iso))
+        scores = _run_scores(market, session, run_key("score", market, iso))
+        out.append((factors, scores))
+    return out

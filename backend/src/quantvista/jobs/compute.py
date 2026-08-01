@@ -8,7 +8,7 @@ Under the QV-015 job framework; emits ``IndicatorsComputed``.
 from __future__ import annotations
 
 import math
-from datetime import date
+from datetime import UTC, date, datetime
 
 import polars as pl
 
@@ -23,7 +23,7 @@ from quantvista.market_data.repositories import (
     price_history_for_indicators,
     upsert_technical_indicators,
 )
-from quantvista.market_data.trading_calendar import last_completed_session
+from quantvista.market_data.trading_calendar import last_completed_session, sessions_in_range
 
 COMPUTE_JOB_NAME = "compute_indicators"
 _LOOKBACK_SESSIONS = 300  # ≥ 252 (12M / beta) + buffer
@@ -86,3 +86,36 @@ def compute_indicators(market: str = "NSE", date_iso: str | None = None) -> str:
     target = date.fromisoformat(date_iso) if date_iso else last_completed_session(date.today())
     key = run_key("ind", market, target.isoformat())
     return _run_compute(market, target, key, "NIFTY200").status.value
+
+
+def backfill_indicators(
+    market: str = "NSE",
+    *,
+    start: date,
+    end: date,
+    index_code: str = "NIFTY200",
+    force: bool = False,
+) -> list[JobOutcome]:
+    """Compute indicators for **every trading session** in ``[start, end]`` (QV-105).
+
+    Indicators are the input the backtest engine ranks on, and they are computed *per date* — so a
+    range of prices with a single date of indicators produces a backtest that silently holds
+    nothing and reports 0.00% on every strategy metric while the benchmark looks healthy. Prices
+    have had a range backfill since QV-016; this gives the derived step the same reach.
+
+    Skips dates already recorded as succeeded (the QV-015 ledger), so an interrupted run resumes
+    cheaply. That skip has a sharp edge worth knowing: a date whose original run wrote **partial**
+    data — fewer stocks priced then than now — is considered done and will not be revisited.
+    ``force=True`` re-runs regardless, recording each repair as its own ledger entry so the
+    provenance of "we recomputed this date later" is kept rather than overwritten.
+
+    Returns one outcome per session, oldest first.
+    """
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S") if force else None
+    outcomes = []
+    for session in sessions_in_range(start, end):
+        parts = ["ind", market, session.isoformat()]
+        if stamp:  # a distinct key per repair run — the ledger must not dedupe a deliberate redo
+            parts += ["repair", stamp]
+        outcomes.append(_run_compute(market, session, run_key(*parts), index_code))
+    return outcomes
