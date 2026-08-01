@@ -127,3 +127,69 @@ def test_update_publishes_a_gauge_per_derived_dataset(
     assert set(gaps) == {"technical_indicators", "factor_values", "scores"}
     published = DATA_COVERAGE_GAP.labels(dataset="technical_indicators")._value.get()
     assert published == gaps["technical_indicators"]
+
+
+def test_a_holiday_price_bar_is_not_counted_as_a_coverage_gap(admin_engine: Engine) -> None:
+    """Regression: the gauge counted priced dates, the backfills iterate trading sessions.
+
+    The dev feed returns bars on some exchange holidays, so comparing against raw priced dates left
+    a permanent gap of ~5 that no backfill could close — a false positive parked on the page
+    threshold, which is how an alert gets ignored and stops meaning anything.
+    """
+    from quantvista.market_data.trading_calendar import sessions_in_range
+
+    market_id, stock_id = uuid4(), uuid4()
+    # a date with prices that the calendar does NOT consider a trading session
+    window_start = _TODAY - timedelta(days=30)
+    sessions = set(sessions_in_range(window_start, _TODAY))
+    holiday = next(
+        (
+            window_start + timedelta(days=n)
+            for n in range(30)
+            if window_start + timedelta(days=n) not in sessions
+        ),
+        None,
+    )
+    assert holiday is not None, (
+        "the window must contain a non-session day for this to prove anything"
+    )
+
+    # measured BEFORE the holiday bar exists, so the comparison is across the insertion
+    with Session(admin_engine) as session:
+        before = derived_coverage_gap(session, "technical_indicators", since=window_start)
+
+    with admin_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO markets (id, code, name, country, currency, timezone) "
+                "VALUES (:id, :c, 'HOL', 'IN', 'INR', 'Asia/Kolkata')"
+            ),
+            {"id": market_id, "c": f"HOL{uuid4().hex[:5]}"},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO stocks (id, market_id, symbol, company_name) "
+                "VALUES (:id, :m, :sym, 'Co')"
+            ),
+            {"id": stock_id, "m": market_id, "sym": f"HOL{uuid4().hex[:5]}"},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO daily_prices (stock_id, date, close, adj_close, source) "
+                "VALUES (:s, :d, 1, 1, 'hol')"
+            ),
+            {"s": stock_id, "d": holiday},
+        )
+    try:
+        # a priced non-session day has no indicators and never will; it must not inflate the gap
+        with Session(admin_engine) as session:
+            after = derived_coverage_gap(session, "technical_indicators", since=window_start)
+        assert after == before, (
+            f"the holiday bar on {holiday} inflated the coverage gap {before} -> {after}; "
+            "the metric is counting priced dates instead of trading sessions again"
+        )
+    finally:
+        with admin_engine.begin() as conn:
+            conn.execute(text("DELETE FROM daily_prices WHERE stock_id = :s"), {"s": stock_id})
+            conn.execute(text("DELETE FROM stocks WHERE id = :s"), {"s": stock_id})
+            conn.execute(text("DELETE FROM markets WHERE id = :m"), {"m": market_id})

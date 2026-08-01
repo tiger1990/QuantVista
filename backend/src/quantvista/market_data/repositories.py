@@ -26,6 +26,7 @@ from quantvista.market_data.models import (
     UniverseEntry,
 )
 from quantvista.market_data.quality import PriceQualityMetrics
+from quantvista.market_data.trading_calendar import sessions_in_range
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,24 +204,38 @@ DERIVED_DATASETS: tuple[str, ...] = ("technical_indicators", "factor_values", "s
 
 
 def derived_coverage_gap(session: Session, dataset: str, *, since: date) -> int:
-    """Trading sessions since ``since`` that have prices but **no** rows in ``dataset`` (QV-105).
+    """**Trading sessions** since ``since`` that have prices but no rows in ``dataset`` (QV-105).
 
     Freshness cannot catch this class of failure. When indicators covered 18 sessions behind 286 of
     prices, ``max(date)`` was *identical* for both — the derived data was perfectly "fresh" and
     almost entirely absent, and every backtest over that history silently returned zeros. What
     matters is coverage depth, so this counts the missing sessions directly.
+
+    Counted against the **trading calendar**, not merely against dates that happen to carry a price
+    row. The dev feed returns bars on some exchange holidays (five in the last year: Diwali,
+    Maharashtra Day, …), and the backfills iterate ``sessions_in_range``. Comparing to raw priced
+    dates therefore left a permanent, uncloseable gap of ~5 — a false positive sitting right on the
+    page threshold, which is precisely how an alert gets muted and stops meaning anything.
     """
     if dataset not in DERIVED_DATASETS:
         raise ValueError(f"unknown derived dataset {dataset!r}; expected one of {DERIVED_DATASETS}")
-    sql = text(
-        "SELECT count(*) FROM ("
-        "  SELECT DISTINCT date FROM daily_prices WHERE date >= :since"
-        "  EXCEPT"
-        f"  SELECT DISTINCT date FROM {dataset} WHERE date >= :since"
-        ") AS missing"
-    )
-    gap: int = session.execute(sql, {"since": since}).scalar_one()
-    return gap
+    priced = {
+        r[0]
+        for r in session.execute(
+            text("SELECT DISTINCT date FROM daily_prices WHERE date >= :since"), {"since": since}
+        )
+    }
+    if not priced:
+        return 0  # nothing ingested yet — not a coverage failure
+    covered = {
+        r[0]
+        for r in session.execute(
+            text(f"SELECT DISTINCT date FROM {dataset} WHERE date >= :since"),  # noqa: S608
+            {"since": since},
+        )
+    }
+    sessions = set(sessions_in_range(since, max(priced)))
+    return len((priced & sessions) - covered)
 
 
 _SECTORS_SQL = text("SELECT id, sector FROM stocks WHERE id = ANY(:ids) AND sector IS NOT NULL")
