@@ -72,10 +72,10 @@ As an ML engineer, I want training features identical to serving features, so th
 ### Scope boundary
 
 - **Features only.** Labels, CV splits, embargo and model training are **QV-088**. Do not add a target column here beyond what a feature needs.
-- **No training libraries.** They arrive with QV-088 — but the feasibility question is now **answered** (checked 2026-08-01, so QV-088 need not be scoped blind):
-  - **LightGBM works on this box** via a source build with OpenMP disabled: `pip install --no-binary lightgbm --config-settings=cmake.define.USE_OPENMP=OFF lightgbm`. Verified end-to-end — 200 trees on 3000×40 in 0.96s single-threaded, and **`LGBMRanker` (learning-to-rank) runs**, which is what QV-088 specifies. `scikit-learn 1.9.0` installs normally.
-  - **The stock wheels do not import**: both LightGBM and XGBoost fail on a missing `libomp.dylib`, and Homebrew has no bottle for it on macOS 12. **XGBoost stays blocked** locally.
-  - `05` §5 names LightGBM for the risk model and treats XGBoost/CatBoost as alternatives, so **standardising Epic 9 on LightGBM costs nothing against the spec**. CI is Linux, where the stock wheels install normally.
+- **No training libraries.** They arrive with QV-088 — and the feasibility question is **settled** (2026-08-01), so QV-088 need not be scoped blind or hedged:
+  - **Both LightGBM 4.7.0 and XGBoost 3.3.0 work on this box with stock wheels**, after `brew install libomp` (22.1.8). The wheels always matched the platform; macOS simply does not ship LLVM's OpenMP runtime, so both failed at import until libomp was installed.
+  - Verified: `LGBMRegressor` fits 200 trees on 3000×40 in **0.41s**, `XGBRegressor` in **1.64s**, and **both `LGBMRanker` and `XGBRanker` run** — learning-to-rank is what QV-088 specifies.
+  - **Do not defer any Epic 9 story as "ML deps unavailable"** — unlike torch (no compatible wheel at all), this was a packaging gap that is now closed. CI is Linux, where the stock wheels install normally, so no CI change is needed.
 - **No serving path.** QV-090 writes ML scores; this story only guarantees the seam exists.
 
 ### Previous-story / epic intelligence
