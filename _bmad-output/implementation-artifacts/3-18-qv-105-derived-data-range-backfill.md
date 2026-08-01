@@ -4,7 +4,7 @@ baseline_commit: 118422aefe3727266fbdf129e4b2ae3b5629ba75
 
 # Story 3.18: QV-105 — Derived-data range backfill (indicators, factors, scores)
 
-Status: review
+Status: done
 
 **Epic:** EPIC-DATA (Epic 3) · **Points:** 3 · **Depends:** QV-016 (price range backfill), QV-025 (compute_indicators), QV-029 (scoring)
 
@@ -72,6 +72,23 @@ prices but no derived rows:
 **It found a live problem immediately**, which is the best evidence it is not vacuous: on the dev
 database `technical_indicators` reads 0 (my backfill) but `factor_values` = **235** and `scores` =
 **236** missing sessions — the manual repair only ever covered indicators.
+
+### Follow-up fix after merge (PR #83) — the gauge counted the wrong thing
+
+Running the factors/scores backfill to close the gap the metric found exposed a defect **in the
+metric itself**. It compared derived rows against **priced dates**, while every backfill iterates
+**trading sessions** (`sessions_in_range`). The dev feed returns bars on some exchange holidays —
+five in the last year (Diwali, Maharashtra Day, …) — so those dates could never be covered:
+
+- a fresh environment would read a permanent gap of **5** for `technical_indicators`, parked right
+  on the `> 5` page threshold, with no action able to clear it;
+- it read 0 here only by accident, because my manual repair looped over priced dates rather than
+  sessions, masking the mismatch.
+
+`derived_coverage_gap` now counts `(priced ∩ sessions) - covered`. A regression test inserts a
+priced non-session day and asserts the gap does **not** move; reverting the metric makes it fail
+with `0 -> 1`. An alert that cannot reach zero is an alert people learn to ignore, which would have
+quietly undone the whole point of adding it.
 
 ### Completion Notes List
 
