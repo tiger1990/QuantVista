@@ -17,7 +17,7 @@ type = layers
 layers =
     quantvista.api | quantvista.jobs
     quantvista.alerts
-    quantvista.portfolio
+    quantvista.portfolio | quantvista.ml
     quantvista.analytics
     quantvista.market_data | quantvista.news
     quantvista.identity

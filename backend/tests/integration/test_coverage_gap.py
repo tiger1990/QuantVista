@@ -18,11 +18,19 @@ from sqlalchemy.orm import Session
 
 from quantvista.jobs.ops_metrics import update_coverage_gap
 from quantvista.market_data.repositories import derived_coverage_gap, latest_price_date
+from quantvista.market_data.trading_calendar import sessions_in_range
 
 pytestmark = pytest.mark.integration
 
 _TODAY = date.today()
-_DAYS = [_TODAY - timedelta(days=n) for n in range(10)]
+
+# A fixed window of REAL trading sessions in a period the dev database does not cover. Deliberately
+# not "the last N days": that made this suite depend on ambient coverage, and it broke the moment a
+# pipeline resync filled the recent window — the gauge is global, so a date another stock already
+# covers is not a gap at all. Anchoring to untouched history keeps the assertions about the code.
+_WINDOW_START = date(2024, 3, 1)
+_WINDOW_END = date(2024, 3, 15)
+_DAYS = sessions_in_range(_WINDOW_START, _WINDOW_END)
 
 
 @pytest.fixture
@@ -51,10 +59,11 @@ def priced_stock(admin_engine: Engine) -> Iterator[UUID]:
             ),
             [{"s": stock_id, "d": d} for d in _DAYS],
         )
-        # indicators for the NEWEST day only — same max(date) as prices, almost no coverage
+        # indicators for the NEWEST session only: that makes max(price) == max(indicator)
+        # (so freshness reads healthy) while every earlier session stays uncovered
         conn.execute(
             text("INSERT INTO technical_indicators (stock_id, date, ret_6m) VALUES (:s, :d, 1)"),
-            {"s": stock_id, "d": _DAYS[0]},
+            {"s": stock_id, "d": _DAYS[-1]},
         )
     yield stock_id
     with admin_engine.begin() as conn:
@@ -78,7 +87,7 @@ def test_freshness_looks_healthy_while_coverage_is_missing(
         newest_indicator = session.execute(
             text("SELECT max(date) FROM technical_indicators")
         ).scalar_one()
-        gap = derived_coverage_gap(session, "technical_indicators", since=_DAYS[-1])
+        gap = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
 
     assert newest_price == newest_indicator, "freshness would report both datasets equally current"
     assert gap > 0, "…while the coverage gauge sees history that freshness cannot"
@@ -87,17 +96,17 @@ def test_freshness_looks_healthy_while_coverage_is_missing(
 def test_gap_shrinks_as_the_history_is_filled(admin_engine: Engine, priced_stock: UUID) -> None:
     """Filling the seeded stock's missing dates must strictly reduce the measured gap."""
     with Session(admin_engine) as session:
-        before = derived_coverage_gap(session, "technical_indicators", since=_DAYS[-1])
+        before = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
     assert before > 0
 
     with admin_engine.begin() as conn:  # simulate the backfill landing
         conn.execute(
             text("INSERT INTO technical_indicators (stock_id, date, ret_6m) VALUES (:s, :d, 1)"),
-            [{"s": priced_stock, "d": d} for d in _DAYS[1:]],
+            [{"s": priced_stock, "d": d} for d in _DAYS[:-1]],
         )
 
     with Session(admin_engine) as session:
-        after = derived_coverage_gap(session, "technical_indicators", since=_DAYS[-1])
+        after = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
     assert after < before, "filling the missing sessions must close the gap they caused"
 
 

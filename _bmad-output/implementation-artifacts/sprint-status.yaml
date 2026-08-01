@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-08-01  # QV-105 done (merged PR #82); coverage-gauge session-basis fix in review
+last_updated: 2026-08-01  # QV-087 review (PIT feature store; Epic 9 underway)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -164,8 +164,8 @@ development_status:
   epic-8-retrospective: optional
 
   # ---- Epic 9: ML Augmentation (EPIC-ML) ----
-  epic-9: backlog
-  9-1-qv-087-feature-store-from-pit-factor-values: backlog
+  epic-9: in-progress  # first story file created (QV-087)
+  9-1-qv-087-feature-store-from-pit-factor-values: review  # ML: new `quantvista.ml` context (DAG sibling of portfolio) + factor_values panel read + 132 backward-only engineered features (11 factors x 4 reps + lag/delta/rolling at 21/63) + structural train/serve parity + generated docs/feature-catalog.md + negative-controlled leakage guard; in-memory Polars frame only (persistence deferred to QV-088)
   9-2-qv-088-walk-forward-purged-cv-training-pipeline: backlog
   9-3-qv-089-champion-challenger-evaluation-gate: backlog
   9-4-qv-090-batch-ml-scoring-serving: backlog
