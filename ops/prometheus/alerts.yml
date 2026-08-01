@@ -33,3 +33,27 @@ groups:
         annotations:
           summary: "Celery default queue backlog above 100"
           runbook: "Check worker health/concurrency; look for a stuck or slow task."
+
+      # Derived-data coverage (QV-105). NOT a freshness check: indicators once carried the same
+      # max(date) as prices while missing 268 of 286 sessions, so the freshness gauge read
+      # perfectly healthy and every backtest over that history silently returned zeros.
+      # `technical_indicators` is what the backtest engine ranks on, so a sustained gap pages.
+      - alert: BacktestInputCoverageGap
+        expr: data_coverage_gap_sessions{dataset="technical_indicators"} > 5
+        for: 1h
+        labels:
+          severity: page
+        annotations:
+          summary: "technical_indicators is missing priced sessions — backtests will return zeros"
+          runbook: "Run backfill_indicators over the gap (scripts/dev_backfill.py, or force=True to repair partial dates)."
+
+      # Stored factors/scores feed rankings and score history, not the backtest engine, so a gap
+      # degrades those surfaces without corrupting results — warn rather than page.
+      - alert: DerivedDataCoverageGap
+        expr: data_coverage_gap_sessions{dataset=~"factor_values|scores"} > 20
+        for: 2h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Derived dataset is missing priced sessions — rankings/score history will be sparse"
+          runbook: "Run backfill_factors_and_scores over the gap; check compute_factors/compute_scores in jobs_runs."

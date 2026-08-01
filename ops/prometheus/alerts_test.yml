@@ -77,3 +77,48 @@ tests:
       - eval_time: 6m
         alertname: QueueBacklogHigh
         exp_alerts: []
+
+  # Coverage — indicators missing many priced sessions → pages after the 1h `for`.
+  - interval: 1m
+    input_series:
+      - series: 'data_coverage_gap_sessions{dataset="technical_indicators"}'
+        values: "268x70"
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: BacktestInputCoverageGap
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              dataset: technical_indicators
+            exp_annotations:
+              summary: "technical_indicators is missing priced sessions — backtests will return zeros"
+              runbook: "Run backfill_indicators over the gap (scripts/dev_backfill.py, or force=True to repair partial dates)."
+
+  # Coverage — fully backfilled indicators → no alert (the state after QV-105).
+  - interval: 1m
+    input_series:
+      - series: 'data_coverage_gap_sessions{dataset="technical_indicators"}'
+        values: "0x70"
+    alert_rule_test:
+      - eval_time: 65m
+        alertname: BacktestInputCoverageGap
+        exp_alerts: []
+
+  # Coverage — a stored-score gap warns, and must NOT page as a backtest-input gap.
+  - interval: 1m
+    input_series:
+      - series: 'data_coverage_gap_sessions{dataset="scores"}'
+        values: "236x130"
+    alert_rule_test:
+      - eval_time: 125m
+        alertname: DerivedDataCoverageGap
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              dataset: scores
+            exp_annotations:
+              summary: "Derived dataset is missing priced sessions — rankings/score history will be sparse"
+              runbook: "Run backfill_factors_and_scores over the gap; check compute_factors/compute_scores in jobs_runs."
+      - eval_time: 125m
+        alertname: BacktestInputCoverageGap
+        exp_alerts: []

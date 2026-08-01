@@ -197,6 +197,32 @@ def latest_price_date(session: Session) -> date | None:
     return latest
 
 
+#: Derived datasets whose coverage should track `daily_prices`. Table names are looked up here and
+#: never interpolated from a caller's string — the query below builds SQL by concatenation.
+DERIVED_DATASETS: tuple[str, ...] = ("technical_indicators", "factor_values", "scores")
+
+
+def derived_coverage_gap(session: Session, dataset: str, *, since: date) -> int:
+    """Trading sessions since ``since`` that have prices but **no** rows in ``dataset`` (QV-105).
+
+    Freshness cannot catch this class of failure. When indicators covered 18 sessions behind 286 of
+    prices, ``max(date)`` was *identical* for both — the derived data was perfectly "fresh" and
+    almost entirely absent, and every backtest over that history silently returned zeros. What
+    matters is coverage depth, so this counts the missing sessions directly.
+    """
+    if dataset not in DERIVED_DATASETS:
+        raise ValueError(f"unknown derived dataset {dataset!r}; expected one of {DERIVED_DATASETS}")
+    sql = text(
+        "SELECT count(*) FROM ("
+        "  SELECT DISTINCT date FROM daily_prices WHERE date >= :since"
+        "  EXCEPT"
+        f"  SELECT DISTINCT date FROM {dataset} WHERE date >= :since"
+        ") AS missing"
+    )
+    gap: int = session.execute(sql, {"since": since}).scalar_one()
+    return gap
+
+
 _SECTORS_SQL = text("SELECT id, sector FROM stocks WHERE id = ANY(:ids) AND sector IS NOT NULL")
 
 

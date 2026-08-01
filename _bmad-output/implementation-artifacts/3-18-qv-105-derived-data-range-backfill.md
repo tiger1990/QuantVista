@@ -47,10 +47,36 @@ claude-opus-5
 - **My own test isolation was the actual cause of the first failure.** The fixture deleted `technical_indicators` but left `jobs_runs`, so the next test's backfill was skipped and wrote nothing — a failure with nothing to do with the code under test. Fixed by deleting the ledger rows in teardown; verified by running the suite twice consecutively with **0 leftover ledger rows**.
 - **Verified the fix is real, not just green:** the suite passes back-to-back, and the window deliberately spans several sessions with an assertion (`len(expected) > 1`) so a one-session window could never make it vacuous.
 
+### Coverage metric — added after review (the production-grade guard)
+
+The backfill fixes the *cause*; nothing yet detected the *condition*. Asked to close that, I first
+checked whether the existing QV-020 freshness gauge could — **it cannot, and that is the crux**:
+
+> When `technical_indicators` covered 18 sessions behind 286 of prices, `max(date)` was
+> **identical** for both (2026-07-24). `data_latest_ingest_timestamp_seconds` would have reported
+> the derived data as perfectly current while ~94% of its history was absent.
+
+Freshness measures *staleness*; this failure is *depth*. So the new signal counts sessions that have
+prices but no derived rows:
+
+- `derived_coverage_gap(session, dataset, since)` — an `EXCEPT` between priced dates and derived
+  dates. The table name comes from a `DERIVED_DATASETS` allow-list because the query concatenates
+  it; a test asserts an unknown dataset is rejected rather than interpolated.
+- Gauge `data_coverage_gap_sessions{dataset}`, published by the existing 60s `refresh_ops_metrics`.
+- **`BacktestInputCoverageGap`** pages on `technical_indicators` > 5 sessions for 1h — that is what
+  the engine ranks on, so a gap corrupts results silently.
+- **`DerivedDataCoverageGap`** warns on `factor_values|scores` > 20 for 2h — those feed rankings and
+  score history, so a gap degrades surfaces without corrupting backtests. Different blast radius,
+  different severity.
+
+**It found a live problem immediately**, which is the best evidence it is not vacuous: on the dev
+database `technical_indicators` reads 0 (my backfill) but `factor_values` = **235** and `scores` =
+**236** missing sessions — the manual repair only ever covered indicators.
+
 ### Completion Notes List
 
 - **Indicators are the critical path, factors/scores are not.** The backtest engine recomputes scores point-in-time from `technical_indicators` via `compute_universe`; the stored `factor_values`/`scores` feed rankings and score history. That is why indicators are always backfilled in full while scores can be limited to the last day — documented in both the script's flag help and the function docstring so the distinction is not folklore.
-- **Scope kept to the backfill.** A coverage *metric* (alerting when derived data lags prices) would be the production-grade guard and is a natural QV-020 follow-up; it is not in this story.
+- **Scope grew, deliberately.** The story shipped the backfill first and flagged a coverage metric as a QV-020 follow-up; the user asked for it in the same change, so it is here. Fixing the cause without a detector would have left the same failure invisible next time.
 - **Dev-only script, real functions.** The backfill functions live in `jobs/` beside `backfill_daily_prices` and are usable from a worker or shell; `dev_backfill.py` stays the dev convenience wrapper it always was.
 
 ### File List
@@ -59,7 +85,13 @@ claude-opus-5
 - `backend/src/quantvista/jobs/scoring.py` (modified — `backfill_factors_and_scores`)
 - `backend/scripts/dev_backfill.py` (modified — derives across the window; `--scores-last-day-only`)
 - `backend/tests/integration/test_derived_backfill.py` (new — 5 tests incl. skip/repair semantics)
+- `backend/src/quantvista/market_data/repositories.py` (modified — `derived_coverage_gap` + allow-list)
+- `backend/src/quantvista/core/observability/metrics.py` (modified — `data_coverage_gap_sessions`)
+- `backend/src/quantvista/jobs/ops_metrics.py` (modified — publish gaps on the 60s refresh)
+- `ops/prometheus/alerts.yml` + `alerts_test.yml` (modified — 2 alerts + 4 promtool cases)
+- `backend/tests/test_prometheus_rules.py` (modified — expected-alert set)
+- `backend/tests/integration/test_coverage_gap.py` (new — incl. the freshness-vs-coverage proof)
 
 ### Change Log
 
-- 2026-08-01 — QV-105: range backfill for derived data. Closes the silent all-zero-backtest trap where a database held a range of prices behind a single date of indicators. Gates: backend 816 passed/5 skipped, ruff/mypy/lint-imports clean.
+- 2026-08-01 — QV-105: range backfill for derived data. Closes the silent all-zero-backtest trap where a database held a range of prices behind a single date of indicators. Also adds the coverage metric + two alerts that detect the condition (freshness provably cannot — the derived data was equally *fresh* while 94% of its history was missing). Gates: backend 820 passed/5 skipped, ruff/mypy/lint-imports clean.
