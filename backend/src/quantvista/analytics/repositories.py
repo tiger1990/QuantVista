@@ -133,6 +133,52 @@ def factor_values_for(
     return dict(by_stock)
 
 
+# --- factor panel for ML feature engineering (QV-087) -------------------------
+# Deliberately SEPARATE from `factor_values_for`, which returns exactly one date and whose
+# single-snapshot semantics the scoring path depends on. This returns a range, ordered so a
+# downstream time-series transform (lag/rolling) can rely on it without re-sorting per group.
+_FACTOR_VALUES_PANEL_SQL = text(
+    """
+    SELECT stock_id, date, factor_key, raw_value, zscore, percentile_sector, percentile_universe
+    FROM factor_values
+    WHERE stock_id = ANY(:ids) AND date >= :start AND date <= :end
+    ORDER BY stock_id, date, factor_key
+    """
+)
+
+
+def factor_values_panel(
+    session: Session, stock_ids: Sequence[UUID], start: date, end: date
+) -> list[dict[str, object]]:
+    """Long-format factor panel over ``[start, end]`` — the ML feature source (QV-087).
+
+    One row per ``(stock, date, factor)``. Values stay ``float`` (these are already-normalised
+    statistics, not money), and missing factors are simply absent rather than zero-filled: a stock
+    with no sentiment coverage must not look like a stock with neutral sentiment.
+    """
+    if not stock_ids:
+        return []
+    rows = session.execute(
+        _FACTOR_VALUES_PANEL_SQL, {"ids": list(stock_ids), "start": start, "end": end}
+    ).all()
+    return [
+        {
+            "stock_id": r.stock_id,
+            "date": r.date,
+            "factor_key": r.factor_key,
+            "raw_value": None if r.raw_value is None else float(r.raw_value),
+            "zscore": None if r.zscore is None else float(r.zscore),
+            "percentile_sector": (
+                None if r.percentile_sector is None else float(r.percentile_sector)
+            ),
+            "percentile_universe": (
+                None if r.percentile_universe is None else float(r.percentile_universe)
+            ),
+        }
+        for r in rows
+    ]
+
+
 # --- rankings read (QV-031 caching) ------------------------------------------
 _RANKINGS_SQL = text(
     """

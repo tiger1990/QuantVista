@@ -18,11 +18,19 @@ from sqlalchemy.orm import Session
 
 from quantvista.jobs.ops_metrics import update_coverage_gap
 from quantvista.market_data.repositories import derived_coverage_gap, latest_price_date
+from quantvista.market_data.trading_calendar import sessions_in_range
 
 pytestmark = pytest.mark.integration
 
 _TODAY = date.today()
-_DAYS = [_TODAY - timedelta(days=n) for n in range(10)]
+
+# A fixed window of REAL trading sessions in a period the dev database does not cover. Deliberately
+# not "the last N days": that made this suite depend on ambient coverage, and it broke the moment a
+# pipeline resync filled the recent window — the gauge is global, so a date another stock already
+# covers is not a gap at all. Anchoring to untouched history keeps the assertions about the code.
+_WINDOW_START = date(2024, 3, 1)
+_WINDOW_END = date(2024, 3, 15)
+_DAYS = sessions_in_range(_WINDOW_START, _WINDOW_END)
 
 
 @pytest.fixture
@@ -51,7 +59,7 @@ def priced_stock(admin_engine: Engine) -> Iterator[UUID]:
             ),
             [{"s": stock_id, "d": d} for d in _DAYS],
         )
-        # indicators for the NEWEST day only — same max(date) as prices, almost no coverage
+        # indicators for ONE session only — the rest of the window is genuinely uncovered
         conn.execute(
             text("INSERT INTO technical_indicators (stock_id, date, ret_6m) VALUES (:s, :d, 1)"),
             {"s": stock_id, "d": _DAYS[0]},
