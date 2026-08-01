@@ -58,6 +58,7 @@ development_status:
   1-9-qv-083-backup-pitr-restore-drill: backlog
   1-10-qv-084-production-cd-pipeline-staging-gates: backlog
   1-11-qv-085-load-soak-test: backlog
+  1-12-qv-104-monthly-partition-maintenance: review  # PLAT: Beat-scheduled `quantvista.ensure_partitions` keeps monthly partitions ahead of the data. Migrations created only current+next month and nothing scheduled the rest, so rows silently fell into `_default` from month 2 (demonstrated on a real DB). Catalog-discovered parents (new partitioned tables covered automatically) + a standing guard test that fails when any parent lacks next month's partition. Found while implementing QV-070
   epic-1-retrospective: optional
 
   # ---- Epic 2: Identity, Tenancy, Entitlements & Billing (EPIC-IDN) ----
