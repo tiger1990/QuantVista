@@ -17,7 +17,15 @@ import yaml
 
 _OPS = Path(__file__).resolve().parents[2] / "ops" / "prometheus"
 
-_EXPECTED_ALERTS = {"PipelineFreshnessLagHigh", "JobFailureRateHigh", "QueueBacklogHigh"}
+_EXPECTED_ALERTS = {
+    "PipelineFreshnessLagHigh",
+    "JobFailureRateHigh",
+    "QueueBacklogHigh",
+    # QV-105 — coverage, not freshness. Derived data can carry today's date and still be missing a
+    # year of history, which `data_latest_ingest_timestamp_seconds` cannot see.
+    "BacktestInputCoverageGap",
+    "DerivedDataCoverageGap",
+}
 
 
 def _load(name: str) -> Any:

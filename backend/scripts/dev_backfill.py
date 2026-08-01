@@ -1,7 +1,12 @@
 """Dev-only backfill: populate scores for the NSE dev universe.
 
 Runs the real pipeline (yfinance prices -> indicators -> factors -> scores) against the dev DB so
-``/rankings`` and the dashboard render real numbers.
+``/rankings``, the dashboard AND backtests render real numbers.
+
+Every step now spans the whole window. Before QV-105 the price step was a range but the derived
+steps ran for a single date, so a database could hold a year of prices behind one day of
+indicators -- and a backtest over that range would silently hold nothing and report 0.00% on every
+strategy metric, with no error anywhere.
 
 HONEST CEILING: dev data (Yahoo, no fundamentals) yields PARTIAL-coverage scores -- momentum + risk
 only; no fundamental/quality signal until the licensed market-data vendor (QV-072). NOT for
@@ -24,9 +29,9 @@ import logging
 from datetime import date, timedelta
 
 from quantvista.core.events import get_event_bus
-from quantvista.jobs.compute import compute_indicators
+from quantvista.jobs.compute import backfill_indicators
 from quantvista.jobs.ingest import backfill_daily_prices
-from quantvista.jobs.scoring import compute_factors, compute_scores
+from quantvista.jobs.scoring import backfill_factors_and_scores, compute_factors, compute_scores
 from quantvista.market_data.adapters.yfinance_dev import YFinanceDevProvider, yahoo_symbol
 from quantvista.market_data.services import PriceIngestionService
 from quantvista.market_data.trading_calendar import last_completed_session
@@ -62,6 +67,14 @@ def main() -> None:
         action="store_true",
         help="per-stock isolation for the price load (full Nifty 200; QV-092)",
     )
+    parser.add_argument(
+        "--scores-last-day-only",
+        action="store_true",
+        help=(
+            "only score the last session (fast; enough for /rankings). Indicators are still "
+            "backfilled across the window, since backtests need them at every rebalance date."
+        ),
+    )
     args = parser.parse_args()
 
     target = last_completed_session(date.today())
@@ -74,10 +87,29 @@ def main() -> None:
     else:
         prices = backfill_daily_prices(args.market, start=start, end=target)
         log.info("  prices: %s", prices.status.value)
-    log.info("indicators %s: %s", tiso, compute_indicators(args.market, tiso))
-    log.info("factors    %s: %s", tiso, compute_factors(args.market, tiso))
-    log.info("scores     %s: %s", tiso, compute_scores(args.market, tiso))
+
+    # Indicators across the WHOLE window, not just the last session (QV-105). Backtests rank off
+    # `technical_indicators` at every rebalance date; with one day of indicators behind a year of
+    # prices, every rebalance selects nothing and the run reports 0.00% on each strategy metric
+    # while the benchmark — pure price maths — looks fine. Nothing errors, which is the trap.
+    log.info("indicators %s..%s", start, target)
+    ind = backfill_indicators(args.market, start=start, end=target)
+    log.info(
+        "  indicators: %d sessions (%d ok)",
+        len(ind),
+        sum(o.status.value == "succeeded" for o in ind),
+    )
+
+    if args.scores_last_day_only:
+        log.info("factors    %s: %s", tiso, compute_factors(args.market, tiso))
+        log.info("scores     %s: %s", tiso, compute_scores(args.market, tiso))
+    else:
+        log.info("factors+scores %s..%s", start, target)
+        pairs = backfill_factors_and_scores(args.market, start=start, end=target)
+        log.info("  factors+scores: %d sessions", len(pairs))
+
     log.info("done -- /rankings?market=%s should now return rows for %s", args.market, tiso)
+    log.info("backtests now have indicator coverage across %s..%s", start, target)
 
 
 if __name__ == "__main__":

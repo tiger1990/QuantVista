@@ -7,18 +7,29 @@ so scrapes always see fresh values. DB/Redis I/O lives here (a composition root)
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from quantvista.core.db import privileged_session_scope
-from quantvista.core.observability.metrics import set_data_freshness, set_queue_depth
+from quantvista.core.observability.metrics import (
+    set_coverage_gap,
+    set_data_freshness,
+    set_queue_depth,
+)
 from quantvista.jobs.celery_app import app
-from quantvista.market_data.repositories import latest_price_date
+from quantvista.market_data.repositories import (
+    DERIVED_DATASETS,
+    derived_coverage_gap,
+    latest_price_date,
+)
 
 _FRESHNESS_DATASET = "daily_prices"
 _DEFAULT_QUEUES = ("default",)
+#: How far back to check derived coverage. A year matches the range users actually backtest over —
+#: a shorter window would have reported "healthy" for the very gap that caused QV-105.
+_COVERAGE_LOOKBACK_DAYS = 365
 
 
 def update_data_freshness(session: Session, dataset: str = _FRESHNESS_DATASET) -> float | None:
@@ -29,6 +40,25 @@ def update_data_freshness(session: Session, dataset: str = _FRESHNESS_DATASET) -
     ts = datetime(latest.year, latest.month, latest.day, tzinfo=UTC).timestamp()
     set_data_freshness(dataset, ts)
     return ts
+
+
+def update_coverage_gap(
+    session: Session,
+    datasets: tuple[str, ...] = DERIVED_DATASETS,
+    lookback_days: int = _COVERAGE_LOOKBACK_DAYS,
+) -> dict[str, int]:
+    """Publish, per derived dataset, how many priced sessions have no derived rows (QV-105).
+
+    Deliberately not a freshness check: derived data can carry today's date and still be missing a
+    year of history, which is invisible to `data_latest_ingest_timestamp_seconds`.
+    """
+    since = date.today() - timedelta(days=lookback_days)
+    gaps: dict[str, int] = {}
+    for dataset in datasets:
+        gap = derived_coverage_gap(session, dataset, since=since)
+        set_coverage_gap(dataset, gap)
+        gaps[dataset] = gap
+    return gaps
 
 
 def update_queue_depth(
@@ -52,6 +82,7 @@ def refresh_ops_metrics() -> str:
 
     with privileged_session_scope() as session:
         update_data_freshness(session)
+        update_coverage_gap(session)
     client = redis.Redis.from_url(get_settings().redis_url)
     update_queue_depth(client)
     return "ok"

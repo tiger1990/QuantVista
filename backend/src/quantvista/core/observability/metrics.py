@@ -42,11 +42,24 @@ DATA_FRESHNESS = Gauge(
     ["dataset"],
 )
 QUEUE_DEPTH = Gauge("celery_queue_depth", "Pending messages in a Celery/Redis queue", ["queue"])
+# Coverage, not freshness (QV-105). A derived dataset can be perfectly fresh — same max(date) as
+# prices — while missing almost all of its history, which is exactly how a year of backtests
+# silently returned zeros. This counts sessions that have prices but no derived rows.
+DATA_COVERAGE_GAP = Gauge(
+    "data_coverage_gap_sessions",
+    "Trading sessions with prices but no rows in the derived dataset",
+    ["dataset"],
+)
 
 
 def set_data_freshness(dataset: str, epoch_seconds: float) -> None:
     """Publish the freshness timestamp for ``dataset`` (thin setter; DB query lives in jobs)."""
     DATA_FRESHNESS.labels(dataset=dataset).set(epoch_seconds)
+
+
+def set_coverage_gap(dataset: str, sessions: int) -> None:
+    """Publish how many priced sessions ``dataset`` lacks (thin setter; query lives in jobs)."""
+    DATA_COVERAGE_GAP.labels(dataset=dataset).set(sessions)
 
 
 def set_queue_depth(queue: str, depth: int) -> None:
