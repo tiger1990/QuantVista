@@ -4,7 +4,7 @@ baseline_commit: 9c6f07b2c2a60234f861b944f7c8a482d3851584
 
 # Story 1.12: QV-104 — Monthly partition maintenance
 
-Status: review
+Status: done
 
 **Epic:** EPIC-PLAT (Epic 1) · **Points:** 2 · **Depends:** QV-014 (partitioned `daily_prices`), QV-015 (job framework)
 
