@@ -38,7 +38,7 @@
 # criteria, notes) lives in plans/sprints/ — see _bmad-output/planning-artifacts/epics.md.
 
 generated: 2026-06-15
-last_updated: 2026-08-01  # QV-070 review (methodology & disclaimer page)
+last_updated: 2026-08-01  # QV-070 + QV-104 done (merged PR #80); QV-011 review (enforced non-advice terminology guide)
 project: FinanceStockManager
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   1-9-qv-083-backup-pitr-restore-drill: backlog
   1-10-qv-084-production-cd-pipeline-staging-gates: backlog
   1-11-qv-085-load-soak-test: backlog
-  1-12-qv-104-monthly-partition-maintenance: review  # PLAT: Beat-scheduled `quantvista.ensure_partitions` keeps monthly partitions ahead of the data. Migrations created only current+next month and nothing scheduled the rest, so rows silently fell into `_default` from month 2 (demonstrated on a real DB). Catalog-discovered parents (new partitioned tables covered automatically) + a standing guard test that fails when any parent lacks next month's partition. Found while implementing QV-070
+  1-12-qv-104-monthly-partition-maintenance: done  # merged PR #80 — PLAT: Beat-scheduled `quantvista.ensure_partitions` keeps monthly partitions ahead of the data. Migrations created only current+next month and nothing scheduled the rest, so rows silently fell into `_default` from month 2 (demonstrated on a real DB). Catalog-discovered parents (new partitioned tables covered automatically) + a standing guard test that fails when any parent lacks next month's partition. Found while implementing QV-070
   epic-1-retrospective: optional
 
   # ---- Epic 2: Identity, Tenancy, Entitlements & Billing (EPIC-IDN) ----
@@ -174,8 +174,8 @@ development_status:
   # ---- Epic 10: Compliance & Data Licensing (EPIC-COMP) ----
   epic-10: in-progress  # first story file created (QV-070); QV-010/QV-011 remain backlog
   10-1-qv-010-spike-m-data-india-data-vendor-evaluation: backlog
-  10-2-qv-011-compliance-content-draft-methodology-non-advice-disclaimer: backlog  # PARTLY DELIVERED — do NOT re-implement: (a) `disclaimer` field + `X-QuantVista-Disclaimer` header constants are SHIPPED (api/routes_stocks.py, mirrored in frontend lib/disclaimer.ts, drift-tested); (b) the Methodology & Disclaimer page is PUBLISHED by QV-070. REMAINING: the non-advice terminology guide as a design-system artifact (07 §1.2 calls for it; it does not exist), plus compliance sign-off on final copy — which is launch-gated by QV-086 anyway. Kept `backlog` because that residual scope is unstarted and is product/compliance-owned, not engineering.
-  10-3-qv-070-methodology-disclaimer-page: review  # COMPLIANCE: public /methodology page (scoring pipeline+weights, PIT/survivorship, backtest cost assumptions incl. benchmark-proxy + data-coverage caveats, reproducibility scope) + non-advice posture from the shared DISCLAIMER constant; Methodology link restored on every score surface + tearsheet; cross-language drift guard. NOTE: QV-011 still backlog but its API-constant AC is already shipped
+  10-2-qv-011-compliance-content-draft-methodology-non-advice-disclaimer: review  # COMPLIANCE: non-advice terminology guide delivered as ENFORCED rules — docs/terminology-guide.md + core/terminology.py (11 banned phrasings w/ reason+replacement, 4 preferred terms) + test_terminology_guard.py scanning all user-facing strings in BOTH trees, build-failing on a breach. Other two ACs were already delivered: disclaimer field/header constants shipped earlier, Methodology page by QV-070. Final launch copy sign-off remains QV-086 (human/compliance-owned)
+  10-3-qv-070-methodology-disclaimer-page: done  # merged PR #80 — COMPLIANCE: public /methodology page (scoring pipeline+weights, PIT/survivorship, backtest cost assumptions incl. benchmark-proxy + data-coverage caveats, reproducibility scope) + non-advice posture from the shared DISCLAIMER constant; Methodology link restored on every score surface + tearsheet; cross-language drift guard. NOTE: QV-011 still backlog but its API-constant AC is already shipped
   10-4-qv-080-dpdp-data-subject-flows-consent-access-erasure: backlog
   10-5-qv-081-audit-logging-complete: backlog
   10-6-qv-086-launch-compliance-content-finalized: backlog

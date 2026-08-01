@@ -4,7 +4,7 @@ baseline_commit: 9c6f07b2c2a60234f861b944f7c8a482d3851584
 
 # Story 10.3: QV-070 — Methodology & Disclaimer page
 
-Status: review
+Status: done
 
 **Epic:** EPIC-COMP (Epic 10) · **Points:** 3 · **Depends:** QV-011 (compliance content draft — **still `backlog`, see the blocker below**)
 
