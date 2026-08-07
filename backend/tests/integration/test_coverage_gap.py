@@ -17,7 +17,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from quantvista.jobs.ops_metrics import update_coverage_gap
-from quantvista.market_data.repositories import derived_coverage_gap, latest_price_date
+from quantvista.market_data.repositories import derived_coverage_gap
 from quantvista.market_data.trading_calendar import sessions_in_range
 
 pytestmark = pytest.mark.integration
@@ -35,7 +35,7 @@ _DAYS = sessions_in_range(_WINDOW_START, _WINDOW_END)
 
 @pytest.fixture
 def priced_stock(admin_engine: Engine) -> Iterator[UUID]:
-    """One stock priced on 10 recent days, with indicators on only the most recent."""
+    """One stock priced on every session of a fixed 2024 window, indicators on the last only."""
     market_id, stock_id = uuid4(), uuid4()
     with admin_engine.begin() as conn:
         conn.execute(
@@ -78,19 +78,26 @@ def test_freshness_looks_healthy_while_coverage_is_missing(
 ) -> None:
     """THE POINT OF THIS METRIC: identical max(date), yet history is absent.
 
-    The gauge is deliberately **global** (a system-wide health signal), so this asserts the
-    relationship rather than an exact count — other stocks in a shared database legitimately
-    contribute coverage on some of the same dates.
+    The freshness comparison is scoped to the **seeded stock**. A global `max(date)` comparison is
+    not a property of the code at all — it is a property of whatever the database happens to hold,
+    and it broke twice: once when a resync filled the recent window, and again when prices were
+    ingested ahead of indicators. The gap assertion stays global, because the gauge is.
     """
     with Session(admin_engine) as session:
-        newest_price = latest_price_date(session)
+        newest_price = session.execute(
+            text("SELECT max(date) FROM daily_prices WHERE stock_id = :s"), {"s": priced_stock}
+        ).scalar_one()
         newest_indicator = session.execute(
-            text("SELECT max(date) FROM technical_indicators")
+            text("SELECT max(date) FROM technical_indicators WHERE stock_id = :s"),
+            {"s": priced_stock},
         ).scalar_one()
         gap = derived_coverage_gap(session, "technical_indicators", since=_DAYS[0])
 
-    assert newest_price == newest_indicator, "freshness would report both datasets equally current"
-    assert gap > 0, "…while the coverage gauge sees history that freshness cannot"
+    assert newest_price == newest_indicator, (
+        "this name's newest price and newest indicator share a date, so a freshness gauge would "
+        "report it perfectly current"
+    )
+    assert gap > 0, "…while the coverage gauge sees the history that freshness cannot"
 
 
 def test_gap_shrinks_as_the_history_is_filled(admin_engine: Engine, priced_stock: UUID) -> None:
