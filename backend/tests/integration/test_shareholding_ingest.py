@@ -127,7 +127,8 @@ def universe(admin_engine: Engine) -> Iterator[_Universe]:
         )
         conn.execute(text("DELETE FROM stocks WHERE id = ANY(:i)"), {"i": ids})
         conn.execute(text("DELETE FROM markets WHERE id = :m"), {"m": market_id})
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "shp:%"})
+        # Scoped to THIS test's throwaway market, not every shareholding run ever recorded.
+        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": f"shp:{market}:%"})
 
 
 def _rows(admin_engine: Engine, stock_id: UUID) -> list[tuple[date, Decimal]]:

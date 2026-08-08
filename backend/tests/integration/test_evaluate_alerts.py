@@ -115,8 +115,12 @@ def world(admin_engine: Engine) -> Iterator[_World]:
         conn.execute(text("DELETE FROM fundamentals WHERE stock_id = :s"), {"s": stock_id})
         conn.execute(text("DELETE FROM stocks WHERE id = :s"), {"s": stock_id})
         conn.execute(text("DELETE FROM markets WHERE id = :m"), {"m": market_id})
-        # the run_key is date-based → clear it so the task is re-runnable across suite runs
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE 'alerts:%'"))
+        # the run_key is date-based → clear it so the task is re-runnable across suite runs,
+        # but only for THIS test's as-of date; `alerts:%` would wipe every real cycle.
+        conn.execute(
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k"),
+            {"k": f"alerts:{_AS_OF.isoformat()}:%"},
+        )
 
 
 def _events(admin_engine: Engine, rule_id: str) -> list[dict[str, Any]]:

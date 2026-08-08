@@ -110,8 +110,10 @@ def universe(admin_engine: Engine) -> Iterator[tuple[str, list[UUID]]]:
         conn.execute(text("DELETE FROM index_constituents WHERE stock_id = ANY(:i)"), {"i": idlist})
         conn.execute(text("DELETE FROM stocks WHERE id = ANY(:i)"), {"i": idlist})
         conn.execute(text("DELETE FROM markets WHERE id = :m"), {"m": market_id})
+        # Scoped to THIS test's throwaway market (see test_compute_indicators for why).
         conn.execute(
-            text("DELETE FROM jobs_runs WHERE run_key LIKE 'fac:%' OR run_key LIKE 'score:%'")
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :f OR run_key LIKE :s"),
+            {"f": f"fac:{market}:%", "s": f"score:{market}:%"},
         )
 
 

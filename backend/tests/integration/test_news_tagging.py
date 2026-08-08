@@ -30,6 +30,7 @@ _URL = "https://qv-tag-test.example/"
 @pytest.fixture
 def seeded(admin_engine: Engine) -> Iterator[dict[str, UUID]]:
     with admin_engine.begin() as conn:
+        started_at = conn.execute(text("SELECT now()")).scalar_one()
         market_id = conn.execute(text("SELECT id FROM markets WHERE code='NSE'")).scalar_one()
         ids: dict[str, UUID] = {}
         for sym, name in ((_SYM_A, _NAME_A), (_SYM_B, _NAME_B)):
@@ -61,7 +62,12 @@ def seeded(admin_engine: Engine) -> Iterator[dict[str, UUID]]:
         conn.execute(
             text("DELETE FROM stocks WHERE symbol IN (:a, :b)"), {"a": _SYM_A, "b": _SYM_B}
         )
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE 'tag_news:%'"))
+        # `tag_news:{timestamp}` carries nothing test-specific, so bound the delete by this
+        # test's own start time rather than wiping every real tagging run.
+        conn.execute(
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k AND started_at >= :t"),
+            {"k": "tag_news:%", "t": started_at},
+        )
 
 
 def _stocks_of(admin_engine: Engine, url: str) -> set[UUID]:
