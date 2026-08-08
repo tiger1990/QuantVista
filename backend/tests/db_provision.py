@@ -30,6 +30,7 @@ import os
 import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
+from uuid import uuid4
 
 from sqlalchemy import create_engine, text
 
@@ -51,6 +52,9 @@ END $$;
 
 # Connecting to create/drop a database requires being attached to a DIFFERENT one.
 _MAINTENANCE_DB = "postgres"
+
+# Advisory-lock key guarding template creation ("QV_T" as an int).
+_TEMPLATE_LOCK_KEY = 0x51565F54
 
 # Mirrors the CI job's grant step so the template matches what CI provisions by hand.
 _GRANT_SQL = """
@@ -144,9 +148,26 @@ def ensure_template(admin_url: str) -> str:
     if _database_exists(admin_url, name):
         return name
 
-    building = f"{name}_building"
+    # Under xdist every worker reaches this at once. Serialise on an advisory lock so exactly one
+    # pays for the migrations; the rest wait and then find the finished template. Without it, N
+    # workers run N concurrent `alembic upgrade head`.
+    with _maintenance_conn(admin_url) as lock_conn:
+        lock_conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _TEMPLATE_LOCK_KEY})
+        try:
+            if _database_exists(admin_url, name):  # a peer built it while we waited
+                return name
+            _build_template(admin_url, name)
+        finally:
+            lock_conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": _TEMPLATE_LOCK_KEY})
+    return name
+
+
+def _build_template(admin_url: str, name: str) -> None:
+    """Build the template under a unique temporary name, renaming only once it is complete."""
+    # Unique per attempt: a shared "_building" name would let one worker drop another's
+    # half-built database mid-migration.
+    building = f"quantvista_building_{uuid4().hex[:10]}"
     with _maintenance_conn(admin_url) as conn:
-        conn.execute(text(f'DROP DATABASE IF EXISTS "{building}" WITH (FORCE)'))
         conn.execute(text(f'CREATE DATABASE "{building}"'))
 
     try:
@@ -163,12 +184,7 @@ def ensure_template(admin_url: str) -> str:
         raise
 
     with _maintenance_conn(admin_url) as conn:
-        # A concurrent run may have won the race; its template is equivalent, so keep it.
-        if _database_exists(admin_url, name):
-            conn.execute(text(f'DROP DATABASE IF EXISTS "{building}" WITH (FORCE)'))
-        else:
-            conn.execute(text(f'ALTER DATABASE "{building}" RENAME TO "{name}"'))
-    return name
+        conn.execute(text(f'ALTER DATABASE "{building}" RENAME TO "{name}"'))
 
 
 def create_run_database(admin_url: str, run_id: str) -> str:

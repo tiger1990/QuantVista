@@ -69,6 +69,16 @@ only a URL swap:
 
 Teardown is `DROP DATABASE`, so tests do not need to hand a shared database back intact.
 
+Because each worker owns its database, the integration suite can run in parallel:
+
+```bash
+pytest -m integration -n auto   # ~30s vs ~49s serial (8-core box)
+```
+
+Do **not** add `-n auto` globally: worker startup dominates the unit suite, which gets *slower*
+(4s serial vs 8s parallel). CI runs the integration job in parallel and the unit job serially for
+exactly this reason. Use `-n 0` to force serial when debugging.
+
 If `CREATE DATABASE` is unavailable, the suite falls back to the shared database guarded by a
 session advisory lock, so two concurrent runs serialise rather than deadlocking on partition DDL.
 Force that path with `QV_TEST_SHARED_DB=1`.

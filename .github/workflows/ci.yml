@@ -166,7 +166,10 @@ jobs:
           PGPASSWORD: quantvista
         run: psql -h localhost -U quantvista -d quantvista -v ON_ERROR_STOP=1 -f src/quantvista/db/seeds/seed_reference.sql
       - name: Integration tests — RLS denial + seed idempotency (as app/admin roles)
-        run: pytest -m integration
+        # -n auto: each xdist worker provisions its OWN database (tests/db_provision.py), so
+        # parallel runs cannot race on shared tables or partition DDL. Measured 49s -> 30s.
+        # The unit job stays serial on purpose: worker startup dominates there (4s -> 8s).
+        run: pytest -m integration -n auto
       - name: Bias regression guards — mandatory, non-skippable (QV-066; 08 §5)
         # The two cardinal sins (look-ahead, survivorship) can never silently regress: these
         # engine-level counterfactuals fail iff the backtest leaks future data or drops delisted
