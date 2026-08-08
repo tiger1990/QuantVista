@@ -23,7 +23,10 @@ from quantvista.market_data.services import MacroSyncService
 pytestmark = pytest.mark.integration
 
 _SERIES = MacroSeries.US_10Y  # stored key = "US_10Y"
-_START, _END = date(2026, 1, 1), date(2026, 1, 3)
+# Mid-month on purpose: real macro series are month-start dated (FRED publishes 2026-01-01,
+# 2026-02-01, …), so a window anchored on the 1st could collide with genuine data and the
+# fixture's purge would delete it. Mid-month dates make that collision implausible.
+_START, _END = date(2026, 1, 14), date(2026, 1, 16)
 
 
 class _FakeMacro:
@@ -37,12 +40,33 @@ class _FakeMacro:
         return self._obs
 
 
+def _purge_window(conn: object) -> None:
+    """Remove only THIS test's rows: one series, within its own date window."""
+    conn.execute(  # type: ignore[attr-defined]
+        text("DELETE FROM macro_series WHERE series_code = :s AND date >= :start AND date <= :end"),
+        {"s": _SERIES.value, "start": _START, "end": _END},
+    )
+
+
 @pytest.fixture
 def clean(admin_engine: Engine) -> Iterator[None]:
+    """Isolate this test's window, before and after, without touching real macro data.
+
+    The previous version cleaned only on teardown and deleted **every** ``US_10Y`` row plus every
+    ``macro:%`` ledger entry. That was wrong twice over: ambient rows synced by the pipeline leaked
+    into an exact-equality assertion and failed it, and the teardown then destroyed those real rows
+    — which is exactly why the failure appeared once, healed itself, and could not be reproduced.
+    """
+    with admin_engine.begin() as conn:
+        _purge_window(conn)  # pre-clean: ambient rows must not leak INTO the assertion
+        started_at = conn.execute(text("SELECT now()")).scalar_one()
     yield
     with admin_engine.begin() as conn:
-        conn.execute(text("DELETE FROM macro_series WHERE series_code = :s"), {"s": _SERIES.value})
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "macro:%"})
+        _purge_window(conn)
+        conn.execute(  # only ledger rows this test created
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k AND started_at >= :t"),
+            {"k": "macro:%", "t": started_at},
+        )
 
 
 def _obs(value: str | None) -> list[MacroObservation]:
@@ -57,8 +81,11 @@ def _rows(admin_engine: Engine) -> list[tuple[date, Decimal | None]]:
         return [
             (r[0], r[1])
             for r in conn.execute(
-                text("SELECT date, value FROM macro_series WHERE series_code = :s ORDER BY date"),
-                {"s": _SERIES.value},
+                text(
+                    "SELECT date, value FROM macro_series "
+                    "WHERE series_code = :s AND date >= :start AND date <= :end ORDER BY date"
+                ),
+                {"s": _SERIES.value, "start": _START, "end": _END},
             )
         ]
 
