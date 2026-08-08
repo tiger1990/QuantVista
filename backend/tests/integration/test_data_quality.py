@@ -219,7 +219,9 @@ def test_task_fails_run_when_gate_trips(admin_engine: Engine, universe: _Univers
     assert status == "failed"
     # cleanup the jobs_runs row
     with admin_engine.begin() as conn:
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "dq:prices:%"})
+        conn.execute(
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": f"dq:prices:{key_market}:%"}
+        )
 
 
 def test_task_succeeds_on_clean_single_date(admin_engine: Engine, universe: _Universe) -> None:
@@ -230,7 +232,10 @@ def test_task_succeeds_on_clean_single_date(admin_engine: Engine, universe: _Uni
     )
     assert outcome.status.value == "succeeded"
     with admin_engine.begin() as conn:
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "dq:prices:%"})
+        conn.execute(
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k"),
+            {"k": f"dq:prices:{universe.market}:%"},
+        )
 
 
 # Keep the daily-task symbol imported (task wiring smoke — construction only, no network).

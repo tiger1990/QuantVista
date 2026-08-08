@@ -119,7 +119,10 @@ def stock(admin_engine: Engine) -> Iterator[tuple[str, str, UUID]]:
         )
         conn.execute(text("DELETE FROM stocks WHERE id=:s"), {"s": stock_id})
         conn.execute(text("DELETE FROM markets WHERE code=:c"), {"c": market})
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "recompute:%"})
+        # run_key is `recompute:{stock_id}:{period_end}` -> scope to this test's stock.
+        conn.execute(
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": f"recompute:{stock_id}:%"}
+        )
 
 
 def test_correction_self_heals_end_to_end(

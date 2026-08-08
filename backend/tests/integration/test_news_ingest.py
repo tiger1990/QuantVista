@@ -55,10 +55,17 @@ class _FakeBus:
 
 @pytest.fixture
 def clean(admin_engine: Engine) -> Iterator[None]:
+    with admin_engine.begin() as conn:
+        started_at = conn.execute(text("SELECT now()")).scalar_one()
     yield
     with admin_engine.begin() as conn:
         conn.execute(text("DELETE FROM news WHERE source_url LIKE :p"), {"p": f"{_PREFIX}%"})
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "news:%"})
+        # `news:{hour}` carries nothing test-specific, so bound the delete by this test's own
+        # start time -- an unqualified `news:%` erases every real ingest run in a shared dev DB.
+        conn.execute(
+            text("DELETE FROM jobs_runs WHERE run_key LIKE :k AND started_at >= :t"),
+            {"k": "news:%", "t": started_at},
+        )
 
 
 def _news_count(admin_engine: Engine) -> int:

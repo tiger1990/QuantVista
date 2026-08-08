@@ -103,7 +103,9 @@ def universe(admin_engine: Engine) -> Iterator[_Env]:
         )
         conn.execute(text("DELETE FROM stocks WHERE id = ANY(:i)"), {"i": [aaa, bbb]})
         conn.execute(text("DELETE FROM markets WHERE id=:m"), {"m": market_id})
-        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": "ind:%"})
+        # Scoped to THIS test's throwaway market: an unqualified `ind:%` deletes the ledger
+        # history of every real backfill in a shared dev database.
+        conn.execute(text("DELETE FROM jobs_runs WHERE run_key LIKE :k"), {"k": f"ind:{market}:%"})
 
 
 def _ti_count(admin_engine: Engine, ids: list[UUID]) -> int:
@@ -122,7 +124,7 @@ def test_compute_writes_a_row_per_stock_with_sane_values(
     events: list[dict[str, object]] = []
     get_event_bus().subscribe("IndicatorsComputed", lambda env: events.append(env))
 
-    key = run_key("ind", "T", uuid4().hex[:8])
+    key = run_key("ind", universe.market, uuid4().hex[:8])
     outcome = _run_compute(universe.market, _TARGET, key, universe.index_code)
 
     assert outcome.status.value == "succeeded"
@@ -150,5 +152,8 @@ def test_compute_writes_a_row_per_stock_with_sane_values(
 
 def test_compute_is_idempotent(admin_engine: Engine, universe: _Env) -> None:
     for _ in range(2):
-        _run_compute(universe.market, _TARGET, run_key("ind", "T", "same"), universe.index_code)
+        # Keyed on the throwaway market (not a literal), so the fixture's scoped cleanup
+        # reclaims it -- a fixed key would survive teardown and skip every later run.
+        key = run_key("ind", universe.market, "same")
+        _run_compute(universe.market, _TARGET, key, universe.index_code)
     assert _ti_count(admin_engine, universe.ids) == 2  # re-run overwrites, no duplicate rows

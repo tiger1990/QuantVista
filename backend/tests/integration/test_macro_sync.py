@@ -65,7 +65,7 @@ def clean(admin_engine: Engine) -> Iterator[None]:
         _purge_window(conn)
         conn.execute(  # only ledger rows this test created
             text("DELETE FROM jobs_runs WHERE run_key LIKE :k AND started_at >= :t"),
-            {"k": "macro:%", "t": started_at},
+            {"k": f"macro:{_SERIES.value}:%", "t": started_at},
         )
 
 
