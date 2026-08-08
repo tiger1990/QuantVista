@@ -1,6 +1,8 @@
 "use client";
 
-import { Bell, Mail, Trash2 } from "lucide-react";
+import { Bell, Mail } from "lucide-react";
+
+import { DeleteButton } from "@/components/delete-button";
 
 import { type AlertRule, useDeleteAlert } from "@/lib/api/queries";
 
@@ -27,18 +29,18 @@ export function AlertList({ rules }: { rules: AlertRule[] }) {
           </div>
           <div className="flex shrink-0 items-center gap-3 text-muted-foreground">
             <span className="flex items-center gap-1 text-xs" title={`Channel: ${r.channel}`}>
-              {r.channel === "email" ? <Mail className="size-3.5" /> : <Bell className="size-3.5" />}
+              {r.channel === "email" ? (
+                <Mail className="size-3.5" />
+              ) : (
+                <Bell className="size-3.5" />
+              )}
               {r.channel === "email" ? "Email" : "In-app"}
             </span>
-            <button
-              type="button"
-              onClick={() => del.mutate(r.id)}
-              disabled={del.isPending}
-              aria-label={`Delete alert on ${r.target_symbol ?? "stock"}`}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="size-4" />
-            </button>
+            <DeleteButton
+              label={`Delete alert on ${r.target_symbol ?? "stock"}`}
+              pending={del.isPending}
+              onConfirm={() => del.mutate(r.id)}
+            />
           </div>
         </li>
       ))}

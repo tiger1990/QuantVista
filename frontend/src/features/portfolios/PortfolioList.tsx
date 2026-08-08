@@ -1,9 +1,9 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { DeleteButton } from "@/components/delete-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,7 +17,8 @@ import {
 function CreatePortfolioForm({ atLimit }: { atLimit: boolean }) {
   const [name, setName] = useState("");
   const create = useCreatePortfolio();
-  const overCap = atLimit || (create.error instanceof CreatePortfolioError && create.error.kind === "limit");
+  const overCap =
+    atLimit || (create.error instanceof CreatePortfolioError && create.error.kind === "limit");
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,14 +55,22 @@ function CreatePortfolioForm({ atLimit }: { atLimit: boolean }) {
           </p>
         </div>
       ) : create.isError ? (
-        <p className="text-xs text-destructive">Could not create the portfolio. Please try again.</p>
+        <p className="text-xs text-destructive">
+          Could not create the portfolio. Please try again.
+        </p>
       ) : null}
     </div>
   );
 }
 
 /** The tenant's portfolios: create + list + delete, each linking to its builder. */
-export function PortfolioList({ portfolios, atLimit }: { portfolios: Portfolio[]; atLimit: boolean }) {
+export function PortfolioList({
+  portfolios,
+  atLimit,
+}: {
+  portfolios: Portfolio[];
+  atLimit: boolean;
+}) {
   const del = useDeletePortfolio();
 
   return (
@@ -81,17 +90,15 @@ export function PortfolioList({ portfolios, atLimit }: { portfolios: Portfolio[]
                 className="min-w-0 flex-1 font-medium hover:text-primary hover:underline"
               >
                 {p.name}
-                <span className="ml-2 text-xs font-normal text-muted-foreground">{p.benchmark}</span>
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {p.benchmark}
+                </span>
               </Link>
-              <button
-                type="button"
-                onClick={() => del.mutate(p.id)}
-                disabled={del.isPending}
-                aria-label={`Delete portfolio ${p.name}`}
-                className="shrink-0 text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="size-4" />
-              </button>
+              <DeleteButton
+                label={`Delete portfolio ${p.name}`}
+                pending={del.isPending}
+                onConfirm={() => del.mutate(p.id)}
+              />
             </li>
           ))}
         </ul>

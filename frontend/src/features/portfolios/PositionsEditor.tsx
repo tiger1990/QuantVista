@@ -1,16 +1,12 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { DeleteButton } from "@/components/delete-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  type Position,
-  useDeletePosition,
-  useStocks,
-  useUpsertPosition,
-} from "@/lib/api/queries";
+import { type Position, useDeletePosition, useStocks, useUpsertPosition } from "@/lib/api/queries";
 import { cn } from "@/lib/utils";
 
 const EPSILON = 0.0001;
@@ -113,7 +109,10 @@ export function PositionsEditor({
         {q.trim() && matches.length > 0 ? (
           <ul className="divide-y divide-border rounded-md border border-border bg-popover">
             {matches.map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm"
+              >
                 <span className="min-w-0 truncate">
                   <span className="font-medium">{s.symbol}</span>
                   <span className="ml-2 text-xs text-muted-foreground">{s.company_name}</span>
@@ -167,15 +166,11 @@ export function PositionsEditor({
                     label={`Target weight of ${p.symbol}`}
                     placeholder="0.00"
                   />
-                  <button
-                    type="button"
-                    onClick={() => del.mutate(p.stock_id)}
-                    disabled={del.isPending}
-                    aria-label={`Remove ${p.symbol}`}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <DeleteButton
+                    label={`Remove ${p.symbol}`}
+                    pending={del.isPending}
+                    onConfirm={() => del.mutate(p.stock_id)}
+                  />
                 </div>
               </li>
             ))}

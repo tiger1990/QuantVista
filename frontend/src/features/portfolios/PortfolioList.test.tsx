@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Portfolio } from "@/lib/api/queries";
 
 import { PortfolioList } from "./PortfolioList";
 
 const del = { mutate: vi.fn(), isPending: false };
+
+// the mock is module-level; without a reset, one test sees the previous test's calls
+beforeEach(() => del.mutate.mockReset());
 const create = { mutate: vi.fn(), isPending: false, isError: false, isSuccess: false, error: null };
 
 vi.mock("@/lib/api/queries", async () => {
@@ -28,11 +31,22 @@ describe("PortfolioList", () => {
     expect(screen.getByText(/no portfolios yet/i)).toBeInTheDocument();
   });
 
-  it("renders a portfolio and deletes on click", () => {
+  it("renders a portfolio and deletes once confirmed", () => {
     render(<PortfolioList portfolios={[PORTFOLIO]} atLimit={false} />);
     expect(screen.getByText("Growth")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /delete portfolio Growth/i }));
+    expect(del.mutate).not.toHaveBeenCalled(); // a portfolio's holdings cannot be re-derived
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(del.mutate).toHaveBeenCalledWith("pf-1");
+  });
+
+  it("cancelling leaves the portfolio alone", () => {
+    render(<PortfolioList portfolios={[PORTFOLIO]} atLimit={false} />);
+    fireEvent.click(screen.getByRole("button", { name: /delete portfolio Growth/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(del.mutate).not.toHaveBeenCalled();
   });
 
   it("shows the upgrade CTA when at the portfolio limit", () => {
