@@ -26,7 +26,13 @@ pytestmark = pytest.mark.integration
 # A short, fixed window in the past: enough sessions to prove the loop, cheap enough to run in CI.
 _START = date(2026, 3, 2)
 _END = date(2026, 3, 6)
-_MARKET = "QV105"
+# Unique per run. A hardcoded market code is a unique key in a SHARED database: if teardown is ever
+# skipped — an interrupted run, an error before the fixture yields — the row survives and every
+# later run dies on `duplicate key value violates unique constraint "markets_code_key"`. Every other
+# fixture in this suite already suffixes with a uuid; this one did not, and it bit exactly that way.
+_RUN_ID = uuid4().hex[:6].upper()
+_MARKET = f"QV105{_RUN_ID}"
+_INDEX = f"QV105IDX{_RUN_ID}"
 
 
 @pytest.fixture
@@ -53,9 +59,9 @@ def seeded_universe(admin_engine: Engine) -> Iterator[list[UUID]]:
             conn.execute(
                 text(
                     "INSERT INTO index_constituents (index_code, stock_id, effective_from, weight) "
-                    "VALUES ('QV105IDX', :s, :d, 1)"
+                    "VALUES (:idx, :s, :d, 1)"
                 ),
-                {"s": sid, "d": date(2026, 1, 1)},
+                {"idx": _INDEX, "s": sid, "d": date(2026, 1, 1)},
             )
         # a longer price history than the window: indicators need lookback to produce values
         conn.execute(
@@ -78,7 +84,9 @@ def seeded_universe(admin_engine: Engine) -> Iterator[list[UUID]]:
         conn.execute(
             text("DELETE FROM daily_prices WHERE stock_id = ANY(:ids)"), {"ids": stock_ids}
         )
-        conn.execute(text("DELETE FROM index_constituents WHERE index_code = 'QV105IDX'"))
+        conn.execute(
+            text("DELETE FROM index_constituents WHERE index_code = :idx"), {"idx": _INDEX}
+        )
         conn.execute(text("DELETE FROM stocks WHERE id = ANY(:ids)"), {"ids": stock_ids})
         conn.execute(text("DELETE FROM markets WHERE id = :m"), {"m": market_id})
         # The ledger must go too. Deleting the rows but leaving `jobs_runs` makes the next test's
@@ -105,7 +113,7 @@ def test_backfill_covers_every_session_not_just_the_last(
     expected = set(sessions_in_range(_START, _END))
     assert len(expected) > 1, "the window must span several sessions or this proves nothing"
 
-    outcomes = backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    outcomes = backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
 
     assert len(outcomes) == len(expected)
     assert _indicator_dates(admin_engine, seeded_universe) == expected
@@ -113,10 +121,10 @@ def test_backfill_covers_every_session_not_just_the_last(
 
 def test_backfill_is_idempotent(admin_engine: Engine, seeded_universe: list[UUID]) -> None:
     """Re-running must not duplicate or fail — a partial backfill has to resume cleanly."""
-    backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
     first = _indicator_dates(admin_engine, seeded_universe)
 
-    backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
 
     assert _indicator_dates(admin_engine, seeded_universe) == first
 
@@ -126,10 +134,10 @@ def test_a_partial_backfill_can_be_completed(
 ) -> None:
     """The realistic recovery: someone backfilled a short window, then extends it."""
     sessions = sessions_in_range(_START, _END)
-    backfill_indicators(_MARKET, start=sessions[-1], end=sessions[-1], index_code="QV105IDX")
+    backfill_indicators(_MARKET, start=sessions[-1], end=sessions[-1], index_code=_INDEX)
     assert _indicator_dates(admin_engine, seeded_universe) == {sessions[-1]}
 
-    backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
 
     assert _indicator_dates(admin_engine, seeded_universe) == set(sessions)
 
@@ -142,14 +150,14 @@ def test_a_date_that_already_ran_is_skipped_without_force(
     This matters operationally — a date whose first run wrote partial data (fewer stocks priced
     then than now) stays partial forever unless the caller asks for a repair.
     """
-    backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
     with admin_engine.begin() as conn:  # simulate a partial/incorrect earlier result
         conn.execute(
             text("DELETE FROM technical_indicators WHERE stock_id = ANY(:ids)"),
             {"ids": seeded_universe},
         )
 
-    again = backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    again = backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
 
     assert all(o.status.value == "skipped" for o in again)
     assert _indicator_dates(admin_engine, seeded_universe) == set(), "skipped runs write nothing"
@@ -159,16 +167,14 @@ def test_force_repairs_a_date_the_ledger_considers_done(
     admin_engine: Engine, seeded_universe: list[UUID]
 ) -> None:
     """`force=True` is the repair path for exactly the situation above."""
-    backfill_indicators(_MARKET, start=_START, end=_END, index_code="QV105IDX")
+    backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX)
     with admin_engine.begin() as conn:
         conn.execute(
             text("DELETE FROM technical_indicators WHERE stock_id = ANY(:ids)"),
             {"ids": seeded_universe},
         )
 
-    repaired = backfill_indicators(
-        _MARKET, start=_START, end=_END, index_code="QV105IDX", force=True
-    )
+    repaired = backfill_indicators(_MARKET, start=_START, end=_END, index_code=_INDEX, force=True)
 
     assert all(o.status.value == "succeeded" for o in repaired)
     assert _indicator_dates(admin_engine, seeded_universe) == set(sessions_in_range(_START, _END))
