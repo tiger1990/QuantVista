@@ -9,6 +9,8 @@ the non-superuser app role, so the integration tests run there.
 from __future__ import annotations
 
 import functools
+import os
+import uuid as _uuid
 from collections.abc import Iterator
 from uuid import UUID, uuid4
 
@@ -16,6 +18,8 @@ import pytest
 from sqlalchemy import Engine, create_engine, text
 
 from quantvista.core.config import get_settings
+from quantvista.core.db import app_engine, privileged_engine
+from tests import db_provision
 
 
 @functools.cache
@@ -30,6 +34,62 @@ def _postgres_reachable() -> bool:
         return True
     except Exception:
         return False
+
+
+# Set by pytest_configure when this run owns a private database; read by teardown and by the
+# fallback advisory lock (which is only needed when we are SHARING a database).
+_RUN_DATABASE: str | None = None
+_RUN_ADMIN_URL: str | None = None
+
+
+def _rebind_to(database: str) -> None:
+    """Point every connection this process will open at ``database``.
+
+    Both engine factories are ``@lru_cache``d (``core/db.py``) and ``get_settings`` is too, so
+    swapping the env vars alone is not enough -- a cached engine would keep talking to the old
+    database. Clearing all three is the whole trick, and forgetting one fails silently.
+    """
+    settings = get_settings()
+    os.environ["ADMIN_DATABASE_URL"] = db_provision.with_database(
+        settings.admin_database_url, database
+    )
+    os.environ["DATABASE_URL"] = db_provision.with_database(settings.database_url, database)
+    get_settings.cache_clear()
+    app_engine.cache_clear()
+    privileged_engine.cache_clear()
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Give this run its own database, so nothing it does can touch shared state.
+
+    Falls back to the shared database (guarded by the advisory lock below) when provisioning is
+    unavailable -- no CREATE DATABASE privilege, an old server, or QV_TEST_SHARED_DB=1. The suite
+    must still run in a constrained environment; it just loses the isolation.
+    """
+    global _RUN_DATABASE, _RUN_ADMIN_URL
+    if os.environ.get("QV_TEST_SHARED_DB") == "1" or not _postgres_reachable():
+        return
+
+    admin_url = get_settings().admin_database_url
+    worker = getattr(config, "workerinput", {}).get("workerid", "main")  # xdist gives each its own
+    run_id = f"{worker}_{_uuid.uuid4().hex[:8]}"
+    try:
+        database = db_provision.create_run_database(admin_url, run_id)
+    except Exception as exc:  # noqa: BLE001 -- degrade to the shared database, do not abort
+        print(f"\n[conftest] per-run database unavailable ({exc}); using the shared one")
+        return
+
+    _RUN_ADMIN_URL, _RUN_DATABASE = admin_url, database
+    _rebind_to(database)
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Drop this run's database. Nothing to tidy inside it -- the whole thing goes."""
+    if _RUN_DATABASE is None or _RUN_ADMIN_URL is None:
+        return
+    app_engine.cache_clear()
+    privileged_engine.cache_clear()
+    db_provision.drop_database(_RUN_ADMIN_URL, _RUN_DATABASE)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -71,12 +131,14 @@ def _serialise_suite_runs(request: pytest.FixtureRequest, admin_engine: Engine) 
     per-run isolation (a database or schema per run) would be better still, but it is a much
     larger change and this closes the actual failure mode.
     """
-    # Take the lock only when integration tests will actually run. Two cases must not:
+    # Only needed when SHARING a database. With a per-run database (the normal path) nothing is
+    # shared, so there is nothing to serialise -- this is the fallback for constrained
+    # environments. Two further cases must not lock:
     #   * no database at all -- the unit-only CI job; connecting there errors the whole run.
     #   * a database, but only unit tests selected -- locking would make `pytest tests/unit`
     #     block behind someone else's long integration run for no reason.
     selected_integration = any("integration" in item.keywords for item in request.session.items)
-    if not selected_integration or not _postgres_reachable():
+    if _RUN_DATABASE is not None or not selected_integration or not _postgres_reachable():
         yield
         return
 

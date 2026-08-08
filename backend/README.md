@@ -55,6 +55,24 @@ lint-imports                            # bounded-context dependency DAG (backen
 
 A **forbidden cross-context import fails `lint-imports`** (and, via QV-003, fails CI).
 
+### Test database isolation
+
+Integration tests run against their **own database**, created per run — `pytest` never touches your
+dev data. It works because the application reads its connection from settings, so isolation needs
+only a URL swap:
+
+1. Migrations + grants + seed are applied once into `quantvista_tmpl_<fingerprint>`. The
+   fingerprint hashes the migration files and the seed, so the template rebuilds itself exactly
+   when the schema changes.
+2. Each run does `CREATE DATABASE quantvista_test_<id> TEMPLATE ...` — a file copy, well under a
+   second — then drops it at the end. With `pytest-xdist` each worker gets its own.
+
+Teardown is `DROP DATABASE`, so tests do not need to hand a shared database back intact.
+
+If `CREATE DATABASE` is unavailable, the suite falls back to the shared database guarded by a
+session advisory lock, so two concurrent runs serialise rather than deadlocking on partition DDL.
+Force that path with `QV_TEST_SHARED_DB=1`.
+
 ## Run in Docker (the local stack)
 
 The backend ships **one image, three roles** (`api`/`worker`/`beat`) selected by `command`:
