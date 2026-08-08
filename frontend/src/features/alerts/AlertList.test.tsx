@@ -1,11 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AlertRule } from "@/lib/api/queries";
 
 import { AlertList } from "./AlertList";
 
 const del = { mutate: vi.fn(), isPending: false };
+
+// the mock is module-level; without a reset, one test sees the previous test's calls
+beforeEach(() => del.mutate.mockReset());
 
 vi.mock("@/lib/api/queries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api/queries")>("@/lib/api/queries");
@@ -36,6 +39,16 @@ describe("AlertList", () => {
     expect(screen.getByText(/email/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /delete alert on DIXON/i }));
+    expect(del.mutate).not.toHaveBeenCalled(); // deleting a rule silently stops future alerts
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(del.mutate).toHaveBeenCalledWith("rule-1");
+  });
+
+  it("cancelling leaves the rule in place", () => {
+    render(<AlertList rules={[RULE]} />);
+    fireEvent.click(screen.getByRole("button", { name: /delete alert on DIXON/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(del.mutate).not.toHaveBeenCalled();
   });
 });

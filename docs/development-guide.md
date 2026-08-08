@@ -25,13 +25,50 @@ psql "$DATABASE_URL" -f seeds/seed_reference.sql   # idempotent reference seed
 - Each request/transaction sets `SET LOCAL app.tenant_id = '<uuid>'` before touching tenant tables.
 - Migrations are **forward-only in prod**; use **expand → backfill → contract** for zero-downtime
   changes. Never destructive in a single release.
-- Partition maintenance: schedule monthly `create_month_partition()` for `daily_prices`,
-  `technical_indicators`, `factor_values`, `scores` (or use pg_partman).
+- Partition maintenance is **automatic** (QV-104): the Beat-scheduled `quantvista.ensure_partitions`
+  keeps three months of monthly partitions ahead for every date-range-partitioned table, discovering
+  them from the catalog. Migrations create only the current + next month, so before QV-104 rows
+  silently fell into `_default` from month two — no error, just lost pruning.
+
+## Running the stack locally
+
+Two processes must be up, and **neither survives a reboot**. Both have silent failure modes that
+read as application bugs, so check them first when something looks broken:
+
+```bash
+# 1. API — the --reload flag is not optional
+cd backend && uvicorn quantvista.api.app:app --port 8000 --reload
+
+# 2. Worker — backtests are routed to the `user` queue
+cd backend && celery -A quantvista.jobs.celery_app worker -Q user --concurrency 2
+```
+
+| Symptom | Cause |
+|---|---|
+| A valid request 404s; the UI blames your inputs | `uvicorn` started **without `--reload`** is serving code from before a merged story. Check `lsof -nP -iTCP:8000 -sTCP:LISTEN` — two processes can both bind, and the one on `127.0.0.1` wins. |
+| A submitted backtest sits at `queued` forever | No worker on the **`user`** queue. Compare `redis-cli llen user` with `llen celery`. |
+| Every strategy metric reads `0.00%` while the benchmark looks fine | Derived data is missing. The benchmark is pure price maths and needs no indicators, which is why only one side zeroes out. |
+
+### Seeding a usable dataset
+
+```bash
+cd backend && python scripts/dev_backfill.py          # prices → indicators → factors → scores
+python scripts/dev_backfill.py --scores-last-day-only # faster; enough for /rankings only
+```
+
+Every step spans the **whole** window. Indicators are always backfilled in full because the backtest
+engine ranks off `technical_indicators` at every rebalance date — one day of indicators behind a year
+of prices produces a silently zeroed backtest (QV-105). If a date was computed earlier from partial
+data, the QV-015 ledger considers it done; use `backfill_indicators(..., force=True)` to repair it.
+
+Coverage is monitored rather than assumed: `data_coverage_gap_sessions` counts **trading sessions**
+that have prices but no derived rows, and alerts on it. Freshness cannot catch this — derived data
+can carry today's date and still be missing a year of history.
 
 ## Backend app — scaffolded (QV-001)
 
 - Importable package `quantvista` under `backend/src/quantvista/`, organised by bounded context:
-  `identity, market_data, news, analytics, portfolio, alerts, core` + `api, jobs, schemas, db`. Layer
+  `identity, market_data, news, analytics, portfolio, ml, alerts, core` + `api, jobs, schemas, db`. Layer
   concerns (`models/services/repositories`) live inside each context, not as shared top-level folders.
 - `import-linter` (`backend/.importlinter`, `root_package = quantvista`) enforces the module DAG —
   a forbidden cross-context import fails `lint-imports` (and CI via QV-003).

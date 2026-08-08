@@ -1,8 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/delete-button";
 import { type SavedScreen, useDeleteScreen, useSavedScreens } from "@/lib/api/queries";
 import type { ScreenCriteria } from "@/lib/screener";
 
@@ -34,16 +32,11 @@ export function SavedScreens({ onLoad }: SavedScreensProps) {
           >
             {screen.name}
           </button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Delete ${screen.name}`}
-            disabled={del.isPending}
-            onClick={() => del.mutate(screen.id)}
-          >
-            <Trash2 className="size-4 text-muted-foreground" />
-          </Button>
+          <DeleteButton
+            label={`Delete ${screen.name}`}
+            pending={del.isPending}
+            onConfirm={() => del.mutate(screen.id)}
+          />
         </li>
       ))}
     </ul>

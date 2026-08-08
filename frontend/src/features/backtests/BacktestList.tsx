@@ -1,8 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { useState } from "react";
-
+import { DeleteButton } from "@/components/delete-button";
 import type { BacktestListItem } from "@/lib/api/queries";
 import { cn } from "@/lib/utils";
 
@@ -29,15 +27,12 @@ export function BacktestList({
   onDelete?: (id: string) => void;
   deletingId?: string | null;
 }) {
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-
   if (items.length === 0) {
     return <p className="text-sm text-muted-foreground">No backtests yet.</p>;
   }
   return (
     <div className="divide-y divide-border rounded-lg border border-border">
       {items.map((b) => {
-        const isConfirming = confirmingId === b.id;
         const isDeleting = deletingId === b.id;
         return (
           <div
@@ -75,42 +70,12 @@ export function BacktestList({
               </span>
             </button>
 
-            {onDelete == null ? null : isConfirming ? (
-              <span className="flex shrink-0 items-center gap-1.5 text-xs">
-                <span className="text-muted-foreground">Delete?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmingId(null);
-                    onDelete(b.id);
-                  }}
-                  className="rounded-sm px-1.5 py-0.5 font-medium text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmingId(null)}
-                  className="rounded-sm px-1.5 py-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  Cancel
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                aria-label={`Delete backtest ${b.start} to ${b.end}`}
-                onClick={() => setConfirmingId(b.id)}
-                disabled={isDeleting}
-                className={cn(
-                  "shrink-0 rounded-md border border-border p-1.5 text-muted-foreground",
-                  "transition-colors hover:border-destructive/40 hover:text-destructive",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                )}
-              >
-                <Trash2 className="size-4" />
-              </button>
+            {onDelete == null ? null : (
+              <DeleteButton
+                label={`Delete backtest ${b.start} to ${b.end}`}
+                pending={isDeleting}
+                onConfirm={() => onDelete(b.id)}
+              />
             )}
           </div>
         );
